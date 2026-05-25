@@ -46,6 +46,12 @@ export function activate(ctx: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("hmm-code.sendSlash", (slash: string) => {
 			if (typeof slash === "string" && slash) provider.cyclePrompt(slash);
 		}),
+		// Restart the sidebar chat's Pi process. Used by the settings panel
+		// after auth changes — Pi caches AuthStorage in memory, so editing
+		// auth.json alone is invisible until the pi process is respawned.
+		vscode.commands.registerCommand("hmm-code.restartChat", () => {
+			provider.restart();
+		}),
 		vscode.commands.registerCommand("hmm-code.cycleMode", () => {
 			provider.cyclePrompt("/mode");
 		}),

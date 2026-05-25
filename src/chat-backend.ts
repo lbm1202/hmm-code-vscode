@@ -66,6 +66,15 @@ export interface ChatBackendOpts {
 export class ChatBackend {
 	private client: PiClient | undefined;
 	private disposed = false;
+	private cwd: string | undefined;
+	/** Cache of get_available_models latest response — populated whenever the
+	 *  sidebar/panel pulls models. Settings panel reads this via the static
+	 *  accessor to populate provider/model dropdowns without needing its own
+	 *  Pi connection. */
+	private static _cachedModels: ModelEntry[] = [];
+	static cachedModels(): ModelEntry[] {
+		return ChatBackend._cachedModels;
+	}
 
 	constructor(
 		private readonly webview: vscode.Webview,
@@ -82,6 +91,7 @@ export class ChatBackend {
 
 	start(cwd: string | undefined): void {
 		if (this.client || this.disposed) return;
+		this.cwd = cwd;
 		const c = new PiClient();
 		c.on("event", (ev: RpcEvent) => {
 			// Side-channel: Pi emits session_info_changed when setSessionName is
@@ -131,6 +141,24 @@ export class ChatBackend {
 		this.disposed = true;
 		this.client?.stop();
 		this.client = undefined;
+	}
+
+	/** Tear down the live Pi process and spawn a fresh one. Used by the
+	 *  settings panel after auth changes — Pi's `ctx.reload()` doesn't
+	 *  refresh AuthStorage, so a full process restart is the reliable
+	 *  way to pick up auth.json edits (e.g. removing openai-codex).
+	 *  The webview's persisted lastSessionFile triggers auto switch_session
+	 *  on the new ready event, so the user lands back on the same chat. */
+	restart(): void {
+		if (this.disposed) return;
+		this.client?.stop();
+		this.client = undefined;
+		// Tiny delay so the previous process fully exits before we spawn
+		// the next one (avoids transient log noise from overlapping starts).
+		setTimeout(() => {
+			if (this.disposed) return;
+			this.start(this.cwd);
+		}, 100);
 	}
 
 	abort(): void {
@@ -303,7 +331,9 @@ export class ChatBackend {
 						// compat) so the webview can compute supported thinking levels
 						// even when state.model is incomplete.
 						const data = res.data as { models?: any[] };
-						this.post({ kind: TO_WEBVIEW.MODELS, models: (data.models ?? []) as any[] });
+						const models = (data.models ?? []) as ModelEntry[];
+						ChatBackend._cachedModels = models;
+						this.post({ kind: TO_WEBVIEW.MODELS, models });
 					}
 				} catch (err) {
 					this.post({

@@ -36,4 +36,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	abort(): void {
 		this.backend?.abort();
 	}
+	restart(): void {
+		this.backend?.restart();
+	}
 }

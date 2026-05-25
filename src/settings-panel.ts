@@ -15,6 +15,7 @@ import * as vscode from "vscode";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { ChatBackend } from "./chat-backend";
 import { codexOAuthLogin } from "./oauth-codex";
 
 const VIEW_TYPE = "hmm-code.settingsPanel";
@@ -115,6 +116,13 @@ export class SettingsPanel {
 				}
 			}
 		}
+		// Built-in + custom models known to the live Pi process (cached
+		// whenever the sidebar pulls get_available_models). Used to populate
+		// the mode-config dropdowns so the user only sees real choices.
+		const availableModels = ChatBackend.cachedModels().map((m: any) => ({
+			provider: String(m.provider ?? ""),
+			id: String(m.id ?? ""),
+		}));
 		return {
 			modesPath: MODES_PATH,
 			modelsPath: MODELS_PATH,
@@ -123,6 +131,7 @@ export class SettingsPanel {
 			modes,
 			auth: authSafe,
 			models,
+			availableModels,
 			oauthProviders: OAUTH_PROVIDERS,
 			apiTypes: API_TYPES,
 		};
@@ -191,11 +200,12 @@ export class SettingsPanel {
 					mkdirSync(dirname(AUTH_PATH), { recursive: true, mode: 0o700 });
 					writeFileSync(AUTH_PATH, JSON.stringify(raw, null, 2), "utf-8");
 					try { chmodSync(AUTH_PATH, 0o600); } catch { /* non-POSIX */ }
-					vscode.commands.executeCommand("hmm-code.sendSlash", "/reload-runtime");
+					// Full pi restart so AuthStorage picks up the new oauth entry
+					vscode.commands.executeCommand("hmm-code.restartChat");
 					panel.webview.postMessage({
 						kind: "codex-status",
 						state: "success",
-						message: "openai-codex 인증 저장됨. 새 채팅에서 사용 가능합니다.",
+						message: "openai-codex 인증 저장됨 + 채팅 재시작.",
 					});
 					SettingsPanel.refresh(panel);
 				} catch (err) {
@@ -227,15 +237,26 @@ export class SettingsPanel {
 					SettingsPanel.writeModes(derived, msg.modeConfigs ?? {});
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
-				if (msg.authAdds || msg.authRemoves) {
+				const authChanged =
+					(msg.authAdds && Object.keys(msg.authAdds).length > 0) ||
+					(msg.authRemoves && msg.authRemoves.length > 0);
+				if (authChanged) {
 					SettingsPanel.writeAuth(msg.authAdds ?? {}, msg.authRemoves ?? []);
 					out.push("auth.json");
 				}
 				if (out.length > 0) {
-					vscode.commands.executeCommand("hmm-code.sendSlash", "/reload-runtime");
+					// Pi caches AuthStorage in memory and ctx.reload() doesn't
+					// re-read auth.json — auth changes need a full process
+					// restart. For modes/models-only changes, /reload-runtime
+					// suffices (extension hooks re-run on session_start).
+					if (authChanged) {
+						vscode.commands.executeCommand("hmm-code.restartChat");
+					} else {
+						vscode.commands.executeCommand("hmm-code.sendSlash", "/reload-runtime");
+					}
 				}
 				SettingsPanel.refresh(panel);
-				panel.webview.postMessage({ kind: "saved", files: out });
+				panel.webview.postMessage({ kind: "saved", files: out, restarted: authChanged });
 				return;
 			}
 			case "discover-models": {
@@ -611,6 +632,7 @@ th {
 	border-color: var(--vscode-focusBorder);
 	background: color-mix(in srgb, var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)) 6%, transparent);
 }
+.mode-card > select { width: 100%; }
 .mode-name { font-weight: 600; font-size: 13px; }
 .mode-name.plan { color: rgb(120, 170, 255); }
 .mode-name.code { color: var(--vscode-foreground); }
@@ -864,29 +886,80 @@ function updateSaveBar() {
 	document.getElementById('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
 }
 
+// Build a {provider: [id, ...]} index from live availableModels (cached from
+// Pi's get_available_models). Used to constrain the mode dropdowns to real
+// choices. Fallback: if Pi hasn't responded yet, both selects show only the
+// current draft value so the user isn't blocked.
+function buildProviderIndex() {
+	const map = new Map();
+	const list = (diskState && diskState.availableModels) || [];
+	for (const m of list) {
+		if (!m.provider || !m.id) continue;
+		if (!map.has(m.provider)) map.set(m.provider, []);
+		map.get(m.provider).push(m.id);
+	}
+	for (const ids of map.values()) ids.sort((a, b) => a.localeCompare(b));
+	return map;
+}
+
+function providerOptionsHtml(currentValue, providerIndex) {
+	const opts = [...providerIndex.keys()].sort();
+	// Ensure the current draft value is selectable even if Pi doesn't know
+	// about it yet (e.g. user typed a provider name that hasn't been
+	// registered or the get_available_models response hasn't arrived).
+	if (currentValue && !providerIndex.has(currentValue)) opts.unshift(currentValue);
+	const parts = ['<option value="">(default)</option>'];
+	for (const p of opts) {
+		const sel = p === currentValue ? ' selected' : '';
+		parts.push('<option value="' + esc(p) + '"' + sel + '>' + esc(p) + '</option>');
+	}
+	return parts.join('');
+}
+
+function modelOptionsHtml(currentValue, provider, providerIndex) {
+	const ids = (provider && providerIndex.get(provider)) || [];
+	const present = ids.slice();
+	if (currentValue && !present.includes(currentValue)) present.unshift(currentValue);
+	const parts = ['<option value="">(default)</option>'];
+	for (const id of present) {
+		const sel = id === currentValue ? ' selected' : '';
+		parts.push('<option value="' + esc(id) + '"' + sel + '>' + esc(id) + '</option>');
+	}
+	return parts.join('');
+}
+
 function renderModes() {
 	const root = document.getElementById('mode-cards');
 	root.innerHTML = '';
+	const providerIndex = buildProviderIndex();
 	for (const name of MODE_NAMES) {
 		const draft = modesDraft[name];
 		const card = document.createElement('div');
 		card.className = 'mode-card' + (modeDirty(name) ? ' dirty' : '');
+		card.dataset.mode = name;
 		card.innerHTML =
 			'<div class="mode-name ' + name + '">' + name + '</div>' +
-			'<input type="text" placeholder="provider (e.g. openai-codex)" value="' + esc(draft.provider) + '" data-mode="' + name + '" data-field="provider" />' +
-			'<input type="text" placeholder="id (e.g. gpt-5.5)" value="' + esc(draft.id) + '" data-mode="' + name + '" data-field="id" />' +
+			'<select data-mode="' + name + '" data-field="provider">' + providerOptionsHtml(draft.provider, providerIndex) + '</select>' +
+			'<select data-mode="' + name + '" data-field="id">' + modelOptionsHtml(draft.id, draft.provider, providerIndex) + '</select>' +
 			'<select data-mode="' + name + '" data-field="thinking">' + THINKING_HTML + '</select>';
 		root.appendChild(card);
-		card.querySelector('select').value = draft.thinking;
+		card.querySelector('select[data-field="thinking"]').value = draft.thinking;
 	}
-	root.querySelectorAll('input, select').forEach((el) => {
-		el.addEventListener('input', () => {
+	root.querySelectorAll('select').forEach((el) => {
+		el.addEventListener('change', () => {
 			const name = el.getAttribute('data-mode');
 			const field = el.getAttribute('data-field');
 			if (!name || !field || !modesDraft[name]) return;
 			modesDraft[name][field] = el.value;
-			const card = el.closest('.mode-card');
-			if (card) card.classList.toggle('dirty', modeDirty(name));
+			// Changing provider invalidates the model selection — re-render
+			// the card so the model dropdown shows the new provider's ids.
+			if (field === 'provider') {
+				modesDraft[name].id = '';
+				renderModes();
+			} else {
+				const card = el.closest('.mode-card');
+				if (card) card.classList.toggle('dirty', modeDirty(name));
+			}
 			updateSaveBar();
 		});
 	});
