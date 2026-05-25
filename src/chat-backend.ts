@@ -10,6 +10,7 @@ import {
 	TO_WEBVIEW,
 } from "./protocol";
 import {
+	collectCascade,
 	deleteSession,
 	listSessions,
 	renameSession,
@@ -410,18 +411,26 @@ export class ChatBackend {
 				await this.refreshSessions();
 				return;
 			case FROM_WEBVIEW.DELETE_SESSION: {
-				// If the file being deleted is the one Pi is actively writing
-				// to, spin up a new session FIRST so Pi releases the file
-				// handle. Otherwise the chat tab would be left showing a
-				// session that no longer exists on disk and Pi would keep
-				// trying to append to the deleted path.
+				// If the file being deleted (or any of its descendants — delete
+				// cascades through the parent→child tree) is the one Pi is
+				// actively writing to, spin up a new session FIRST so Pi
+				// releases the file handle. Otherwise the chat tab would be
+				// left showing a session that no longer exists on disk and
+				// Pi would keep trying to append to the deleted path.
 				let isCurrent = false;
 				if (client) {
 					try {
 						const stateRes = await client.send({ type: "get_state" });
 						if (stateRes.success) {
 							const f = (stateRes.data as { sessionFile?: string })?.sessionFile;
-							if (typeof f === "string" && f === raw.file) isCurrent = true;
+							if (typeof f === "string") {
+								// Treat as "current is being deleted" whenever the active
+								// session is in the cascade set — covers the case where the
+								// user deletes an ancestor and cascade wipes the active
+								// child too.
+								const cascade = collectCascade(raw.file, this.workspaceCwd());
+								if (cascade.has(f)) isCurrent = true;
+							}
 						}
 					} catch {
 						/* probe failure isn't fatal — fall through to delete */

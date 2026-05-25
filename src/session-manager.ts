@@ -108,8 +108,11 @@ export function listSessions(cwd: string): SessionEntry[] {
 	return out;
 }
 
-/** Delete a session and all descendants (BFS via parentFile pointer). */
-export function deleteSession(file: string, cwd: string): void {
+/** Compute the cascade set for `file` — the file itself plus every
+ *  descendant (transitive children via parentFile). Returned as a Set
+ *  so callers can do O(1) membership tests (e.g. "is the active session
+ *  about to be wiped?"). */
+export function collectCascade(file: string, cwd: string): Set<string> {
 	const all = listSessions(cwd);
 	const childrenOf = new Map<string, string[]>();
 	for (const s of all) {
@@ -118,13 +121,20 @@ export function deleteSession(file: string, cwd: string): void {
 		list.push(s.file);
 		childrenOf.set(s.parentFile, list);
 	}
-	const toDelete: string[] = [];
+	const set = new Set<string>();
 	const queue: string[] = [file];
 	while (queue.length > 0) {
 		const f = queue.shift()!;
-		toDelete.push(f);
+		if (set.has(f)) continue;
+		set.add(f);
 		for (const k of childrenOf.get(f) ?? []) queue.push(k);
 	}
+	return set;
+}
+
+/** Delete a session and all descendants (BFS via parentFile pointer). */
+export function deleteSession(file: string, cwd: string): void {
+	const toDelete = [...collectCascade(file, cwd)];
 
 	const namesPath = sidecarPath(file);
 	const namesMap = existsSync(namesPath) ? readNamesMap(namesPath) : undefined;
