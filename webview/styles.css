@@ -425,6 +425,11 @@ html, body {
 	color: var(--vscode-foreground);
 	border-top: 1px dashed var(--vscode-panel-border);
 	padding-top: 8px;
+	/* Bubble container sets white-space: pre-wrap, which would make every
+	 * newline between marked-emitted block elements (e.g. </li>\n<li>) show
+	 * up as a visible blank line. Override to normal so list/heading spacing
+	 * comes from CSS margins instead of literal whitespace. */
+	white-space: normal;
 }
 .plan-preview .plan-body > :first-child { margin-top: 0; }
 .plan-preview .plan-body > :last-child { margin-bottom: 0; }
@@ -439,12 +444,36 @@ html, body {
 	margin: 10px 0 4px 0;
 	color: var(--vscode-descriptionForeground);
 }
+.plan-preview .plan-body ul,
+.plan-preview .plan-body ol {
+	margin: 4px 0;
+	padding-left: 22px;
+}
+.plan-preview .plan-body li {
+	margin: 2px 0;
+	line-height: 1.55;
+}
+.plan-preview .plan-body p {
+	margin: 6px 0;
+}
 .plan-preview .plan-body pre {
 	background: var(--vscode-textBlockQuote-background);
 	padding: 8px 10px;
 	border-radius: 4px;
 	overflow-x: auto;
 	font-size: 12px;
+	white-space: pre-wrap; /* explicit — code blocks need whitespace preserved */
+}
+.plan-preview .plan-body code {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 0.9em;
+	background: var(--vscode-textBlockQuote-background);
+	padding: 1px 4px;
+	border-radius: 3px;
+}
+.plan-preview .plan-body pre code {
+	padding: 0;
+	background: transparent;
 }
 .plan-preview .plan-section-label {
 	font-size: 10px;
