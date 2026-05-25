@@ -154,3 +154,29 @@ export function highlightLine(line: string, lang: string | undefined): string {
 		return escapeHtml(line);
 	}
 }
+
+/** Highlight a multi-line block as one tokenization pass so cross-line
+ *  context (multi-line strings, block comments, here-docs) is preserved.
+ *  Each token row is joined with "\n" so the result drops into a <pre>
+ *  without further structural markup. */
+export function highlightBlock(text: string, lang: string | undefined): string {
+	if (!cached || !lang) return escapeHtml(text);
+	try {
+		const tokens = cached.codeToTokensBase(text, {
+			lang: lang as any,
+			theme: THEME_NAME,
+		});
+		return tokens
+			.map((line) =>
+				line
+					.map((t) => {
+						const style = t.color ? ` style="color:${escapeAttr(t.color)}"` : "";
+						return `<span${style}>${escapeHtml(t.content)}</span>`;
+					})
+					.join(""),
+			)
+			.join("\n");
+	} catch {
+		return escapeHtml(text);
+	}
+}

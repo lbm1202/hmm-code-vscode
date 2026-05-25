@@ -4,7 +4,7 @@
 // raw JSON envelope.
 
 import { cssEscape, escapeHtml, safeStringify, summarizeArgs } from "./helpers";
-import { highlightLine, langFromPath } from "./syntax";
+import { highlightBlock, highlightLine, langFromPath } from "./syntax";
 import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
 
 /** Tools whose primary UX is a question card. Pretty-render their result block. */
@@ -447,7 +447,21 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 	const existing = block.querySelector<HTMLPreElement>(".tool-result-streaming");
 	const pre = existing ?? document.createElement("pre");
 	pre.className = ok ? "tool-result" : "tool-result tool-result-err";
-	pre.textContent = text;
+	// Special path: read tool success → syntax highlight the file content via
+	// Shiki. Path lives on the summary's file-link element (we added it for
+	// Ctrl/Cmd-click). Falls back to plain textContent if no path, no
+	// supported language, or Shiki not ready yet.
+	let usedHighlight = false;
+	if (ok && toolName === "read") {
+		const link = block.querySelector(".file-link");
+		const filePath = link?.getAttribute("data-file-path") ?? undefined;
+		const lang = langFromPath(filePath);
+		if (lang) {
+			pre.innerHTML = highlightBlock(text, lang);
+			usedHighlight = true;
+		}
+	}
+	if (!usedHighlight) pre.textContent = text;
 	if (!existing) block.appendChild(pre);
 	const lineCount = text === "" ? 0 : text.split("\n").length;
 	if (lineCount > 1) {
