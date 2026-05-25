@@ -120,10 +120,43 @@ export class ChatBackend {
 	}
 	/** Broadcast `/reload-runtime` to every live Pi process. Used by the
 	 *  settings panel after modes/models changes — extension hooks re-read
-	 *  modes.json on `ctx.reload()`. Keeps Pi processes alive (no in-flight
-	 *  session disruption), unlike `restartAll`. */
+	 *  modes.json on `ctx.reload()`, and our session_start(reason="reload")
+	 *  handler refreshes the modelRegistry so models.json edits show up.
+	 *  Keeps Pi processes alive (no in-flight session disruption), unlike
+	 *  `restartAll`. */
 	static reloadAll(): void {
-		for (const b of ChatBackend._live) b.prompt("/reload-runtime");
+		for (const b of ChatBackend._live) {
+			b.prompt("/reload-runtime");
+			// Pi processes the slash asynchronously; reload is usually
+			// sub-second. Schedule a model re-pull to refresh the picker's
+			// cached availableModels (modes.json:modelAliases re-attached
+			// inside the REQUEST_MODELS handler).
+			b.scheduleModelRefresh(800);
+		}
+	}
+
+	private modelRefreshTimer: NodeJS.Timeout | undefined;
+	private scheduleModelRefresh(delayMs: number): void {
+		if (this.modelRefreshTimer) clearTimeout(this.modelRefreshTimer);
+		this.modelRefreshTimer = setTimeout(async () => {
+			this.modelRefreshTimer = undefined;
+			if (this.disposed || !this.client) return;
+			try {
+				const res = await this.client.send({ type: "get_available_models" });
+				if (!res.success) return;
+				const data = res.data as { models?: any[] };
+				const raw = (data.models ?? []) as ModelEntry[];
+				const aliases = readModelAliases();
+				const models = raw.map((m) => {
+					const alias = findAlias(aliases, m.provider, m.id);
+					return alias ? { ...m, alias } : m;
+				});
+				ChatBackend._cachedModels = models;
+				this.post({ kind: TO_WEBVIEW.MODELS, models });
+			} catch (err) {
+				console.error("[hmm-code:chat-backend] post-reload model refresh failed:", err);
+			}
+		}, delayMs);
 	}
 
 	constructor(
@@ -190,6 +223,10 @@ export class ChatBackend {
 
 	dispose(): void {
 		this.disposed = true;
+		if (this.modelRefreshTimer) {
+			clearTimeout(this.modelRefreshTimer);
+			this.modelRefreshTimer = undefined;
+		}
 		this.client?.stop();
 		this.client = undefined;
 		ChatBackend._live.delete(this);
