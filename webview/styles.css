@@ -931,10 +931,10 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 }
 
 .modal-wide { min-width: min(560px, 90vw); }
-.session-tree { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.session-tree .session-row { gap: 4px; align-items: stretch; }
+.session-tree { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .session-caret {
 	width: 22px;
+	flex: 0 0 22px;
 	background: transparent;
 	border: none;
 	color: var(--vscode-descriptionForeground);
@@ -947,10 +947,10 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 .session-kid-count {
 	color: var(--vscode-descriptionForeground);
 	font-size: 11px;
-	margin-left: 6px;
 }
 .session-iconbtn.primary {
 	width: auto;
+	min-width: 48px;
 	padding: 4px 10px;
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
@@ -959,17 +959,27 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 .session-iconbtn.primary:hover { background: var(--vscode-button-hoverBackground); }
 
 .session-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+
+/* Row layout:
+ *   [caret] [title-button (flex:1, min-width:0)] [actions (no shrink)]
+ *
+ * flex-wrap lets the actions group drop to a second line once the title
+ * can't keep its min-width — handles narrow sidebars (<~360px) gracefully
+ * instead of squeezing every word into a single column.
+ */
 .session-row {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: stretch;
 	gap: 4px;
+	row-gap: 4px;
 }
 .session-item {
-	flex: 1;
+	flex: 1 1 200px;
+	min-width: 0; /* allow text-overflow: ellipsis to actually clip */
 	display: flex;
-	justify-content: space-between;
 	align-items: center;
-	gap: 12px;
+	gap: 8px;
 	padding: 8px 12px;
 	font-family: var(--vscode-editor-font-family);
 	font-size: 12px;
@@ -979,12 +989,31 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 4px;
 	cursor: pointer;
+	overflow: hidden;
 }
 .session-item:hover { background: var(--vscode-list-hoverBackground); }
-.session-time { font-weight: 500; }
-.session-id { font-size: 11px; color: var(--vscode-descriptionForeground); }
+.session-time {
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+.session-id {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	flex: 0 0 auto;
+}
+.session-actions {
+	display: flex;
+	gap: 4px;
+	flex: 0 0 auto;
+	margin-left: auto;
+}
 .session-iconbtn {
 	width: 30px;
+	flex: 0 0 30px;
 	background: var(--vscode-editor-background);
 	color: var(--vscode-foreground);
 	border: 1px solid var(--vscode-panel-border);
@@ -996,6 +1025,12 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 .session-iconbtn.danger:hover {
 	background: var(--vscode-errorForeground, #f48771);
 	color: var(--vscode-button-foreground);
+}
+
+/* Under ~340px (= sidebar typical narrow) the id sublabel is the first
+ * thing to disappear — it's just metadata, not actionable. */
+@media (max-width: 340px) {
+	.session-id { display: none; }
 }
 
 #prompt-input.disabled,

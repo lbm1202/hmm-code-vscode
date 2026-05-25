@@ -83,6 +83,9 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 			const label = sessionLabel(s);
 			const idShort = s.name.split("_")[1]?.slice(0, 6) ?? "";
 			const kidCount = hasKids ? `<span class="session-kid-count">(${kids.length})</span>` : "";
+			// Title-bar layout: title on the left, then kid count, then id. We
+			// keep them in flow order (no space-between) so spacing stays even
+			// regardless of row width. ID truncates first when space is tight.
 			titleBtn.innerHTML =
 				`<span class="session-time">${escapeHtml(label)}</span>` +
 				kidCount +
@@ -97,6 +100,12 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 			});
 			row.appendChild(titleBtn);
 
+			// Actions wrapper so the action buttons stay together as a unit
+			// when the row wraps in narrow widths (sidebar < ~360px).
+			const actions = document.createElement("div");
+			actions.className = "session-actions";
+			row.appendChild(actions);
+
 			const goBtn = document.createElement("button");
 			goBtn.className = "session-iconbtn primary";
 			goBtn.textContent = "이동";
@@ -109,7 +118,7 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 					command: { type: "switch_session", sessionPath: s.file },
 				});
 			});
-			row.appendChild(goBtn);
+			actions.appendChild(goBtn);
 
 			const renameBtn = document.createElement("button");
 			renameBtn.className = "session-iconbtn";
@@ -125,7 +134,7 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 					console.error("[hmm-code:session-picker] rename failed:", err);
 				}
 			});
-			row.appendChild(renameBtn);
+			actions.appendChild(renameBtn);
 
 			const delBtn = document.createElement("button");
 			delBtn.className = "session-iconbtn danger";
@@ -152,7 +161,7 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 					console.error("[hmm-code:session-picker] delete failed:", err);
 				}
 			});
-			row.appendChild(delBtn);
+			actions.appendChild(delBtn);
 
 			list.appendChild(row);
 
