@@ -67,6 +67,8 @@ export const ui = {
 	availableThinking: [] as string[],
 	sessions: [] as SessionEntry[],
 	hasMessages: false,
+	/** Mirror of Pi's setStatus("auto-approve", "on"|"off"). Session-scoped. */
+	autoApprove: false,
 };
 
 /** Per-session UI flags. */

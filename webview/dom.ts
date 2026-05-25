@@ -45,6 +45,7 @@ const APP_HTML = `
 				<button class="picker" id="picker-model"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
 				<button class="picker" id="picker-thinking"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
 				<button class="picker hidden" id="btn-reset" title="모드 기본값으로 모델/추론 재설정">↺ 기본값</button>
+				<button class="picker autoapprove off" id="btn-autoapprove" title="권한 ask 자동승인 토글 (세션 한정)">🔒 Auto</button>
 			</div>
 			<div class="footer-right">
 				<span class="ctx-pill" id="ctx-pill">ctx —</span>
@@ -75,6 +76,7 @@ export interface DomRefs {
 	btnSessions: HTMLElement;
 	btnSettings: HTMLElement;
 	btnReset: HTMLElement;
+	btnAutoApprove: HTMLElement;
 }
 
 /** Mounts the app scaffold into #app and returns refs to all interactive nodes. */
@@ -102,6 +104,7 @@ export function mountDom(root: HTMLElement): DomRefs {
 		btnSessions: document.getElementById("btn-sessions")!,
 		btnSettings: document.getElementById("btn-settings")!,
 		btnReset: document.getElementById("btn-reset")!,
+		btnAutoApprove: document.getElementById("btn-autoapprove")!,
 	};
 }
 

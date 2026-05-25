@@ -228,6 +228,15 @@ function handleSetStatus(key: string, value: string): void {
 	} else if (key === STATUS_KEYS.OVERRIDDEN) {
 		runtime.isOverridden = value === "1";
 		updateResetVisibility();
+	} else if (key === STATUS_KEYS.AUTO_APPROVE) {
+		ui.autoApprove = value === "on" || value === "true" || value === "1";
+		const btn = e.btnAutoApprove;
+		btn.classList.toggle("on", ui.autoApprove);
+		btn.classList.toggle("off", !ui.autoApprove);
+		btn.textContent = ui.autoApprove ? "🔓 Auto" : "🔒 Auto";
+		btn.title = ui.autoApprove
+			? "권한 ask 자동승인 켜짐 — 클릭해서 끄기"
+			: "권한 ask 자동승인 꺼짐 — 클릭해서 켜기";
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
 		e.ctxPill.textContent = `ctx ${value}`;

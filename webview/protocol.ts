@@ -31,6 +31,8 @@ export const FROM_WEBVIEW = {
 	OPEN_SETTINGS: "open-settings",
 	/** Ctrl/Cmd-click on a file path in a tool summary/header → open in editor. */
 	OPEN_FILE: "open-file",
+	/** Inline slash — host forwards to Pi without echoing to chat. */
+	SLASH: "slash",
 } as const;
 
 export const STATUS_KEYS = {
@@ -41,6 +43,7 @@ export const STATUS_KEYS = {
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
 	TODOS: "todos",
+	AUTO_APPROVE: "auto-approve",
 } as const;
 
 export const PI_EVENT = {

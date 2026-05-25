@@ -707,6 +707,17 @@ body.mod-down .file-link:hover {
 	opacity: 0.6;
 }
 
+/* Auto-approve toggle: muted when off, accent-color border + glow when on
+ * so the user is reminded the permission ask layer is bypassed. */
+.picker.autoapprove.on {
+	color: var(--vscode-charts-orange, #ff9966);
+	border-color: var(--vscode-charts-orange, #ff9966);
+	box-shadow: 0 0 0 1px var(--vscode-charts-orange, #ff9966) inset;
+}
+.picker.autoapprove.off {
+	opacity: 0.85;
+}
+
 .footer-right {
 	display: flex;
 	align-items: center;

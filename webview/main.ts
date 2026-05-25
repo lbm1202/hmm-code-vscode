@@ -37,6 +37,14 @@ e.btnSettings.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.OPEN_SETTINGS });
 });
 
+// Auto-approve toggle — sends /auto-approve via the SLASH channel so the
+// command runs Pi-side without appending a user bubble. Pi extension flips
+// state.autoApprove and broadcasts setStatus("auto-approve", "on"|"off")
+// back, which dispatch.ts handler renders on the button.
+e.btnAutoApprove.addEventListener("click", () => {
+	post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve" });
+});
+
 setEmptyVisibility();
 
 // Ctrl/Cmd-click on a `.file-link` (rendered by tool summaries + edit-diff

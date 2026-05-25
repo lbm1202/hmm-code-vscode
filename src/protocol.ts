@@ -37,6 +37,10 @@ export const FROM_WEBVIEW = {
 	/** Ctrl/Cmd-click on a file path in a tool summary/header. Host opens
 	 *  the file in the editor area (no-op for non-existent paths). */
 	OPEN_FILE: "open-file",
+	/** Inline slash command — bypasses the user-message echo path so a
+	 *  button click doesn't litter the chat with /commands. Host forwards
+	 *  directly to Pi via prompt/no-reply. */
+	SLASH: "slash",
 } as const;
 export type FromWebviewKind = (typeof FROM_WEBVIEW)[keyof typeof FROM_WEBVIEW];
 
@@ -48,6 +52,7 @@ export const STATUS_KEYS = {
 	OVERRIDDEN: "overridden",
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
+	AUTO_APPROVE: "auto-approve",
 	TODOS: "todos",
 } as const;
 

@@ -117,7 +117,8 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
-	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string };
+	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
+	| { kind: typeof FROM_WEBVIEW.SLASH; text: string };
 
 export interface ChatBackendOpts {
 	/** Fires when Pi reports a session name change (initial load or rename). */
@@ -432,6 +433,9 @@ export class ChatBackend {
 				return;
 			case FROM_WEBVIEW.OPEN_SETTINGS:
 				vscode.commands.executeCommand("hmm-code.openSettings");
+				return;
+			case FROM_WEBVIEW.SLASH:
+				if (typeof raw.text === "string" && raw.text) this.prompt(raw.text);
 				return;
 			case FROM_WEBVIEW.OPEN_FILE: {
 				// Ctrl/Cmd-click on a file path in a tool summary. Resolve
