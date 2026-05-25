@@ -21,7 +21,7 @@ extension [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) (위치:
 | **read 결과 highlight** | 파일 경로 추정 → Shiki 전체 블록 토큰화 |
 | **Ctrl/Cmd-click on file path** | 도구 호출의 파일 경로 → 편집기로 열기 |
 | **Auto-approve 토글** | 권한 ask 자동 통과 (인라인 버튼, 세션 한정) |
-| **권한 confirm modal** | Pi 의 `ctx.ui.confirm` → webview modal — Pi 의 permission 시스템 ([PERMISSIONS.md](https://github.com/lbm1202/hmm-code-pi/blob/main/PERMISSIONS.md)) UI surface |
+| **권한 confirm modal** | Pi 의 `ctx.ui.confirm` → webview modal — Pi 의 permission 시스템 ([PERMISSIONS.md](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/PERMISSIONS.md)) UI surface |
 | **설정 패널** | 모드/모델/필터/인증/커스텀 공급자 — 별도 편집기 탭 |
 | **세션 picker** | 부모-자식 트리 + 이름변경 + cascade 삭제. 활성 세션 삭제 시 자동 새 세션 |
 | **자동 제목** | 첫 메시지 페어 후 GPT-mini 로 세션 제목 생성 (Pi 확장) |
@@ -32,14 +32,14 @@ extension [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) (위치:
 
 | 문서 | 내용 |
 |---|---|
-| [USER_GUIDE.md](USER_GUIDE.md) | 모든 UI 기능 walkthrough |
-| [SETTINGS.md](SETTINGS.md) | 설정 패널 상세 |
-| [ANALYSIS.md](ANALYSIS.md) | 파일별 deep-dive + 아키텍처 결정 |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 모든 UI 기능 walkthrough |
+| [docs/SETTINGS.md](docs/SETTINGS.md) | 설정 패널 상세 |
+| [docs/ANALYSIS.md](docs/ANALYSIS.md) | 파일별 deep-dive + 아키텍처 결정 |
 
 Pi 확장 쪽 워크플로우 / 권한 / AGENTS.md 문서:
-- [hmm-code-pi WORKFLOW](https://github.com/lbm1202/hmm-code-pi/blob/main/WORKFLOW.md)
-- [hmm-code-pi PERMISSIONS](https://github.com/lbm1202/hmm-code-pi/blob/main/PERMISSIONS.md)
-- [hmm-code-pi AGENTS-md](https://github.com/lbm1202/hmm-code-pi/blob/main/AGENTS-md.md)
+- [hmm-code-pi WORKFLOW](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/WORKFLOW.md)
+- [hmm-code-pi PERMISSIONS](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/PERMISSIONS.md)
+- [hmm-code-pi AGENTS-MD](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/AGENTS-MD.md)
 
 ---
 
@@ -132,7 +132,7 @@ VS Code UI 를 제공.
 - 공급자 인증 (API key 인라인 + Codex OAuth)
 - 커스텀 공급자 (vLLM/Ollama 등) + 모델 자동 발견
 - 저장 시 자동 reload (auth → restartAll, modes/models → reloadAll)
-- 자세히: [SETTINGS.md](SETTINGS.md)
+- 자세히: [docs/SETTINGS.md](docs/SETTINGS.md)
 
 ### Permission system integration
 - Pi 의 `tool_call` 훅이 `ctx.ui.confirm` 호출 → webview modal 띄움
@@ -141,7 +141,7 @@ VS Code UI 를 제공.
   - 응답 도중에도 즉시 적용 (Pi 의 slash command 는 streaming 중에도
     queue 없이 실행됨)
   - 세션 한정 (새 세션마다 OFF)
-- Pi 의 권한 룰 자체는 [hmm-code-pi PERMISSIONS](https://github.com/lbm1202/hmm-code-pi/blob/main/PERMISSIONS.md)
+- Pi 의 권한 룰 자체는 [hmm-code-pi PERMISSIONS](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/PERMISSIONS.md)
   참조
 
 ### Branding
@@ -242,7 +242,7 @@ media/
   logo.svg            (예비 — 빈 상태는 dom.ts 의 inline SVG)
 ```
 
-자세히는 [`ANALYSIS.md`](ANALYSIS.md).
+자세히는 [`docs/ANALYSIS.md`](docs/ANALYSIS.md).
 
 ---
 

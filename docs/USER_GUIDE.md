@@ -4,9 +4,9 @@ VS Code 확장의 모든 UI 기능 walkthrough.
 
 > 기능 자체의 의미 / 워크플로우는 자매 repo
 > [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) 의 문서 참조:
-> - [Workflow](https://github.com/lbm1202/hmm-code-pi/blob/main/WORKFLOW.md)
-> - [Permissions](https://github.com/lbm1202/hmm-code-pi/blob/main/PERMISSIONS.md)
-> - [AGENTS.md](https://github.com/lbm1202/hmm-code-pi/blob/main/AGENTS-md.md)
+> - [Workflow](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/WORKFLOW.md)
+> - [Permissions](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/PERMISSIONS.md)
+> - [AGENTS.md](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/AGENTS-MD.md)
 >
 > 이 문서는 그것들을 "VS Code 안에서 어떻게 쓰느냐" 만 다룸.
 
