@@ -377,9 +377,12 @@ html, body {
 	color: var(--vscode-descriptionForeground);
 }
 
-/* finalize_plan tool-call body preview — shows summary + steps + target
- * mode WHILE the 3-option dialog is open, so the user can read the plan
- * before committing to "new session / current session / revise". */
+/* finalize_plan tool-call body preview — shows summary + body + steps +
+ * validation + docs + target WHILE the 3-option dialog is open, so the
+ * user can read the plan before committing to "new session / current
+ * session / revise". Cap height for Kilo-class long plans — the entire
+ * block scrolls as a unit, so the user can see ALL sections without the
+ * chat itself scrolling past a wall of plan content. */
 .plan-preview {
 	padding: 10px 12px;
 	background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
@@ -387,6 +390,8 @@ html, body {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	max-height: 70vh;
+	overflow-y: auto;
 }
 .plan-preview .plan-summary {
 	font-weight: 500;
@@ -430,11 +435,6 @@ html, body {
 	 * up as a visible blank line. Override to normal so list/heading spacing
 	 * comes from CSS margins instead of literal whitespace. */
 	white-space: normal;
-	/* Cap height for Kilo-class long bodies — Steps/Validation/Docs/target
-	 * stay visible below without the user having to scroll the chat past
-	 * a wall of design notes. Inline scroll only kicks in past ~60vh. */
-	max-height: 60vh;
-	overflow-y: auto;
 }
 .plan-preview .plan-body > :first-child { margin-top: 0; }
 .plan-preview .plan-body > :last-child { margin-bottom: 0; }
