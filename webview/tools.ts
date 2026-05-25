@@ -585,7 +585,11 @@ function formatBuiltInResult(
 	return null;
 }
 
-/** Extract human-readable text from an AgentToolResult, or fall back to JSON. */
+/** Extract human-readable text from an AgentToolResult, or fall back to JSON.
+ *  When the envelope is just `{content: []}` (common for the FIRST partial
+ *  event of a streaming bash call before any stdout has arrived), return ""
+ *  so the streaming pre stays empty instead of briefly flashing the raw
+ *  `{"content":[]}` JSON. */
 export function extractToolText(output: any): string {
 	if (output == null) return "";
 	if (typeof output === "string") return output;
@@ -595,6 +599,9 @@ export function extractToolText(output: any): string {
 			.filter((p: any) => p && p.type === "text" && typeof p.text === "string")
 			.map((p: any) => p.text);
 		if (parts.length > 0) return parts.join("\n");
+		// Content array present but empty / non-text-only → no human text yet.
+		// Return "" rather than JSON-dumping the envelope.
+		return "";
 	}
 	return safeStringify(output);
 }
