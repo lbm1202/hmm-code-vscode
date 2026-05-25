@@ -416,6 +416,57 @@ html, body {
 	border-radius: 3px;
 	font-family: var(--vscode-editor-font-family);
 }
+/* Body section — free markdown rendered via marked. Hide the default
+ * top-margin on the first child so it doesn't visually disconnect from
+ * the summary above. */
+.plan-preview .plan-body {
+	font-size: 13px;
+	line-height: 1.55;
+	color: var(--vscode-foreground);
+	border-top: 1px dashed var(--vscode-panel-border);
+	padding-top: 8px;
+}
+.plan-preview .plan-body > :first-child { margin-top: 0; }
+.plan-preview .plan-body > :last-child { margin-bottom: 0; }
+.plan-preview .plan-body h3 {
+	font-size: 13px;
+	font-weight: 600;
+	margin: 12px 0 6px 0;
+}
+.plan-preview .plan-body h4 {
+	font-size: 12px;
+	font-weight: 600;
+	margin: 10px 0 4px 0;
+	color: var(--vscode-descriptionForeground);
+}
+.plan-preview .plan-body pre {
+	background: var(--vscode-textBlockQuote-background);
+	padding: 8px 10px;
+	border-radius: 4px;
+	overflow-x: auto;
+	font-size: 12px;
+}
+.plan-preview .plan-section-label {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+}
+.plan-preview .plan-checklist {
+	margin: 0;
+	padding-left: 22px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.plan-preview .plan-checklist li {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+.plan-preview .plan-validation li::marker { content: "✓ "; color: var(--vscode-charts-green, #4ec9b0); }
+.plan-preview .plan-docs li::marker { content: "📄 "; }
 /* Ctrl/Cmd-click opens the file in the editor. We don't show an underline by
  * default (it'd be noisy on every tool summary); the title attribute hints
  * the affordance, and holding the modifier flips on the hover style. */

@@ -3,7 +3,7 @@
 // finalize_plan, todo_write) get pretty-formatted result blocks instead of the
 // raw JSON envelope.
 
-import { cssEscape, escapeHtml, safeStringify, summarizeArgs } from "./helpers";
+import { cssEscape, escapeHtml, md, safeStringify, summarizeArgs } from "./helpers";
 import { highlightBlock, highlightLine, langFromPath } from "./syntax";
 import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
 
@@ -123,25 +123,62 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 	return "";
 }
 
-/** Render plan summary + steps INSIDE the finalize_plan tool call body so
- *  the user can read the plan WHILE the 3-option dialog is still up. Without
- *  this, the user has to commit to "new session / current session / revise"
- *  blind, only seeing the truncated summary in the tool-call chip. */
+/** Render plan summary + body + steps + validation + docs INSIDE the
+ *  finalize_plan tool call body so the user can read the full plan WHILE
+ *  the 3-option dialog is still up. Without this, the user has to commit
+ *  to "new session / current session / revise" blind, only seeing the
+ *  truncated summary in the tool-call chip. */
 function renderFinalizePlanPreview(args: any): string {
 	const summary = String(args?.summary ?? "").trim();
+	const body = String(args?.body ?? "").trim();
 	const steps = Array.isArray(args?.steps) ? args.steps.map((s: any) => String(s ?? "")) : [];
+	const validation = Array.isArray(args?.validation)
+		? args.validation.map((s: any) => String(s ?? ""))
+		: [];
+	const docs = Array.isArray(args?.docs) ? args.docs.map((s: any) => String(s ?? "")) : [];
 	const target = String(args?.target_mode ?? "code");
-	if (!summary && steps.length === 0) return "";
-	const summaryHtml = summary
-		? `<div class="plan-summary">${escapeHtml(summary)}</div>`
-		: "";
-	const stepsHtml = steps.length
-		? `<ol class="plan-steps">${steps
-			.map((s) => `<li>${escapeHtml(s)}</li>`)
-			.join("")}</ol>`
-		: "";
-	const targetHtml = `<div class="plan-target">→ <code>${escapeHtml(target)}</code> 모드로 핸드오프</div>`;
-	return `<div class="plan-preview">${summaryHtml}${stepsHtml}${targetHtml}</div>`;
+
+	if (!summary && !body && steps.length === 0 && validation.length === 0 && docs.length === 0) {
+		return "";
+	}
+
+	const parts: string[] = [];
+	if (summary) {
+		parts.push(`<div class="plan-summary">${escapeHtml(summary)}</div>`);
+	}
+	if (body) {
+		// Body is free markdown — render via marked (same as assistant bubbles)
+		// so ### sub-headings, lists, code fences all show properly.
+		parts.push(`<div class="plan-body">${md(body)}</div>`);
+	}
+	if (steps.length) {
+		parts.push(
+			`<div class="plan-section-label">Steps</div>` +
+				`<ol class="plan-steps">${steps
+					.map((s) => `<li>${escapeHtml(s)}</li>`)
+					.join("")}</ol>`,
+		);
+	}
+	if (validation.length) {
+		parts.push(
+			`<div class="plan-section-label">Validation</div>` +
+				`<ul class="plan-checklist plan-validation">${validation
+					.map((v) => `<li>${escapeHtml(v)}</li>`)
+					.join("")}</ul>`,
+		);
+	}
+	if (docs.length) {
+		parts.push(
+			`<div class="plan-section-label">Documentation</div>` +
+				`<ul class="plan-checklist plan-docs">${docs
+					.map((d) => `<li>${escapeHtml(d)}</li>`)
+					.join("")}</ul>`,
+		);
+	}
+	parts.push(
+		`<div class="plan-target">→ <code>${escapeHtml(target)}</code> 모드로 핸드오프</div>`,
+	);
+	return `<div class="plan-preview">${parts.join("")}</div>`;
 }
 
 /** Normalize edit/multi_edit args into a flat list of {oldText, newText}.
