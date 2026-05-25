@@ -45,10 +45,10 @@ export function addToolCall(toolName: string, toolCallId: string, args: unknown)
 	block.dataset.toolCallId = toolCallId;
 	block.dataset.toolName = toolName;
 	const summary = document.createElement("summary");
-	const argSummary = summaryForTool(toolName, args);
+	const argHtml = summaryHtmlForTool(toolName, args);
 	summary.innerHTML =
 		`<span class="tool-name">${escapeHtml(toolName)}</span>` +
-		(argSummary ? `<span class="tool-args-inline">${escapeHtml(argSummary)}</span>` : "") +
+		argHtml +
 		`<span class="tool-spinner" title="실행 중…">⏳</span>`;
 	block.appendChild(summary);
 	// Args JSON block only when (a) not interactive (those use a card UI),
@@ -97,7 +97,10 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 		const edits = collectEdits(args);
 		if (edits.length === 0) return "";
 		const label = toolName === "multi_edit" || edits.length > 1 ? toolName : "edit";
-		const header = `<div class="edit-diff-header">${escapeHtml(label)} ${escapeHtml(abbreviateHome(path))}</div>`;
+		const pathHtml = path
+			? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
+			: "";
+		const header = `<div class="edit-diff-header">${escapeHtml(label)} ${pathHtml}</div>`;
 		const blocks = edits
 			.map((e, i) => {
 				const sep =
@@ -138,7 +141,10 @@ function collectEdits(args: any): { oldText: string; newText: string }[] {
 
 function renderWritePreview(path: string, content: string): string {
 	if (!content && !path) return "";
-	const header = `<div class="edit-diff-header">write ${escapeHtml(abbreviateHome(path))}</div>`;
+	const pathHtml = path
+		? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
+		: "";
+	const header = `<div class="edit-diff-header">write ${pathHtml}</div>`;
 	const lines = content.split("\n");
 	const MAX = 30;
 	const shown = lines.slice(0, MAX);
@@ -314,6 +320,36 @@ function builtInSummaryArgs(toolName: string, args: any): string {
 		return String(args?.path ?? args?.glob ?? args?.pattern ?? "");
 	}
 	return "";
+}
+
+/** Extract the primary file path from a tool's args, if there is one.
+ *  Used to make tool summaries Ctrl/Cmd-clickable (opens the file in editor).
+ *  Returns undefined for tools whose args aren't path-shaped. */
+export function filePathFromArgs(toolName: string, args: any): string | undefined {
+	if (!args || typeof args !== "object") return undefined;
+	if (
+		toolName === "edit" ||
+		toolName === "write" ||
+		toolName === "multi_edit" ||
+		toolName === "read"
+	) {
+		const p = String(args?.path ?? args?.file_path ?? "");
+		return p || undefined;
+	}
+	return undefined;
+}
+
+/** Build a summary HTML chunk. When a file path is present we wrap the entire
+ *  summary text in a `.file-link` span so Ctrl/Cmd-click can open the file —
+ *  events.ts has the global capture handler. */
+export function summaryHtmlForTool(toolName: string, args: any): string {
+	const text = summaryForTool(toolName, args);
+	if (!text) return "";
+	const path = filePathFromArgs(toolName, args);
+	if (path) {
+		return `<span class="tool-args-inline file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(text)}</span>`;
+	}
+	return `<span class="tool-args-inline">${escapeHtml(text)}</span>`;
 }
 
 /** Show the args JSON only if args have more than one field worth showing. */

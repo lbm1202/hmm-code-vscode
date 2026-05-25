@@ -38,3 +38,34 @@ e.btnSettings.addEventListener("click", () => {
 });
 
 setEmptyVisibility();
+
+// Ctrl/Cmd-click on a `.file-link` (rendered by tool summaries + edit-diff
+// headers) opens the file in the editor area. Plain click falls through so
+// the surrounding <summary> can still toggle the <details> block.
+document.addEventListener(
+	"click",
+	(ev) => {
+		const onlyMod = (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey;
+		if (!onlyMod) return;
+		const target = (ev.target as HTMLElement | null)?.closest?.(".file-link");
+		if (!target) return;
+		const path = target.getAttribute("data-file-path");
+		if (!path) return;
+		ev.preventDefault();
+		ev.stopPropagation();
+		post({ kind: FROM_WEBVIEW.OPEN_FILE, path });
+	},
+	true, // capture: beat the <summary> default toggle
+);
+
+// Track Ctrl/Cmd modifier on body so `.file-link:hover` can flip to an
+// underlined "this is clickable" style only while the user is actually
+// holding the modifier (avoids permanent link-noise on every summary).
+const updateModDown = (down: boolean) => document.body.classList.toggle("mod-down", down);
+document.addEventListener("keydown", (e) => {
+	if (e.ctrlKey || e.metaKey) updateModDown(true);
+});
+document.addEventListener("keyup", (e) => {
+	if (!e.ctrlKey && !e.metaKey) updateModDown(false);
+});
+window.addEventListener("blur", () => updateModDown(false));

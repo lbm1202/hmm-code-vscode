@@ -376,6 +376,16 @@ html, body {
 	background: transparent;
 	color: var(--vscode-descriptionForeground);
 }
+/* Ctrl/Cmd-click opens the file in the editor. We don't show an underline by
+ * default (it'd be noisy on every tool summary); the title attribute hints
+ * the affordance, and holding the modifier flips on the hover style. */
+.file-link {
+	color: var(--vscode-textLink-foreground);
+}
+body.mod-down .file-link:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
 .diff-prefix {
 	display: inline-block;
 	width: 14px;

@@ -29,6 +29,8 @@ export const FROM_WEBVIEW = {
 	RENAME_SESSION: "rename-session",
 	/** Open the standalone settings panel. Host executes hmm-code.openSettings. */
 	OPEN_SETTINGS: "open-settings",
+	/** Ctrl/Cmd-click on a file path in a tool summary/header → open in editor. */
+	OPEN_FILE: "open-file",
 } as const;
 
 export const STATUS_KEYS = {

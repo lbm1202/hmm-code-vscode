@@ -116,7 +116,8 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.LIST_SESSIONS }
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
-	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS };
+	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
+	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string };
 
 export interface ChatBackendOpts {
 	/** Fires when Pi reports a session name change (initial load or rename). */
@@ -432,6 +433,28 @@ export class ChatBackend {
 			case FROM_WEBVIEW.OPEN_SETTINGS:
 				vscode.commands.executeCommand("hmm-code.openSettings");
 				return;
+			case FROM_WEBVIEW.OPEN_FILE: {
+				// Ctrl/Cmd-click on a file path in a tool summary. Resolve
+				// relative paths against the current cwd (Pi's working dir,
+				// which the user opened the workspace at). vscode.open errors
+				// if the file doesn't exist; we just surface that to stderr.
+				const p = raw.path;
+				if (typeof p !== "string" || !p) return;
+				const abs = p.startsWith("/") || /^[A-Za-z]:[\\\/]/.test(p)
+					? p
+					: this.cwd
+						? `${this.cwd.replace(/\/$/, "")}/${p}`
+						: p;
+				try {
+					await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+				} catch (err) {
+					this.post({
+						kind: TO_WEBVIEW.STDERR,
+						text: `open-file failed (${abs}): ${(err as Error).message}`,
+					});
+				}
+				return;
+			}
 			case FROM_WEBVIEW.REQUEST_MESSAGES:
 				try {
 					const res = await client.send({ type: "get_messages" });

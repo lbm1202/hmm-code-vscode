@@ -34,6 +34,9 @@ export const FROM_WEBVIEW = {
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",
 	OPEN_SETTINGS: "open-settings",
+	/** Ctrl/Cmd-click on a file path in a tool summary/header. Host opens
+	 *  the file in the editor area (no-op for non-existent paths). */
+	OPEN_FILE: "open-file",
 } as const;
 export type FromWebviewKind = (typeof FROM_WEBVIEW)[keyof typeof FROM_WEBVIEW];
 

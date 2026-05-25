@@ -11,7 +11,7 @@ import {
 	INTERACTIVE_TOOLS,
 	renderEditOrWriteBody,
 	shouldShowArgsBlock,
-	summaryForTool,
+	summaryHtmlForTool,
 	updateToolResult,
 } from "./tools";
 import { finalizeTurn } from "./turn-lifecycle";
@@ -82,10 +82,9 @@ function renderAssistantHistory(m: any): void {
 			block.dataset.toolCallId = String(tc.id ?? Math.random());
 			block.dataset.toolName = name;
 			const summary = document.createElement("summary");
-			const argSummary = summaryForTool(name, tc.arguments);
 			summary.innerHTML =
 				`<span class="tool-name">${escapeHtml(name)}</span>` +
-				(argSummary ? `<span class="tool-args-inline">${escapeHtml(argSummary)}</span>` : "");
+				summaryHtmlForTool(name, tc.arguments);
 			block.appendChild(summary);
 			if (
 				tc.arguments !== undefined &&
