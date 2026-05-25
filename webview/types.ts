@@ -18,6 +18,8 @@ export type SessionEntry = {
 export type ModelEntry = {
 	provider: string;
 	id: string;
+	/** User alias from modes.json:modelAliases (attached by ChatBackend). */
+	alias?: string;
 	reasoning?: boolean;
 	thinkingLevelMap?: Record<string, string | null>;
 	compat?: { thinkingFormat?: string; [k: string]: unknown };

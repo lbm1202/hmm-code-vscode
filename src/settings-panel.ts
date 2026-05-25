@@ -252,7 +252,9 @@ export class SettingsPanel {
 					if (authChanged) {
 						vscode.commands.executeCommand("hmm-code.restartChat");
 					} else {
-						vscode.commands.executeCommand("hmm-code.sendSlash", "/reload-runtime");
+						// Broadcast to ALL live backends (sidebar + every open
+						// editor panel) so they stay in sync.
+						ChatBackend.reloadAll();
 					}
 				}
 				SettingsPanel.refresh(panel);
@@ -712,7 +714,7 @@ th {
 }
 .model-grid {
 	display: grid;
-	grid-template-columns: 60px 1fr 1fr 40px;
+	grid-template-columns: 40px 1fr 1fr 90px 40px;
 	gap: 8px;
 	margin-bottom: 4px;
 }
@@ -725,11 +727,20 @@ th {
 }
 .model-row-card {
 	display: grid;
-	grid-template-columns: 60px 1fr 1fr 40px;
+	grid-template-columns: 40px 1fr 1fr 90px 40px;
 	gap: 8px;
 	align-items: center;
 	margin: 4px 0;
 }
+.model-row-card .reasoning-cell {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+.model-row-card .reasoning-cell input { margin: 0; }
 .model-row-card .row-num {
 	color: var(--vscode-descriptionForeground);
 	font-size: 11px;
@@ -1228,27 +1239,30 @@ function renderModelRows(container, provName, models) {
 	// Header
 	const header = document.createElement('div');
 	header.className = 'model-grid';
-	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">이름</div><div></div>';
+	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">이름</div><div class="label" style="text-align:center">추론</div><div></div>';
 	container.appendChild(header);
 	models.forEach((m, idx) => {
 		const row = document.createElement('div');
 		row.className = 'model-row-card';
+		const reasoningChecked = m.reasoning ? 'checked' : '';
 		row.innerHTML =
 			'<div class="row-num">' + (idx + 1) + '</div>' +
 			'<input type="text" placeholder="model-id" value="' + esc(m.id || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="id" />' +
 			'<input type="text" placeholder="(optional)" value="' + esc(m.name || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="name" />' +
+			'<label class="reasoning-cell" title="모델이 reasoning/thinking 출력을 지원하면 체크"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
 			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="제거">✕</button>';
 		container.appendChild(row);
 	});
 	container.querySelectorAll('input[data-mf]').forEach((el) => {
-		el.addEventListener('input', () => {
+		const isCheckbox = el.type === 'checkbox';
+		el.addEventListener(isCheckbox ? 'change' : 'input', () => {
 			const p = el.getAttribute('data-mp');
 			const i = parseInt(el.getAttribute('data-mi'), 10);
 			const f = el.getAttribute('data-mf');
 			if (!p || isNaN(i) || !f) return;
 			const cfg = modelsDraft.providers[p];
 			if (!cfg?.models?.[i]) return;
-			cfg.models[i][f] = el.value;
+			cfg.models[i][f] = isCheckbox ? el.checked : el.value;
 			updateSaveBar();
 			const card = el.closest('.provider-card');
 			if (card) card.classList.toggle('dirty', provDirty(p));

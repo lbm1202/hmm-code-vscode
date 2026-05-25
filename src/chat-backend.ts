@@ -1,4 +1,7 @@
 import * as vscode from "vscode";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { PiClient } from "./pi-client";
 import {
 	FROM_WEBVIEW,
@@ -14,9 +17,42 @@ import {
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
 
+const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
+
+/** Read modelAliases from ~/.pi/agent/modes.json. Returns empty map on any
+ *  error (file missing, parse failure, schema mismatch) so callers don't
+ *  need to special-case the absent-file path. */
+function readModelAliases(): Record<string, string> {
+	try {
+		if (!existsSync(MODES_JSON_PATH)) return {};
+		const raw = JSON.parse(readFileSync(MODES_JSON_PATH, "utf-8")) as {
+			modelAliases?: Record<string, string>;
+		};
+		return raw?.modelAliases ?? {};
+	} catch {
+		return {};
+	}
+}
+
+/** Find the alias for (provider,id). Tries "provider/id" first, then bare id. */
+function findAlias(
+	aliases: Record<string, string>,
+	provider: string | undefined,
+	id: string,
+): string | undefined {
+	if (provider) {
+		const fq = `${provider}/${id}`;
+		if (aliases[fq]) return aliases[fq];
+	}
+	return aliases[id];
+}
+
 export interface ModelEntry {
 	provider: string;
 	id: string;
+	/** User-defined alias from modes.json:modelAliases. Attached by
+	 *  ChatBackend when caching/posting; not present on raw Pi responses. */
+	alias?: string;
 	reasoning?: boolean;
 	thinkingLevelMap?: Record<string, string | null>;
 	compat?: { thinkingFormat?: string; [k: string]: unknown };
@@ -81,6 +117,13 @@ export class ChatBackend {
 	private static _live = new Set<ChatBackend>();
 	static restartAll(): void {
 		for (const b of ChatBackend._live) b.restart();
+	}
+	/** Broadcast `/reload-runtime` to every live Pi process. Used by the
+	 *  settings panel after modes/models changes — extension hooks re-read
+	 *  modes.json on `ctx.reload()`. Keeps Pi processes alive (no in-flight
+	 *  session disruption), unlike `restartAll`. */
+	static reloadAll(): void {
+		for (const b of ChatBackend._live) b.prompt("/reload-runtime");
 	}
 
 	constructor(
@@ -340,7 +383,16 @@ export class ChatBackend {
 						// compat) so the webview can compute supported thinking levels
 						// even when state.model is incomplete.
 						const data = res.data as { models?: any[] };
-						const models = (data.models ?? []) as ModelEntry[];
+						const raw = (data.models ?? []) as ModelEntry[];
+						// Attach modelAliases (from modes.json) so pickers can show
+						// the user's friendly name instead of the raw model id.
+						// Read on every request — modes.json is small and may have
+						// been edited since the last call.
+						const aliases = readModelAliases();
+						const models = raw.map((m) => {
+							const alias = findAlias(aliases, m.provider, m.id);
+							return alias ? { ...m, alias } : m;
+						});
 						ChatBackend._cachedModels = models;
 						this.post({ kind: TO_WEBVIEW.MODELS, models });
 					}

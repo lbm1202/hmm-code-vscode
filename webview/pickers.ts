@@ -132,15 +132,22 @@ function openModelPopover(): void {
 	const curProvider = ui.modelProvider;
 	showPopover(
 		els().pickerModel,
-		ui.availableModels.map((m) => ({
-			label: m.id,
-			sublabel: m.provider,
-			selected: !!curId && curId === m.id && (!curProvider || curProvider === m.provider),
-			onClick: () =>
-				post({
-					kind: FROM_WEBVIEW.COMMAND,
-					command: { type: "set_model", provider: m.provider, modelId: m.id },
-				}),
-		})),
+		ui.availableModels.map((m) => {
+			const alias = (m as { alias?: string }).alias;
+			// When alias present: alias as label, "id · provider" as sublabel
+			// (so the raw id stays discoverable). Otherwise fall back to id/provider.
+			const label = alias ?? m.id;
+			const sublabel = alias ? `${m.id} · ${m.provider}` : m.provider;
+			return {
+				label,
+				sublabel,
+				selected: !!curId && curId === m.id && (!curProvider || curProvider === m.provider),
+				onClick: () =>
+					post({
+						kind: FROM_WEBVIEW.COMMAND,
+						command: { type: "set_model", provider: m.provider, modelId: m.id },
+					}),
+			};
+		}),
 	);
 }
