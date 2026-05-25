@@ -983,6 +983,24 @@ body.mod-down .file-link:hover {
 	border-color: var(--vscode-focusBorder, var(--vscode-panel-border));
 }
 
+/* Multi-select variant — checkbox label instead of clickable button.
+ * Has a checkbox + label text on the same row, no full-width hover (the
+ * label itself is clickable thanks to <label> semantics). */
+.question-option-multi {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+.question-option-multi input[type="checkbox"] {
+	margin: 0;
+	flex: 0 0 auto;
+}
+.question-option-multi span {
+	flex: 1 1 auto;
+	line-height: 1.4;
+}
+
 .question-row {
 	display: flex;
 	gap: 8px;

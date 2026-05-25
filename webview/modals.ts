@@ -72,13 +72,78 @@ export function showModal(req: any): void {
 }
 
 function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => void, cancel: () => void): void {
-	const list = document.createElement("div");
-	list.className = "question-options";
 	const rawOpts: string[] = Array.isArray(req.options) ? req.options : [];
 	// Pi extensions (e.g. ask_user) append "Other (type your own)" for TUI
 	// clients without inline text input. We render an inline textarea below,
-	// so hide that option to avoid duplication.
-	const opts = rawOpts.filter((o) => !/Other \(type your own\)/i.test(o));
+	// so hide that option to avoid duplication. Same for the "✓ Done" sentinel
+	// the Pi side adds for multi-select TUI loops — we submit all picks at
+	// once via a real checkbox group instead.
+	const opts = rawOpts.filter(
+		(o) => !/Other \(type your own\)/i.test(o) && !/✓\s*Done/i.test(o),
+	);
+
+	// Multi-select detection: Pi side prefixes the title with
+	// "(선택 가능: 다중)" for ask_user questions where multiple options
+	// can be picked. Render checkboxes + a "선택 완료" submit button.
+	const isMulti = typeof req.title === "string" && /\(선택 가능: 다중\)/.test(req.title);
+
+	if (isMulti) {
+		const list = document.createElement("div");
+		list.className = "question-options question-options-multi";
+		const checks: HTMLInputElement[] = [];
+		opts.forEach((opt: string) => {
+			const label = document.createElement("label");
+			label.className = "question-option question-option-multi";
+			const cb = document.createElement("input");
+			cb.type = "checkbox";
+			cb.value = opt;
+			label.appendChild(cb);
+			const txt = document.createElement("span");
+			txt.textContent = opt;
+			label.appendChild(txt);
+			list.appendChild(label);
+			checks.push(cb);
+		});
+		card.appendChild(list);
+
+		// Optional inline free-text — added to the selection on submit if
+		// the textarea has content.
+		const customLabel = document.createElement("div");
+		customLabel.className = "question-message";
+		customLabel.textContent = "또는 직접 입력 (선택 사항, 함께 제출됨):";
+		card.appendChild(customLabel);
+		const customInput = document.createElement("textarea");
+		customInput.rows = 2;
+		customInput.className = "question-input";
+		customInput.placeholder = "추가하고 싶은 답 (선택)";
+		card.appendChild(customInput);
+
+		const row = document.createElement("div");
+		row.className = "question-row";
+		const submit = document.createElement("button");
+		submit.className = "primary";
+		submit.textContent = "선택 완료";
+		const doSubmit = () => {
+			const picked = checks.filter((c) => c.checked).map((c) => stripNumbering(c.value));
+			const extra = customInput.value.trim();
+			if (extra) picked.push(extra);
+			if (picked.length === 0) return;
+			reply({ type: "extension_ui_response", id: req.id, value: picked.join(", ") });
+		};
+		submit.addEventListener("click", doSubmit);
+		const cancelBtn = document.createElement("button");
+		cancelBtn.className = "ghost";
+		cancelBtn.textContent = "취소";
+		cancelBtn.addEventListener("click", cancel);
+		row.appendChild(submit);
+		row.appendChild(cancelBtn);
+		card.appendChild(row);
+		return;
+	}
+
+	// Single-select (default) path
+	const list = document.createElement("div");
+	list.className = "question-options";
 	opts.forEach((opt: string) => {
 		const btn = document.createElement("button");
 		btn.className = "question-option";
@@ -124,6 +189,13 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 	customRow.appendChild(sendCustom);
 	customRow.appendChild(cancelBtn);
 	card.appendChild(customRow);
+}
+
+/** Strip the leading "N. " numbering Pi adds to options (and the " — desc"
+ *  description tail) so we send back just the canonical label that Pi's
+ *  ask_user parsing expects. */
+function stripNumbering(s: string): string {
+	return s.replace(/^\d+\.\s+/, "").split(" — ")[0];
 }
 
 function renderConfirm(card: HTMLElement, req: any, reply: (r: UiResponse) => void): void {
