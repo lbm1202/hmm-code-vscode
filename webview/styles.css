@@ -430,6 +430,11 @@ html, body {
 	 * up as a visible blank line. Override to normal so list/heading spacing
 	 * comes from CSS margins instead of literal whitespace. */
 	white-space: normal;
+	/* Cap height for Kilo-class long bodies — Steps/Validation/Docs/target
+	 * stay visible below without the user having to scroll the chat past
+	 * a wall of design notes. Inline scroll only kicks in past ~60vh. */
+	max-height: 60vh;
+	overflow-y: auto;
 }
 .plan-preview .plan-body > :first-child { margin-top: 0; }
 .plan-preview .plan-body > :last-child { margin-bottom: 0; }
