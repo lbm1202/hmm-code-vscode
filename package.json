@@ -1,0 +1,119 @@
+{
+  "name": "hmm-code",
+  "displayName": "Hmm-code",
+  "description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/debug/ask modes.",
+  "version": "0.1.0",
+  "publisher": "lbm1202",
+  "private": true,
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lbm1202/hmm-code-vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onWebviewPanel:hmm-code.chatPanel",
+    "onWebviewPanel:hmm-code.settingsPanel"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "hmm-code.open",
+        "title": "Hmm-code: Open Chat in Sidebar"
+      },
+      {
+        "command": "hmm-code.openInPanel",
+        "title": "Hmm-code: New Chat Panel",
+        "icon": {
+          "light": "media/icon-32.png",
+          "dark": "media/icon-32.png"
+        }
+      },
+      {
+        "command": "hmm-code.openSettings",
+        "title": "Hmm-code: Open Settings"
+      },
+      {
+        "command": "hmm-code.cycleMode",
+        "title": "Hmm-code: Cycle Mode"
+      },
+      {
+        "command": "hmm-code.toggleThinking",
+        "title": "Hmm-code: Toggle Thinking Level"
+      },
+      {
+        "command": "hmm-code.resetDefaults",
+        "title": "Hmm-code: Reset Model + Thinking to Mode Defaults"
+      },
+      {
+        "command": "hmm-code.abort",
+        "title": "Hmm-code: Cancel Current Turn"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "hmm-code.openInPanel",
+          "group": "navigation@9999"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "hmm-code.cycleMode",
+        "key": "shift+tab",
+        "mac": "shift+tab",
+        "when": "hmm-code.focus"
+      },
+      {
+        "command": "hmm-code.toggleThinking",
+        "key": "alt+t",
+        "when": "hmm-code.focus"
+      },
+      {
+        "command": "hmm-code.resetDefaults",
+        "key": "alt+x",
+        "when": "hmm-code.focus"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hmm-code",
+          "title": "Hmm-code",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "hmm-code": [
+        {
+          "type": "webview",
+          "id": "hmm-code.chat",
+          "name": "Chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "compile": "tsc --noEmit",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "marked": "^18.0.4"
+  }
+}

@@ -1,0 +1,518 @@
+// Tool-call rendering: details block per call, args summary, streaming partial
+// output, final result. Interactive tools (ask_user, request_mode_switch,
+// finalize_plan, todo_write) get pretty-formatted result blocks instead of the
+// raw JSON envelope.
+
+import { cssEscape, escapeHtml, safeStringify, summarizeArgs } from "./helpers";
+import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
+
+/** Tools whose primary UX is a question card. Pretty-render their result block. */
+export const INTERACTIVE_TOOLS = new Set([
+	"ask_user",
+	"request_mode_switch",
+	"finalize_plan",
+	"todo_write",
+]);
+
+/** Pi built-in tools we render with a custom summary + result formatter.
+ *  Skips the generic JSON args dump (summary alone conveys the key info). */
+export const BUILT_IN_PRETTY = new Set([
+	"bash",
+	"edit",
+	"write",
+	"read",
+	"grep",
+	"find",
+	"ls",
+	"multi_edit",
+]);
+
+/** Collapse the details block after stream end if the result has more than
+ *  this many lines. User can click to expand. Keeps the chat scrollable. */
+const COLLAPSE_LINES_THRESHOLD = 10;
+
+export function addToolCall(toolName: string, toolCallId: string, args: unknown): void {
+	const b = ensureBubble();
+	if (!b.toolsEl) {
+		b.toolsEl = document.createElement("div");
+		b.toolsEl.className = "msg-tools";
+		b.bubble.appendChild(b.toolsEl);
+	}
+	const block = document.createElement("details");
+	block.className = "tool-call";
+	if (INTERACTIVE_TOOLS.has(toolName)) block.classList.add("tool-call-interactive");
+	if (BUILT_IN_PRETTY.has(toolName)) block.classList.add("tool-call-builtin");
+	block.dataset.toolCallId = toolCallId;
+	block.dataset.toolName = toolName;
+	const summary = document.createElement("summary");
+	const argSummary = summaryForTool(toolName, args);
+	summary.innerHTML =
+		`<span class="tool-name">${escapeHtml(toolName)}</span>` +
+		(argSummary ? `<span class="tool-args-inline">${escapeHtml(argSummary)}</span>` : "") +
+		`<span class="tool-spinner" title="실행 중…">⏳</span>`;
+	block.appendChild(summary);
+	// Args JSON block only when (a) not interactive (those use a card UI),
+	// (b) not a known built-in (those have a clean summary), and (c) >1 key
+	// worth showing. For typical { path } / { command } args the summary
+	// already conveys everything; a JSON pre below would be pure noise.
+	if (
+		args !== undefined &&
+		!INTERACTIVE_TOOLS.has(toolName) &&
+		!BUILT_IN_PRETTY.has(toolName) &&
+		shouldShowArgsBlock(args)
+	) {
+		const pre = document.createElement("pre");
+		pre.className = "tool-input";
+		pre.textContent = safeStringify(args);
+		block.appendChild(pre);
+	}
+	// Edit/write/multi_edit: render a diff body up-front from args so the user
+	// sees the change before tool execution finishes. Auto-open so the diff
+	// is visible without an extra click.
+	const diffBody = renderEditOrWriteBody(toolName, args);
+	if (diffBody) {
+		const div = document.createElement("div");
+		div.innerHTML = diffBody;
+		// Move the actual element (first child) out of the wrapper.
+		const inner = div.firstElementChild;
+		if (inner) block.appendChild(inner);
+		(block as HTMLDetailsElement).open = true;
+	}
+	b.toolsEl.appendChild(block);
+	pinStatusToEnd();
+}
+
+/** Render a diff/preview body for edit/write/multi_edit from args.
+ *  Returns "" if the tool doesn't qualify or args are missing.
+ *
+ *  Pi-side schemas (verified against pi-coding-agent core/tools/{edit,write}.js):
+ *    edit:  { path: string, edits: [{ oldText: string, newText: string }, ...] }
+ *    write: { path: string, content: string }
+ *  Both prefer `path`; fall back to `file_path` for foreign-schema compatibility. */
+export function renderEditOrWriteBody(toolName: string, args: any): string {
+	if (toolName === "edit" || toolName === "multi_edit") {
+		const path = String(args?.path ?? args?.file_path ?? "");
+		// Pi's edit takes an array (oldText/newText). Some legacy single-edit
+		// callers might send {old_string, new_string} directly — handle both.
+		const edits = collectEdits(args);
+		if (edits.length === 0) return "";
+		const label = toolName === "multi_edit" || edits.length > 1 ? toolName : "edit";
+		const header = `<div class="edit-diff-header">${escapeHtml(label)} ${escapeHtml(abbreviateHome(path))}</div>`;
+		const blocks = edits
+			.map((e, i) => {
+				const sep =
+					edits.length > 1
+						? `<div class="edit-diff-edit-sep">edit ${i + 1} / ${edits.length}</div>`
+						: "";
+				return (i > 0 ? sep : "") + renderDiffRows(e.oldText, e.newText);
+			})
+			.join("");
+		return `<div class="edit-diff">${header}${blocks}</div>`;
+	}
+	if (toolName === "write") {
+		const path = String(args?.path ?? args?.file_path ?? "");
+		const content = String(args?.content ?? "");
+		return renderWritePreview(path, content);
+	}
+	return "";
+}
+
+/** Normalize edit/multi_edit args into a flat list of {oldText, newText}.
+ *  Handles Pi's array schema and legacy single-edit/snake-case variants. */
+function collectEdits(args: any): { oldText: string; newText: string }[] {
+	const out: { oldText: string; newText: string }[] = [];
+	if (Array.isArray(args?.edits)) {
+		for (const e of args.edits) {
+			if (!e || typeof e !== "object") continue;
+			const oldText = String(e.oldText ?? e.old_string ?? e.oldStr ?? "");
+			const newText = String(e.newText ?? e.new_string ?? e.newStr ?? "");
+			if (oldText || newText) out.push({ oldText, newText });
+		}
+	}
+	// Legacy / inline single-edit fields on the args itself.
+	const oldText = String(args?.oldText ?? args?.old_string ?? "");
+	const newText = String(args?.newText ?? args?.new_string ?? "");
+	if (oldText || newText) out.push({ oldText, newText });
+	return out;
+}
+
+function renderWritePreview(path: string, content: string): string {
+	if (!content && !path) return "";
+	const header = `<div class="edit-diff-header">write ${escapeHtml(abbreviateHome(path))}</div>`;
+	const lines = content.split("\n");
+	const MAX = 30;
+	const shown = lines.slice(0, MAX);
+	const more =
+		lines.length > MAX
+			? `<div class="diff-more">… +${lines.length - MAX} more lines (${content.length.toLocaleString()} chars)</div>`
+			: "";
+	const rows = shown
+		.map(
+			(line) =>
+				`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${escapeHtml(line) || " "}</div>`,
+		)
+		.join("");
+	return `<div class="edit-diff">${header}${rows}${more}</div>`;
+}
+
+/** Build red/green line rows for an old→new edit. Uses inline word-diff for
+ *  single-line edits, plain line-by-line otherwise. */
+function renderDiffRows(oldStr: string, newStr: string): string {
+	const oldLines = oldStr.split("\n");
+	const newLines = newStr.split("\n");
+
+	// Inline word-diff path: small single-line edits look much better with the
+	// changed substring highlighted instead of two full-width red/green bars.
+	if (oldLines.length === 1 && newLines.length === 1) {
+		const [oldH, newH] = inlineWordDiff(oldLines[0], newLines[0]);
+		return (
+			`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${oldH}</div>` +
+			`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${newH}</div>`
+		);
+	}
+
+	const rows: string[] = [];
+	for (const line of oldLines) {
+		rows.push(
+			`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${escapeHtml(line) || " "}</div>`,
+		);
+	}
+	for (const line of newLines) {
+		rows.push(
+			`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${escapeHtml(line) || " "}</div>`,
+		);
+	}
+	return rows.join("");
+}
+
+/** Highlight the differing middle of two single-line strings. */
+function inlineWordDiff(oldS: string, newS: string): [string, string] {
+	// Common prefix
+	let prefix = 0;
+	const minLen = Math.min(oldS.length, newS.length);
+	while (prefix < minLen && oldS[prefix] === newS[prefix]) prefix++;
+	// Common suffix (don't overlap into the prefix region)
+	let suffix = 0;
+	const remOld = oldS.length - prefix;
+	const remNew = newS.length - prefix;
+	const minRem = Math.min(remOld, remNew);
+	while (suffix < minRem && oldS[oldS.length - 1 - suffix] === newS[newS.length - 1 - suffix]) {
+		suffix++;
+	}
+	const oldPre = escapeHtml(oldS.slice(0, prefix));
+	const oldMid = escapeHtml(oldS.slice(prefix, oldS.length - suffix));
+	const oldSuf = escapeHtml(oldS.slice(oldS.length - suffix));
+	const newPre = escapeHtml(newS.slice(0, prefix));
+	const newMid = escapeHtml(newS.slice(prefix, newS.length - suffix));
+	const newSuf = escapeHtml(newS.slice(newS.length - suffix));
+	const oldMark = oldMid ? `<mark class="diff-mark-old">${oldMid}</mark>` : "";
+	const newMark = newMid ? `<mark class="diff-mark-new">${newMid}</mark>` : "";
+	return [`${oldPre}${oldMark}${oldSuf}`, `${newPre}${newMark}${newSuf}`];
+}
+
+function abbreviateHome(path: string): string {
+	// Best-effort: webview can't see process.env.HOME. Show as-is; the host
+	// usually sends absolute paths already.
+	return path;
+}
+
+/** Cleanest one-line summary for a tool call, regardless of category. */
+export function summaryForTool(toolName: string, args: any): string {
+	if (INTERACTIVE_TOOLS.has(toolName)) {
+		const s = interactiveSummaryArgs(toolName, args);
+		if (s) return s;
+	}
+	if (BUILT_IN_PRETTY.has(toolName)) {
+		const s = builtInSummaryArgs(toolName, args);
+		if (s) return s;
+	}
+	return summarizeArgs(args);
+}
+
+/** Compact summary for Pi built-ins. Show only the semantically primary field. */
+function builtInSummaryArgs(toolName: string, args: any): string {
+	if (toolName === "bash") {
+		const cmd = String(args?.command ?? "").trim();
+		// Multi-line scripts: show the first non-empty line + a line-count hint.
+		const lines = cmd.split("\n").filter((l) => l.trim());
+		const firstLine = lines[0] ?? "";
+		const truncated = firstLine.length > 100 ? firstLine.slice(0, 97) + "…" : firstLine;
+		const more = lines.length > 1 ? `  (+${lines.length - 1} lines)` : "";
+		return truncated + more;
+	}
+	if (toolName === "edit" || toolName === "write" || toolName === "multi_edit") {
+		const path = String(args?.path ?? args?.file_path ?? "");
+		// For edit, append an `(N edits)` hint when multiple replacements are queued.
+		if ((toolName === "edit" || toolName === "multi_edit") && Array.isArray(args?.edits) && args.edits.length > 1) {
+			return `${path}  (${args.edits.length} edits)`;
+		}
+		return path;
+	}
+	if (toolName === "read") {
+		const path = String(args?.path ?? args?.file_path ?? "");
+		const off = typeof args?.offset === "number" ? args.offset : undefined;
+		const lim = typeof args?.limit === "number" ? args.limit : undefined;
+		if (off !== undefined || lim !== undefined) {
+			const start = off ?? 0;
+			const end = lim !== undefined ? start + lim : "?";
+			return `${path} [${start}-${end}]`;
+		}
+		return path;
+	}
+	if (toolName === "grep") {
+		const pattern = String(args?.pattern ?? "");
+		const path = args?.path ? `  · ${args.path}` : "";
+		const tr = pattern.length > 60 ? pattern.slice(0, 57) + "…" : pattern;
+		return tr + path;
+	}
+	if (toolName === "find" || toolName === "ls") {
+		return String(args?.path ?? args?.glob ?? args?.pattern ?? "");
+	}
+	return "";
+}
+
+/** Show the args JSON only if args have more than one field worth showing. */
+export function shouldShowArgsBlock(args: unknown): boolean {
+	if (!args || typeof args !== "object") return false;
+	const keys = Object.keys(args as Record<string, unknown>);
+	return keys.length > 1;
+}
+
+/** Compact one-line description for interactive tool args. */
+export function interactiveSummaryArgs(toolName: string, args: any): string {
+	if (toolName === "ask_user" && Array.isArray(args?.questions)) {
+		const topics = args.questions.map((q: any) => q?.topic).filter(Boolean);
+		return topics.length ? topics.join(" / ") : `${args.questions.length}개 질문`;
+	}
+	if (toolName === "request_mode_switch") {
+		return `→ ${args?.target_mode ?? "?"}${args?.reason ? ` · ${String(args.reason).slice(0, 50)}` : ""}`;
+	}
+	if (toolName === "finalize_plan") {
+		return String(args?.summary ?? "").slice(0, 60);
+	}
+	if (toolName === "todo_write" && Array.isArray(args?.todos)) {
+		const todos = args.todos;
+		const done = todos.filter((t: any) => t?.status === "completed").length;
+		const inProg = todos.find((t: any) => t?.status === "in_progress");
+		const label = inProg ? `· ${String(inProg.content ?? "").slice(0, 40)}` : "";
+		return `${done}/${todos.length} ${label}`.trim();
+	}
+	return "";
+}
+
+/** Render incremental partial output for a running tool (e.g. streaming bash).
+ * Skips interactive tools — they have a custom pretty renderer that should
+ * always be the source of truth, not a raw partial dump. */
+export function updateToolPartial(toolCallId: string, partial: unknown): void {
+	const block = document.querySelector<HTMLElement>(
+		`[data-tool-call-id="${cssEscape(toolCallId)}"]`,
+	);
+	if (!block) return;
+	if (INTERACTIVE_TOOLS.has(block.dataset.toolName ?? "")) return;
+	(block as HTMLDetailsElement).open = true;
+	let pre = block.querySelector<HTMLPreElement>(".tool-result-streaming");
+	if (!pre) {
+		pre = document.createElement("pre");
+		pre.className = "tool-result tool-result-streaming";
+		block.appendChild(pre);
+	}
+	pre.textContent = extractToolText(partial);
+}
+
+export function updateToolResult(toolCallId: string, ok: boolean, output: unknown): void {
+	const block = document.querySelector<HTMLElement>(
+		`[data-tool-call-id="${cssEscape(toolCallId)}"]`,
+	);
+	if (!block) return;
+	// Remove the running spinner from the summary.
+	block.querySelector(".tool-spinner")?.remove();
+
+	const toolName = block.dataset.toolName ?? "";
+
+	// 1. Interactive-tool pretty renderer (ask_user / todo_write / etc.)
+	const interactivePretty = formatInteractiveResult(toolName, output, ok);
+	if (interactivePretty) {
+		block.querySelector(".tool-result-streaming")?.remove();
+		const div = document.createElement("div");
+		div.className = ok
+			? "tool-result tool-result-pretty"
+			: "tool-result tool-result-pretty tool-result-err";
+		div.innerHTML = interactivePretty;
+		block.appendChild(div);
+		(block as HTMLDetailsElement).open = true;
+		return;
+	}
+
+	// 2. Built-in pretty renderer (edit/write success → single-line confirm).
+	const builtinPretty = formatBuiltInResult(toolName, output, ok);
+	if (builtinPretty) {
+		block.querySelector(".tool-result-streaming")?.remove();
+		const div = document.createElement("div");
+		div.className = ok
+			? "tool-result tool-result-pretty tool-result-builtin"
+			: "tool-result tool-result-pretty tool-result-err";
+		div.innerHTML = builtinPretty.html;
+		block.appendChild(div);
+		(block as HTMLDetailsElement).open = builtinPretty.open;
+		if (builtinPretty.summaryHint) {
+			appendSummaryHint(block, builtinPretty.summaryHint);
+		}
+		return;
+	}
+
+	// 3. Default: raw text in a pre. Strip the AgentToolResult envelope:
+	// most tools return { content: [{type:"text", text}], details?: ... }.
+	const text = extractToolText(output);
+	const existing = block.querySelector<HTMLPreElement>(".tool-result-streaming");
+	const pre = existing ?? document.createElement("pre");
+	pre.className = ok ? "tool-result" : "tool-result tool-result-err";
+	pre.textContent = text;
+	if (!existing) block.appendChild(pre);
+	const lineCount = text === "" ? 0 : text.split("\n").length;
+	if (lineCount > 1) {
+		appendSummaryHint(block, `${lineCount} lines`);
+	}
+	// Auto-collapse long output so the chat stays scrollable. Errors stay open
+	// so the user sees the failure immediately.
+	if (ok && lineCount > COLLAPSE_LINES_THRESHOLD) {
+		(block as HTMLDetailsElement).open = false;
+	}
+}
+
+function appendSummaryHint(block: HTMLElement, text: string): void {
+	const summary = block.querySelector("summary");
+	if (!summary) return;
+	// Replace any existing hint to avoid duplication on re-renders.
+	summary.querySelector(".tool-result-lines")?.remove();
+	const hint = document.createElement("span");
+	hint.className = "tool-result-lines";
+	hint.textContent = text;
+	summary.appendChild(hint);
+}
+
+/** Pretty-format for Pi built-in tool results. Returns null to fall through. */
+function formatBuiltInResult(
+	toolName: string,
+	output: any,
+	ok: boolean,
+): { html: string; open: boolean; summaryHint?: string } | null {
+	if (!BUILT_IN_PRETTY.has(toolName)) return null;
+	const text = extractToolText(output);
+
+	// Edit / write / multi_edit: success is a single-line confirmation.
+	if (toolName === "edit" || toolName === "write" || toolName === "multi_edit") {
+		if (!ok) {
+			const msg = text || safeStringify(output);
+			return {
+				html: `<span class="builtin-err">✗ ${escapeHtml(msg.slice(0, 400))}</span>`,
+				open: true,
+			};
+		}
+		const firstLine = text.split("\n").find((l) => l.trim()) ?? "완료";
+		return {
+			html: `<span class="builtin-ok">✓ ${escapeHtml(firstLine.slice(0, 200))}</span>`,
+			open: true,
+		};
+	}
+
+	// Bash / read / grep / find / ls: keep raw output, but add a clear ✗ marker
+	// on failure and a "N lines" hint regardless.
+	if (!ok) {
+		const msg = text || safeStringify(output);
+		return {
+			html: `<span class="builtin-err">✗ ${escapeHtml(msg.slice(0, 1000))}</span>`,
+			open: true,
+		};
+	}
+	// Successful raw-output tools fall through to the default pre rendering
+	// (path 3 above) which already adds line count + auto-collapses.
+	return null;
+}
+
+/** Extract human-readable text from an AgentToolResult, or fall back to JSON. */
+export function extractToolText(output: any): string {
+	if (output == null) return "";
+	if (typeof output === "string") return output;
+	const content = output.content;
+	if (Array.isArray(content)) {
+		const parts = content
+			.filter((p: any) => p && p.type === "text" && typeof p.text === "string")
+			.map((p: any) => p.text);
+		if (parts.length > 0) return parts.join("\n");
+	}
+	return safeStringify(output);
+}
+
+/** Pretty-format the result for interactive tools. Returns "" to fall through. */
+export function formatInteractiveResult(toolName: string, output: any, ok: boolean): string {
+	const details = output?.details ?? {};
+	if (toolName === "ask_user") {
+		if (details?.cancelled) return `<span class="status-text">사용자가 취소함</span>`;
+		const answers: any[] = details?.answers ?? [];
+		if (answers.length === 0) return `<span class="status-text">응답 없음</span>`;
+		return (
+			`<ul class="qa-list">` +
+			answers
+				.map(
+					(a) =>
+						`<li><span class="qa-topic">${escapeHtml(String(a.topic ?? "?"))}</span>` +
+						`<span class="qa-answer">${escapeHtml(String(a.selected ?? ""))}${a.wasOther ? ' <em class="qa-other">(직접 입력)</em>' : ""}</span></li>`,
+				)
+				.join("") +
+			`</ul>`
+		);
+	}
+	if (toolName === "request_mode_switch") {
+		if (details?.cancelled) return `<span class="status-text">사용자가 취소함</span>`;
+		const accepted = details?.accepted;
+		if (accepted === true) return `<span class="status-text">전환 승인 → ${escapeHtml(String(details?.to ?? "?"))}</span>`;
+		if (accepted === false) return `<span class="status-text">전환 거절</span>`;
+		return "";
+	}
+	if (toolName === "todo_write") {
+		const todos: any[] = details?.todos ?? [];
+		if (todos.length === 0) return `<span class="status-text">빈 목록</span>`;
+		const ICON: Record<string, string> = {
+			pending: "☐",
+			in_progress: "▶",
+			completed: "☑",
+			cancelled: "✕",
+		};
+		const done = todos.filter((t) => t.status === "completed").length;
+		const items = todos
+			.map((t) => {
+				const icon = ICON[t.status] ?? "•";
+				const cls = `todo-item todo-${t.status} todo-pri-${t.priority ?? "medium"}`;
+				const pri = t.priority && t.priority !== "medium"
+					? `<span class="todo-pri">${escapeHtml(t.priority)}</span>`
+					: "";
+				return `<li class="${cls}"><span class="todo-icon">${escapeHtml(icon)}</span><span class="todo-label">${escapeHtml(String(t.content ?? ""))}</span>${pri}</li>`;
+			})
+			.join("");
+		return (
+			`<div class="todo-header">진행 ${done}/${todos.length}</div>` +
+			`<ul class="todo-list">${items}</ul>`
+		);
+	}
+	if (toolName === "finalize_plan") {
+		const branch = details?.branch ?? "?";
+		const path = details?.planPath ?? details?.path ?? "";
+		const labels: Record<string, string> = {
+			new_session_auto: "새 세션에서 실행",
+			new_session_via_client: "새 세션에서 실행",
+			new_session_pending: "새 세션 대기",
+			current_session: "현재 세션에서 실행",
+			current_session_deferred: "현재 세션에서 실행 (turn 종료 후)",
+			revise: "수정 요청",
+			deferred: "사용자 보류",
+		};
+		const label = labels[String(branch)] ?? String(branch);
+		return `<span class="status-text">${escapeHtml(label)}</span>${path ? `<br><small>${escapeHtml(path)}</small>` : ""}`;
+	}
+	if (!ok) {
+		// Generic error formatting
+		const msg = output?.content?.[0]?.text ?? safeStringify(output);
+		return `<span class="status-text">${escapeHtml(String(msg).slice(0, 200))}</span>`;
+	}
+	return "";
+}
