@@ -372,6 +372,10 @@ html, body {
 	background: color-mix(in srgb, var(--vscode-diffEditor-insertedLineBackground, rgba(80, 200, 100, 0.18)) 100%, transparent);
 	color: var(--vscode-foreground);
 }
+.diff-row-ctx {
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+}
 .diff-prefix {
 	display: inline-block;
 	width: 14px;

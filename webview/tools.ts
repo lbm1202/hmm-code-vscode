@@ -155,8 +155,9 @@ function renderWritePreview(path: string, content: string): string {
 	return `<div class="edit-diff">${header}${rows}${more}</div>`;
 }
 
-/** Build red/green line rows for an old→new edit. Uses inline word-diff for
- *  single-line edits, plain line-by-line otherwise. */
+/** Build a unified-diff line view for an old→new edit. Single-line edits use
+ *  inline word-diff; multi-line edits run an LCS so unchanged lines stay as
+ *  context (white) and only true insertions/deletions are colored. */
 function renderDiffRows(oldStr: string, newStr: string): string {
 	const oldLines = oldStr.split("\n");
 	const newLines = newStr.split("\n");
@@ -171,18 +172,62 @@ function renderDiffRows(oldStr: string, newStr: string): string {
 		);
 	}
 
+	const ops = lcsDiffOps(oldLines, newLines);
 	const rows: string[] = [];
-	for (const line of oldLines) {
-		rows.push(
-			`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${escapeHtml(line) || " "}</div>`,
-		);
-	}
-	for (const line of newLines) {
-		rows.push(
-			`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${escapeHtml(line) || " "}</div>`,
-		);
+	for (const op of ops) {
+		const safe = escapeHtml(op.line) || " ";
+		if (op.kind === "ctx") {
+			rows.push(`<div class="diff-row diff-row-ctx"><span class="diff-prefix"> </span>${safe}</div>`);
+		} else if (op.kind === "del") {
+			rows.push(`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${safe}</div>`);
+		} else {
+			rows.push(`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${safe}</div>`);
+		}
 	}
 	return rows.join("");
+}
+
+type DiffOp = { kind: "ctx" | "del" | "add"; line: string };
+
+/** Line-level diff via LCS backtrack. O(n*m) time/space — fine for typical
+ *  edits (< few hundred lines). For pathologically large blocks (> 50k cells)
+ *  we bail to a naive remove-then-add so we never hang the webview. */
+function lcsDiffOps(a: string[], b: string[]): DiffOp[] {
+	const n = a.length;
+	const m = b.length;
+	if (n * m > 50_000) {
+		return [
+			...a.map<DiffOp>((l) => ({ kind: "del", line: l })),
+			...b.map<DiffOp>((l) => ({ kind: "add", line: l })),
+		];
+	}
+	// dp[i][j] = LCS length of a[i..] and b[j..]
+	const dp = new Array<Uint32Array>(n + 1);
+	for (let i = 0; i <= n; i++) dp[i] = new Uint32Array(m + 1);
+	for (let i = n - 1; i >= 0; i--) {
+		for (let j = m - 1; j >= 0; j--) {
+			dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+		}
+	}
+	const ops: DiffOp[] = [];
+	let i = 0;
+	let j = 0;
+	while (i < n && j < m) {
+		if (a[i] === b[j]) {
+			ops.push({ kind: "ctx", line: a[i] });
+			i++;
+			j++;
+		} else if (dp[i + 1][j] >= dp[i][j + 1]) {
+			ops.push({ kind: "del", line: a[i] });
+			i++;
+		} else {
+			ops.push({ kind: "add", line: b[j] });
+			j++;
+		}
+	}
+	while (i < n) ops.push({ kind: "del", line: a[i++] });
+	while (j < m) ops.push({ kind: "add", line: b[j++] });
+	return ops;
 }
 
 /** Highlight the differing middle of two single-line strings. */
