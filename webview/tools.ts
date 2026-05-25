@@ -97,11 +97,9 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 		// callers might send {old_string, new_string} directly — handle both.
 		const edits = collectEdits(args);
 		if (edits.length === 0) return "";
-		const label = toolName === "multi_edit" || edits.length > 1 ? toolName : "edit";
-		const pathHtml = path
-			? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
-			: "";
-		const header = `<div class="edit-diff-header">${escapeHtml(label)} ${pathHtml}</div>`;
+		// No path header here — the <summary> above already shows the path
+		// (clickable file-link). Repeating it inside the body was just visual
+		// noise. The edit count is still useful, surface it inline instead.
 		const lang = langFromPath(path);
 		const blocks = edits
 			.map((e, i) => {
@@ -112,7 +110,7 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 				return (i > 0 ? sep : "") + renderDiffRows(e.oldText, e.newText, lang);
 			})
 			.join("");
-		return `<div class="edit-diff">${header}${blocks}</div>`;
+		return `<div class="edit-diff">${blocks}</div>`;
 	}
 	if (toolName === "write") {
 		const path = String(args?.path ?? args?.file_path ?? "");
@@ -143,10 +141,8 @@ function collectEdits(args: any): { oldText: string; newText: string }[] {
 
 function renderWritePreview(path: string, content: string): string {
 	if (!content && !path) return "";
-	const pathHtml = path
-		? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
-		: "";
-	const header = `<div class="edit-diff-header">write ${pathHtml}</div>`;
+	// Path header omitted — the <summary> already shows it. Avoids duplicate
+	// path lines between the collapsed summary and the open body.
 	const lang = langFromPath(path);
 	const lines = content.split("\n");
 	const MAX = 30;
@@ -161,7 +157,7 @@ function renderWritePreview(path: string, content: string): string {
 				`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${highlightLine(line, lang) || " "}</div>`,
 		)
 		.join("");
-	return `<div class="edit-diff">${header}${rows}${more}</div>`;
+	return `<div class="edit-diff">${rows}${more}</div>`;
 }
 
 /** Build a unified-diff line view for an old→new edit. Single-line edits use
