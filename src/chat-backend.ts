@@ -75,12 +75,20 @@ export class ChatBackend {
 	static cachedModels(): ModelEntry[] {
 		return ChatBackend._cachedModels;
 	}
+	/** Live instances (sidebar + every open ChatPanel). The settings panel
+	 *  triggers `restartAll()` after auth changes so every Pi process picks
+	 *  up the new auth.json — not just the sidebar. */
+	private static _live = new Set<ChatBackend>();
+	static restartAll(): void {
+		for (const b of ChatBackend._live) b.restart();
+	}
 
 	constructor(
 		private readonly webview: vscode.Webview,
 		private readonly opts: ChatBackendOpts = {},
 	) {
 		webview.onDidReceiveMessage((raw: FromWebview) => this.handleFromWebview(raw));
+		ChatBackend._live.add(this);
 	}
 
 	private notifySessionName(name: unknown): void {
@@ -141,6 +149,7 @@ export class ChatBackend {
 		this.disposed = true;
 		this.client?.stop();
 		this.client = undefined;
+		ChatBackend._live.delete(this);
 	}
 
 	/** Tear down the live Pi process and spawn a fresh one. Used by the

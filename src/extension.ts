@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { ChatBackend } from "./chat-backend";
 import { ChatViewProvider } from "./chat-view";
 import { ChatPanel } from "./chat-panel";
 import { SettingsPanel } from "./settings-panel";
@@ -46,11 +47,13 @@ export function activate(ctx: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("hmm-code.sendSlash", (slash: string) => {
 			if (typeof slash === "string" && slash) provider.cyclePrompt(slash);
 		}),
-		// Restart the sidebar chat's Pi process. Used by the settings panel
-		// after auth changes — Pi caches AuthStorage in memory, so editing
-		// auth.json alone is invisible until the pi process is respawned.
+		// Restart every live Pi process (sidebar + any open editor panels).
+		// Used by the settings panel after auth changes — Pi caches
+		// AuthStorage in memory, so editing auth.json alone is invisible
+		// until the process respawns. ChatBackend tracks live instances in
+		// a static registry so each one gets its own fresh pi.
 		vscode.commands.registerCommand("hmm-code.restartChat", () => {
-			provider.restart();
+			ChatBackend.restartAll();
 		}),
 		vscode.commands.registerCommand("hmm-code.cycleMode", () => {
 			provider.cyclePrompt("/mode");
