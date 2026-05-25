@@ -4,6 +4,7 @@
 // raw JSON envelope.
 
 import { cssEscape, escapeHtml, safeStringify, summarizeArgs } from "./helpers";
+import { highlightLine, langFromPath } from "./syntax";
 import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
 
 /** Tools whose primary UX is a question card. Pretty-render their result block. */
@@ -101,13 +102,14 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 			? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
 			: "";
 		const header = `<div class="edit-diff-header">${escapeHtml(label)} ${pathHtml}</div>`;
+		const lang = langFromPath(path);
 		const blocks = edits
 			.map((e, i) => {
 				const sep =
 					edits.length > 1
 						? `<div class="edit-diff-edit-sep">edit ${i + 1} / ${edits.length}</div>`
 						: "";
-				return (i > 0 ? sep : "") + renderDiffRows(e.oldText, e.newText);
+				return (i > 0 ? sep : "") + renderDiffRows(e.oldText, e.newText, lang);
 			})
 			.join("");
 		return `<div class="edit-diff">${header}${blocks}</div>`;
@@ -145,6 +147,7 @@ function renderWritePreview(path: string, content: string): string {
 		? `<span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(abbreviateHome(path))}</span>`
 		: "";
 	const header = `<div class="edit-diff-header">write ${pathHtml}</div>`;
+	const lang = langFromPath(path);
 	const lines = content.split("\n");
 	const MAX = 30;
 	const shown = lines.slice(0, MAX);
@@ -155,7 +158,7 @@ function renderWritePreview(path: string, content: string): string {
 	const rows = shown
 		.map(
 			(line) =>
-				`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${escapeHtml(line) || " "}</div>`,
+				`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${highlightLine(line, lang) || " "}</div>`,
 		)
 		.join("");
 	return `<div class="edit-diff">${header}${rows}${more}</div>`;
@@ -163,8 +166,9 @@ function renderWritePreview(path: string, content: string): string {
 
 /** Build a unified-diff line view for an old→new edit. Single-line edits use
  *  inline word-diff; multi-line edits run an LCS so unchanged lines stay as
- *  context (white) and only true insertions/deletions are colored. */
-function renderDiffRows(oldStr: string, newStr: string): string {
+ *  context (white) and only true insertions/deletions are colored. Each line
+ *  body is syntax-highlighted via Shiki when a language is supplied. */
+function renderDiffRows(oldStr: string, newStr: string, lang?: string): string {
 	const oldLines = oldStr.split("\n");
 	const newLines = newStr.split("\n");
 
@@ -181,13 +185,13 @@ function renderDiffRows(oldStr: string, newStr: string): string {
 	const ops = lcsDiffOps(oldLines, newLines);
 	const rows: string[] = [];
 	for (const op of ops) {
-		const safe = escapeHtml(op.line) || " ";
+		const body = highlightLine(op.line, lang) || " ";
 		if (op.kind === "ctx") {
-			rows.push(`<div class="diff-row diff-row-ctx"><span class="diff-prefix"> </span>${safe}</div>`);
+			rows.push(`<div class="diff-row diff-row-ctx"><span class="diff-prefix"> </span>${body}</div>`);
 		} else if (op.kind === "del") {
-			rows.push(`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${safe}</div>`);
+			rows.push(`<div class="diff-row diff-row-old"><span class="diff-prefix">-</span>${body}</div>`);
 		} else {
-			rows.push(`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${safe}</div>`);
+			rows.push(`<div class="diff-row diff-row-new"><span class="diff-prefix">+</span>${body}</div>`);
 		}
 	}
 	return rows.join("");

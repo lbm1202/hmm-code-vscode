@@ -1,0 +1,16 @@
+.vscode/**
+.vscode-test/**
+src/**
+webview/**
+out/**/*.map
+node_modules/**
+.gitignore
+.git/**
+.eslintrc.json
+esbuild.config.mjs
+tsconfig.json
+package-lock.json
+**/.DS_Store
+hmm-code-*.vsix
+*.md
+!README.md

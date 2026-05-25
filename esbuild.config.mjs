@@ -1,6 +1,9 @@
 import { build, context } from "esbuild";
 
 const watch = process.argv.includes("--watch");
+// Minify in non-watch builds — webview pulls in Shiki (grammars + theme) and
+// without minification the bundle blows past 2MB. Watch keeps it readable.
+const minify = !watch;
 
 const extensionConfig = {
 	entryPoints: ["src/extension.ts"],
@@ -22,6 +25,7 @@ const webviewConfig = {
 	target: "es2022",
 	format: "iife",
 	sourcemap: true,
+	minify,
 	logLevel: "info",
 };
 
