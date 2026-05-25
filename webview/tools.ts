@@ -117,7 +117,31 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 		const content = String(args?.content ?? "");
 		return renderWritePreview(path, content);
 	}
+	if (toolName === "finalize_plan") {
+		return renderFinalizePlanPreview(args);
+	}
 	return "";
+}
+
+/** Render plan summary + steps INSIDE the finalize_plan tool call body so
+ *  the user can read the plan WHILE the 3-option dialog is still up. Without
+ *  this, the user has to commit to "new session / current session / revise"
+ *  blind, only seeing the truncated summary in the tool-call chip. */
+function renderFinalizePlanPreview(args: any): string {
+	const summary = String(args?.summary ?? "").trim();
+	const steps = Array.isArray(args?.steps) ? args.steps.map((s: any) => String(s ?? "")) : [];
+	const target = String(args?.target_mode ?? "code");
+	if (!summary && steps.length === 0) return "";
+	const summaryHtml = summary
+		? `<div class="plan-summary">${escapeHtml(summary)}</div>`
+		: "";
+	const stepsHtml = steps.length
+		? `<ol class="plan-steps">${steps
+			.map((s) => `<li>${escapeHtml(s)}</li>`)
+			.join("")}</ol>`
+		: "";
+	const targetHtml = `<div class="plan-target">→ <code>${escapeHtml(target)}</code> 모드로 핸드오프</div>`;
+	return `<div class="plan-preview">${summaryHtml}${stepsHtml}${targetHtml}</div>`;
 }
 
 /** Normalize edit/multi_edit args into a flat list of {oldText, newText}.
@@ -602,7 +626,14 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 			deferred: "사용자 보류",
 		};
 		const label = labels[String(branch)] ?? String(branch);
-		return `<span class="status-text">${escapeHtml(label)}</span>${path ? `<br><small>${escapeHtml(path)}</small>` : ""}`;
+		// Plan path → Ctrl/Cmd-clickable file-link, same mechanism as
+		// edit/write/read tool paths. The plan file is already on disk by
+		// the time finalize_plan returns (Pi side wrote it), so vscode.open
+		// resolves immediately.
+		const pathHtml = path
+			? `<br><small><span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open plan file">${escapeHtml(path)}</span></small>`
+			: "";
+		return `<span class="status-text">${escapeHtml(label)}</span>${pathHtml}`;
 	}
 	if (!ok) {
 		// Generic error formatting

@@ -376,6 +376,46 @@ html, body {
 	background: transparent;
 	color: var(--vscode-descriptionForeground);
 }
+
+/* finalize_plan tool-call body preview — shows summary + steps + target
+ * mode WHILE the 3-option dialog is open, so the user can read the plan
+ * before committing to "new session / current session / revise". */
+.plan-preview {
+	padding: 10px 12px;
+	background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+	border-left: 3px solid var(--vscode-charts-blue, #5b9bd5);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.plan-preview .plan-summary {
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+.plan-preview .plan-steps {
+	margin: 0;
+	padding-left: 22px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.plan-preview .plan-steps li {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+.plan-preview .plan-target {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 2px;
+}
+.plan-preview .plan-target code {
+	background: var(--vscode-textBlockQuote-background);
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-family: var(--vscode-editor-font-family);
+}
 /* Ctrl/Cmd-click opens the file in the editor. We don't show an underline by
  * default (it'd be noisy on every tool summary); the title attribute hints
  * the affordance, and holding the modifier flips on the hover style. */

@@ -31,11 +31,7 @@ VS Code 윈도우 reload / 재시작 → 모든 탭 자동 복원. 마지막 열
 
 ## 2. 채팅 푸터 (picker row)
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ [code▲] [Hmm▲] [medium▲] [↺ 기본값] [🔒 Auto] │ ctx 24% [↑] │
-└──────────────────────────────────────────────────────────┘
-```
+왼쪽부터: **mode picker** · **model picker** · **thinking picker** · **↺ 기본값** (조건부) · **🔒 Auto** 토글 · 우측 끝: **ctx 사용률** · **↑ 전송 / ■ 중단**
 
 | 버튼 | 동작 |
 |---|---|
@@ -117,18 +113,13 @@ VS Code 윈도우 reload / 재시작 → 모든 탭 자동 복원. 마지막 열
 
 권한 시스템이 `ask` 판정하면 webview modal 뜸:
 
-```
-┌────────────────────────────────────────┐
-│  Permission                            │
-│                                        │
-│  Mode "code" → bash command needs      │
-│  approval: rm -rf node_modules         │
-│                                        │
-│  Allow this action?                    │
-│                                        │
-│       [거절]            [허용]         │
-└────────────────────────────────────────┘
-```
+> **Permission**
+>
+> Mode "code" → bash command needs approval: `rm -rf node_modules`
+>
+> Allow this action?
+>
+> **[거절]** &nbsp;&nbsp; **[허용]**
 
 - **허용**: 그 한 번만 통과. 같은 명령 다시 호출되면 또 ask
 - **거절**: tool result 가 `isError: true` + "User denied" 로 LLM 에
