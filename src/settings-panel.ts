@@ -234,7 +234,7 @@ export class SettingsPanel {
 				if (msg.modes) {
 					// model.name IS the alias source — manual alias UI is gone.
 					const derived = SettingsPanel.deriveAliasesFromModels(msg.models ?? {});
-					SettingsPanel.writeModes(derived, msg.modeConfigs ?? {});
+					SettingsPanel.writeModes(derived, msg.modeConfigs ?? {}, msg.autoTitle);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
 				const authChanged =
@@ -340,8 +340,17 @@ export class SettingsPanel {
 	private static writeModes(
 		derived: { aliasesByKey: Record<string, string>; managedKeys: Set<string> },
 		modes: Record<string, { provider?: string; id?: string; thinking?: string }>,
+		autoTitle?: { provider?: string; id?: string } | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
+		// Auto-title model override (consumed by auto-title.ts resolveTitleModel).
+		// Both blank → delete the field so the GPT-candidate fallback applies.
+		if (autoTitle !== undefined) {
+			const p = (autoTitle?.provider ?? "").trim();
+			const i = (autoTitle?.id ?? "").trim();
+			if (p && i) raw.autoTitle = { provider: p, id: i };
+			else delete raw.autoTitle;
+		}
 		const existing = (raw.modelAliases && typeof raw.modelAliases === "object") ? raw.modelAliases : {};
 		// Final aliases = (existing entries NOT managed by models.json) +
 		//                 (derived entries — model.name → alias)
@@ -473,6 +482,19 @@ export class SettingsPanel {
 		<h2>모드</h2>
 		<div class="desc">각 모드별 모델 (provider + id) 과 thinking level. 빈 값으로 두면 default 사용.</div>
 		<div id="mode-cards"></div>
+	</div>
+
+	<div class="section">
+		<h2>기타 모델 설정</h2>
+		<div class="desc">
+			세션 자동 제목 생성에 사용할 모델. 빈 값이면 GPT-mini 후보 → code 모드 모델 → 활성 모델 순으로 fallback.
+			컨텍스트 요약(compact)은 Pi 가 항상 <strong>현재 활성 모델</strong>을 사용 — 별도 설정 불가.
+		</div>
+		<div class="mode-card" id="autotitle-card" style="grid-template-columns: 140px 1fr 1fr;">
+			<div class="mode-name" style="color: var(--vscode-foreground);">자동 제목</div>
+			<select id="autotitle-provider"></select>
+			<select id="autotitle-id"></select>
+		</div>
 	</div>
 
 	<div class="section">
@@ -819,6 +841,7 @@ const MODE_NAMES = ${JSON.stringify(MODE_NAMES)};
 const SETTINGS_JS_BODY = `
 let diskState = null;
 let modesDraft = {};
+let autoTitleDraft = { provider: '', id: '' };
 let authAddsDraft = {};           // provider id -> key (new ones to add)
 let authRemovesDraft = new Set(); // provider ids to remove
 let modelsDraft = { providers: {} };
@@ -864,9 +887,22 @@ function modelsDirty() {
 	return JSON.stringify(modelsDraft) !== JSON.stringify(diskModels());
 }
 
+function diskAutoTitle() {
+	const a = diskState && diskState.modes && diskState.modes.autoTitle;
+	return {
+		provider: (a && a.provider) || '',
+		id: (a && a.id) || '',
+	};
+}
+function autoTitleDirty() {
+	const d = diskAutoTitle();
+	return d.provider !== autoTitleDraft.provider || d.id !== autoTitleDraft.id;
+}
+
 function isDirty() {
 	if (!diskState) return false;
 	for (const n of MODE_NAMES) if (modeDirty(n)) return true;
+	if (autoTitleDirty()) return true;
 	if (authDirty()) return true;
 	if (modelsDirty()) return true;
 	return false;
@@ -881,6 +917,7 @@ function updateSaveBar() {
 	authD = Object.keys(authAddsDraft).length + authRemovesDraft.size;
 	const parts = [];
 	if (modeD) parts.push(modeD + '개 모드');
+	if (autoTitleDirty()) parts.push('자동 제목 모델');
 	if (authD) parts.push(authD + '개 인증');
 	if (modelsDirty()) parts.push('커스텀 공급자');
 	document.getElementById('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
@@ -1331,15 +1368,39 @@ function renderDiscoveryFor(container, provName) {
 	});
 }
 
+function renderAutoTitle() {
+	const card = document.getElementById('autotitle-card');
+	if (!card) return;
+	card.classList.toggle('dirty', autoTitleDirty());
+	const providerIndex = buildProviderIndex();
+	const provSel = document.getElementById('autotitle-provider');
+	const idSel = document.getElementById('autotitle-id');
+	provSel.innerHTML = providerOptionsHtml(autoTitleDraft.provider, providerIndex);
+	idSel.innerHTML = modelOptionsHtml(autoTitleDraft.id, autoTitleDraft.provider, providerIndex);
+	provSel.onchange = () => {
+		autoTitleDraft.provider = provSel.value;
+		autoTitleDraft.id = '';
+		renderAutoTitle();
+		updateSaveBar();
+	};
+	idSel.onchange = () => {
+		autoTitleDraft.id = idSel.value;
+		card.classList.toggle('dirty', autoTitleDirty());
+		updateSaveBar();
+	};
+}
+
 function render(s) {
 	diskState = s;
 	modesDraft = {};
 	for (const n of MODE_NAMES) modesDraft[n] = diskMode(n);
+	autoTitleDraft = diskAutoTitle();
 	authAddsDraft = {};
 	authRemovesDraft = new Set();
 	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
 
 	renderModes();
+	renderAutoTitle();
 	renderAuth();
 	renderProviders();
 	updateSaveBar();
@@ -1411,6 +1472,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
 		kind: 'save',
 		modes: true,
 		modeConfigs: modesDraft,
+		autoTitle: autoTitleDraft,
 		authAdds: authAddsDraft,
 		authRemoves: Array.from(authRemovesDraft),
 		models: modelsDraft,
