@@ -550,7 +550,7 @@ export class SettingsPanel {
 		<h2>공급자별 모델 필터</h2>
 		<div class="desc">
 			모델 picker 에 보일 모델을 공급자별로 선택. 전부 체크되어 있으면 필터 없음(전체 노출). 일부만 체크하면 그 모델들만 picker 에 보임.
-			모드 설정의 dropdown 은 항상 전체 모델을 표시.
+			위쪽 모드 설정 / 자동 제목 dropdown 도 동일하게 필터링됨 (이미 선택된 hidden 모델은 유지).
 		</div>
 		<div id="allowlist-cards"></div>
 	</div>
@@ -1051,10 +1051,17 @@ function updateSaveBar() {
 // Pi's get_available_models). Used to constrain the mode dropdowns to real
 // choices. Fallback: if Pi hasn't responded yet, both selects show only the
 // current draft value so the user isn't blocked.
-function buildProviderIndex() {
+function buildProviderIndex(applyAllowlist = true) {
 	// Map<provider, Array<{id, alias?}>>. Alias comes from modes.json:modelAliases
 	// and is attached to availableModels by the host. Dropdowns display alias
 	// when present so the user sees "Hmm" instead of "Qwen3.6-35B-A3B-MLX-VL-oQ5".
+	//
+	// applyAllowlist=true (default): respect the user's allowlist filter so
+	// the mode/autoTitle dropdowns mirror what the chat picker shows. A mode
+	// that's already configured to a now-hidden model keeps its selection —
+	// modelOptionsHtml re-injects the currentValue if it's missing.
+	// applyAllowlist=false: used by the allowlist UI itself, which must list
+	// every model so the user can toggle them.
 	const map = new Map();
 	const list = (diskState && diskState.availableModels) || [];
 	for (const m of list) {
@@ -1062,7 +1069,16 @@ function buildProviderIndex() {
 		if (!map.has(m.provider)) map.set(m.provider, []);
 		map.get(m.provider).push({ id: m.id, alias: m.alias });
 	}
-	for (const arr of map.values()) arr.sort((a, b) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
+	if (applyAllowlist) {
+		for (const [prov, entries] of map.entries()) {
+			const allowed = Array.isArray(allowlistDraft[prov])
+				? new Set(allowlistDraft[prov])
+				: null;
+			if (allowed) map.set(prov, entries.filter((e) => allowed.has(e.id)));
+		}
+	}
+	for (const arr of map.values())
+		arr.sort((a, b) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
 	return map;
 }
 
@@ -1530,7 +1546,9 @@ function renderAllowlist() {
 	const root = document.getElementById('allowlist-cards');
 	if (!root) return;
 	root.innerHTML = '';
-	const providerIndex = buildProviderIndex();
+	// Allowlist UI must show ALL models so the user can toggle them — pass
+	// applyAllowlist=false so we don't filter out the very items being managed.
+	const providerIndex = buildProviderIndex(false);
 	const providers = [...providerIndex.keys()].sort();
 	if (providers.length === 0) {
 		root.innerHTML = '<div class="note">사용 가능한 모델이 아직 없습니다. 채팅 세션이 시작되면 자동으로 채워집니다.</div>';
@@ -1587,6 +1605,10 @@ function renderAllowlist() {
 			if (current.size === entries.length) delete allowlistDraft[prov];
 			else allowlistDraft[prov] = [...current];
 			renderAllowlist();
+			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
+			// hidden models disappear from their selects too.
+			renderModes();
+			renderAutoTitle();
 			updateSaveBar();
 		});
 	});
@@ -1595,6 +1617,10 @@ function renderAllowlist() {
 			const prov = btn.getAttribute('data-allow-all');
 			if (prov) delete allowlistDraft[prov];
 			renderAllowlist();
+			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
+			// hidden models disappear from their selects too.
+			renderModes();
+			renderAutoTitle();
 			updateSaveBar();
 		});
 	});
@@ -1603,6 +1629,10 @@ function renderAllowlist() {
 			const prov = btn.getAttribute('data-allow-none');
 			if (prov) allowlistDraft[prov] = [];
 			renderAllowlist();
+			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
+			// hidden models disappear from their selects too.
+			renderModes();
+			renderAutoTitle();
 			updateSaveBar();
 		});
 	});

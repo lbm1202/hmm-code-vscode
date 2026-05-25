@@ -409,7 +409,43 @@ export class ChatBackend {
 			case FROM_WEBVIEW.LIST_SESSIONS:
 				await this.refreshSessions();
 				return;
-			case FROM_WEBVIEW.DELETE_SESSION:
+			case FROM_WEBVIEW.DELETE_SESSION: {
+				// If the file being deleted is the one Pi is actively writing
+				// to, spin up a new session FIRST so Pi releases the file
+				// handle. Otherwise the chat tab would be left showing a
+				// session that no longer exists on disk and Pi would keep
+				// trying to append to the deleted path.
+				let isCurrent = false;
+				if (client) {
+					try {
+						const stateRes = await client.send({ type: "get_state" });
+						if (stateRes.success) {
+							const f = (stateRes.data as { sessionFile?: string })?.sessionFile;
+							if (typeof f === "string" && f === raw.file) isCurrent = true;
+						}
+					} catch {
+						/* probe failure isn't fatal — fall through to delete */
+					}
+				}
+				if (isCurrent && client) {
+					try {
+						const res = await client.send({ type: "new_session" });
+						if (res.success) {
+							// SESSION_START isn't pushed to RPC subscribers for
+							// new_session; synthesize it so the webview clears
+							// the chat and rebinds to the new file.
+							this.post({
+								kind: TO_WEBVIEW.EVENT,
+								event: { type: "session_start", reason: "new_session" },
+							});
+						}
+					} catch (err) {
+						this.post({
+							kind: TO_WEBVIEW.STDERR,
+							text: `new_session before delete failed: ${(err as Error).message}`,
+						});
+					}
+				}
 				try {
 					deleteSession(raw.file, this.workspaceCwd());
 				} catch (err) {
@@ -420,6 +456,7 @@ export class ChatBackend {
 				}
 				await this.refreshSessions();
 				return;
+			}
 			case FROM_WEBVIEW.RENAME_SESSION:
 				try {
 					renameSession(raw.file, raw.name);

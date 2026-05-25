@@ -143,6 +143,11 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 					const ok = await showConfirmDialog(msg);
 					if (!ok) return;
 					post({ kind: FROM_WEBVIEW.DELETE_SESSION, file: s.file });
+					// Close the picker — list is stale either way and re-opening
+					// shows the fresh state. If the deleted file was the active
+					// session, the host spins up a new one for us (see
+					// chat-backend DELETE_SESSION handler).
+					modalRoot.innerHTML = "";
 				} catch (err) {
 					console.error("[hmm-code:session-picker] delete failed:", err);
 				}
