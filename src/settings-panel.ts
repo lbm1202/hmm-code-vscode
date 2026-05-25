@@ -87,7 +87,15 @@ export class SettingsPanel {
 			}
 		});
 
+		// Re-push state whenever ChatBackend's static model cache updates so
+		// dropdowns repopulate even if the panel was opened before any chat
+		// session had pulled get_available_models. Without this, opening
+		// Settings first → opening chat after leaves all model dropdowns
+		// stuck on "(default)".
+		const unsubscribe = ChatBackend.onCacheUpdate(() => SettingsPanel.refresh(panel));
+
 		panel.onDidDispose(() => {
+			unsubscribe();
 			if (SettingsPanel.instance === panel) SettingsPanel.instance = undefined;
 		});
 
@@ -99,6 +107,12 @@ export class SettingsPanel {
 			kind: "state",
 			state: SettingsPanel.readState(),
 		});
+		// If no chat session has populated the model cache yet, ask the first
+		// live backend to fetch. The cache observer above will then trigger a
+		// follow-up refresh once the data lands.
+		if (ChatBackend.cachedModels().length === 0) {
+			ChatBackend.requestModelsOnce();
+		}
 	}
 
 	private static readState() {
@@ -119,10 +133,20 @@ export class SettingsPanel {
 		// Built-in + custom models known to the live Pi process (cached
 		// whenever the sidebar pulls get_available_models). Used to populate
 		// the mode-config dropdowns so the user only sees real choices.
+		// Includes alias (from modes.json:modelAliases) so dropdowns can show
+		// the user's friendly name instead of the raw id.
 		const availableModels = ChatBackend.cachedModels().map((m: any) => ({
 			provider: String(m.provider ?? ""),
 			id: String(m.id ?? ""),
+			alias: m.alias ? String(m.alias) : undefined,
 		}));
+		// Allowlist map lives inside modes.json:modelAllowlist. Surface it as
+		// a top-level field so the allowlist UI doesn't need to reach into
+		// the modes blob.
+		const modelAllowlist =
+			modes && typeof modes === "object" && modes.modelAllowlist && typeof modes.modelAllowlist === "object"
+				? (modes.modelAllowlist as Record<string, string[]>)
+				: {};
 		return {
 			modesPath: MODES_PATH,
 			modelsPath: MODELS_PATH,
@@ -132,6 +156,7 @@ export class SettingsPanel {
 			auth: authSafe,
 			models,
 			availableModels,
+			modelAllowlist,
 			oauthProviders: OAUTH_PROVIDERS,
 			apiTypes: API_TYPES,
 		};
@@ -234,7 +259,12 @@ export class SettingsPanel {
 				if (msg.modes) {
 					// model.name IS the alias source — manual alias UI is gone.
 					const derived = SettingsPanel.deriveAliasesFromModels(msg.models ?? {});
-					SettingsPanel.writeModes(derived, msg.modeConfigs ?? {}, msg.autoTitle);
+					SettingsPanel.writeModes(
+						derived,
+						msg.modeConfigs ?? {},
+						msg.autoTitle,
+						msg.modelAllowlist,
+					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
 				const authChanged =
@@ -343,6 +373,7 @@ export class SettingsPanel {
 		derived: { aliasesByKey: Record<string, string>; managedKeys: Set<string> },
 		modes: Record<string, { provider?: string; id?: string; thinking?: string }>,
 		autoTitle?: { provider?: string; id?: string } | null,
+		modelAllowlist?: Record<string, string[]> | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
 		// Auto-title model override (consumed by auto-title.ts resolveTitleModel).
@@ -352,6 +383,22 @@ export class SettingsPanel {
 			const i = (autoTitle?.id ?? "").trim();
 			if (p && i) raw.autoTitle = { provider: p, id: i };
 			else delete raw.autoTitle;
+		}
+		// modelAllowlist: per-provider id list. Semantics:
+		//   missing key → no filter for that provider
+		//   [] (empty)  → 0 visible (explicit hide-all)
+		//   [...]       → only those visible
+		// Webview drops the key entirely when the user re-checks every model,
+		// so the only way to get a key here is an explicit subset (incl. []).
+		if (modelAllowlist !== undefined) {
+			const clean: Record<string, string[]> = {};
+			if (modelAllowlist) {
+				for (const [prov, ids] of Object.entries(modelAllowlist)) {
+					if (Array.isArray(ids)) clean[prov] = ids.slice();
+				}
+			}
+			if (Object.keys(clean).length === 0) delete raw.modelAllowlist;
+			else raw.modelAllowlist = clean;
 		}
 		const existing = (raw.modelAliases && typeof raw.modelAliases === "object") ? raw.modelAliases : {};
 		// Final aliases = (existing entries NOT managed by models.json) +
@@ -497,6 +544,15 @@ export class SettingsPanel {
 			<select id="autotitle-provider"></select>
 			<select id="autotitle-id"></select>
 		</div>
+	</div>
+
+	<div class="section">
+		<h2>공급자별 모델 필터</h2>
+		<div class="desc">
+			모델 picker 에 보일 모델을 공급자별로 선택. 전부 체크되어 있으면 필터 없음(전체 노출). 일부만 체크하면 그 모델들만 picker 에 보임.
+			모드 설정의 dropdown 은 항상 전체 모델을 표시.
+		</div>
+		<div id="allowlist-cards"></div>
 	</div>
 
 	<div class="section">
@@ -686,6 +742,41 @@ th {
 	font-size: 11px;
 	margin: 0 0 14px 0;
 }
+.provider-card .provider-header {
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 10px;
+}
+.provider-card .provider-header .provider-name {
+	font-size: 13px; font-weight: 600;
+}
+.provider-card .provider-header .provider-meta {
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+}
+.provider-card .provider-header .provider-actions { display: flex; gap: 6px; }
+.allowlist-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 4px 12px;
+}
+.allowlist-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	padding: 2px 4px;
+	cursor: pointer;
+}
+.allowlist-item:hover { background: var(--vscode-list-hoverBackground); }
+.allowlist-item input { margin: 0; }
+.allowlist-item span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .field { margin-bottom: 14px; }
 .field label {
 	display: block;
@@ -856,6 +947,9 @@ let autoTitleDraft = { provider: '', id: '' };
 let authAddsDraft = {};           // provider id -> key (new ones to add)
 let authRemovesDraft = new Set(); // provider ids to remove
 let modelsDraft = { providers: {} };
+// Per-provider model id allowlist draft. Empty obj or empty list per provider
+// = no filter for that provider. Sent to host as modelAllowlist on save.
+let allowlistDraft = {};
 
 function showToast(text, isError) {
 	const t = document.getElementById('toast');
@@ -910,12 +1004,30 @@ function autoTitleDirty() {
 	return d.provider !== autoTitleDraft.provider || d.id !== autoTitleDraft.id;
 }
 
+function diskAllowlist() {
+	const a = diskState && diskState.modelAllowlist;
+	return (a && typeof a === 'object') ? a : {};
+}
+function allowlistDirty() {
+	// Preserve empty arrays — they mean "explicitly hide all from this provider",
+	// distinct from a missing key which means "no filter".
+	const norm = (obj) => {
+		const out = {};
+		for (const [k, v] of Object.entries(obj || {})) {
+			if (Array.isArray(v)) out[k] = v.slice().sort();
+		}
+		return out;
+	};
+	return JSON.stringify(norm(allowlistDraft)) !== JSON.stringify(norm(diskAllowlist()));
+}
+
 function isDirty() {
 	if (!diskState) return false;
 	for (const n of MODE_NAMES) if (modeDirty(n)) return true;
 	if (autoTitleDirty()) return true;
 	if (authDirty()) return true;
 	if (modelsDirty()) return true;
+	if (allowlistDirty()) return true;
 	return false;
 }
 
@@ -931,6 +1043,7 @@ function updateSaveBar() {
 	if (autoTitleDirty()) parts.push('자동 제목 모델');
 	if (authD) parts.push(authD + '개 인증');
 	if (modelsDirty()) parts.push('커스텀 공급자');
+	if (allowlistDirty()) parts.push('모델 필터');
 	document.getElementById('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
 }
 
@@ -939,14 +1052,17 @@ function updateSaveBar() {
 // choices. Fallback: if Pi hasn't responded yet, both selects show only the
 // current draft value so the user isn't blocked.
 function buildProviderIndex() {
+	// Map<provider, Array<{id, alias?}>>. Alias comes from modes.json:modelAliases
+	// and is attached to availableModels by the host. Dropdowns display alias
+	// when present so the user sees "Hmm" instead of "Qwen3.6-35B-A3B-MLX-VL-oQ5".
 	const map = new Map();
 	const list = (diskState && diskState.availableModels) || [];
 	for (const m of list) {
 		if (!m.provider || !m.id) continue;
 		if (!map.has(m.provider)) map.set(m.provider, []);
-		map.get(m.provider).push(m.id);
+		map.get(m.provider).push({ id: m.id, alias: m.alias });
 	}
-	for (const ids of map.values()) ids.sort((a, b) => a.localeCompare(b));
+	for (const arr of map.values()) arr.sort((a, b) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
 	return map;
 }
 
@@ -965,13 +1081,19 @@ function providerOptionsHtml(currentValue, providerIndex) {
 }
 
 function modelOptionsHtml(currentValue, provider, providerIndex) {
-	const ids = (provider && providerIndex.get(provider)) || [];
-	const present = ids.slice();
-	if (currentValue && !present.includes(currentValue)) present.unshift(currentValue);
+	const entries = (provider && providerIndex.get(provider)) || [];
+	const present = entries.slice();
+	if (currentValue && !present.some((e) => e.id === currentValue)) {
+		present.unshift({ id: currentValue });
+	}
 	const parts = ['<option value="">(default)</option>'];
-	for (const id of present) {
-		const sel = id === currentValue ? ' selected' : '';
-		parts.push('<option value="' + esc(id) + '"' + sel + '>' + esc(id) + '</option>');
+	for (const e of present) {
+		const sel = e.id === currentValue ? ' selected' : '';
+		// Label: alias if available, else id. Title attribute always shows raw
+		// id so hovering disambiguates aliases that map to similar names.
+		const label = e.alias || e.id;
+		const title = e.alias ? e.alias + ' (' + e.id + ')' : e.id;
+		parts.push('<option value="' + esc(e.id) + '" title="' + esc(title) + '"' + sel + '>' + esc(label) + '</option>');
 	}
 	return parts.join('');
 }
@@ -1404,6 +1526,88 @@ function renderAutoTitle() {
 	};
 }
 
+function renderAllowlist() {
+	const root = document.getElementById('allowlist-cards');
+	if (!root) return;
+	root.innerHTML = '';
+	const providerIndex = buildProviderIndex();
+	const providers = [...providerIndex.keys()].sort();
+	if (providers.length === 0) {
+		root.innerHTML = '<div class="note">사용 가능한 모델이 아직 없습니다. 채팅 세션이 시작되면 자동으로 채워집니다.</div>';
+		return;
+	}
+	for (const prov of providers) {
+		const entries = providerIndex.get(prov) || [];
+		const allowed = Array.isArray(allowlistDraft[prov]) ? new Set(allowlistDraft[prov]) : null;
+		// allowed === null → all visible (no filter for this provider)
+		// allowed === Set → only those ids visible
+		const card = document.createElement('div');
+		card.className = 'provider-card';
+		const filtered = allowed && allowed.size < entries.length;
+		card.innerHTML =
+			'<div class="provider-header">' +
+				'<div class="provider-name">' + esc(prov) + '</div>' +
+				'<div class="provider-meta">' +
+					(filtered ? esc(String(allowed.size)) + ' / ' + entries.length + ' 노출' : '전체 ' + entries.length + ' 노출') +
+				'</div>' +
+				'<div class="provider-actions">' +
+					'<button class="ghost" data-allow-all="' + esc(prov) + '">전체</button>' +
+					'<button class="ghost" data-allow-none="' + esc(prov) + '">해제</button>' +
+				'</div>' +
+			'</div>' +
+			'<div class="allowlist-grid" data-allow-grid="' + esc(prov) + '"></div>';
+		root.appendChild(card);
+		const grid = card.querySelector('[data-allow-grid]');
+		for (const e of entries) {
+			const checked = allowed ? allowed.has(e.id) : true;
+			const label = document.createElement('label');
+			label.className = 'allowlist-item';
+			const title = e.alias ? e.alias + ' (' + e.id + ')' : e.id;
+			label.title = title;
+			label.innerHTML =
+				'<input type="checkbox" data-allow-prov="' + esc(prov) + '" data-allow-id="' + esc(e.id) + '" ' + (checked ? 'checked' : '') + ' />' +
+				'<span>' + esc(e.alias || e.id) + '</span>';
+			grid.appendChild(label);
+		}
+	}
+	// Wire change/click handlers.
+	root.querySelectorAll('input[type="checkbox"][data-allow-prov]').forEach((el) => {
+		el.addEventListener('change', () => {
+			const prov = el.getAttribute('data-allow-prov');
+			const id = el.getAttribute('data-allow-id');
+			if (!prov || !id) return;
+			const entries = providerIndex.get(prov) || [];
+			// Start from the current effective set (all visible if no filter).
+			const current = Array.isArray(allowlistDraft[prov])
+				? new Set(allowlistDraft[prov])
+				: new Set(entries.map((e) => e.id));
+			if (el.checked) current.add(id);
+			else current.delete(id);
+			// If user re-checked everything, drop the key entirely (= no filter).
+			if (current.size === entries.length) delete allowlistDraft[prov];
+			else allowlistDraft[prov] = [...current];
+			renderAllowlist();
+			updateSaveBar();
+		});
+	});
+	root.querySelectorAll('button[data-allow-all]').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			const prov = btn.getAttribute('data-allow-all');
+			if (prov) delete allowlistDraft[prov];
+			renderAllowlist();
+			updateSaveBar();
+		});
+	});
+	root.querySelectorAll('button[data-allow-none]').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			const prov = btn.getAttribute('data-allow-none');
+			if (prov) allowlistDraft[prov] = [];
+			renderAllowlist();
+			updateSaveBar();
+		});
+	});
+}
+
 function render(s) {
 	diskState = s;
 	modesDraft = {};
@@ -1412,9 +1616,11 @@ function render(s) {
 	authAddsDraft = {};
 	authRemovesDraft = new Set();
 	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
+	allowlistDraft = JSON.parse(JSON.stringify(diskAllowlist()));
 
 	renderModes();
 	renderAutoTitle();
+	renderAllowlist();
 	renderAuth();
 	renderProviders();
 	updateSaveBar();
@@ -1487,6 +1693,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
 		modes: true,
 		modeConfigs: modesDraft,
 		autoTitle: autoTitleDraft,
+		modelAllowlist: allowlistDraft,
 		authAdds: authAddsDraft,
 		authRemoves: Array.from(authRemovesDraft),
 		models: modelsDraft,

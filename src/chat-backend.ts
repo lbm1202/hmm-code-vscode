@@ -19,18 +19,25 @@ import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
-/** Read modelAliases from ~/.pi/agent/modes.json. Returns empty map on any
- *  error (file missing, parse failure, schema mismatch) so callers don't
- *  need to special-case the absent-file path. */
-function readModelAliases(): Record<string, string> {
+/** Read modes.json once and return the two maps the model post-processing
+ *  needs. Empty maps on any error (file missing, parse failure, etc) so
+ *  callers don't need to special-case the absent-file path. */
+function readModelMaps(): {
+	aliases: Record<string, string>;
+	allowlist: Record<string, string[]>;
+} {
 	try {
-		if (!existsSync(MODES_JSON_PATH)) return {};
+		if (!existsSync(MODES_JSON_PATH)) return { aliases: {}, allowlist: {} };
 		const raw = JSON.parse(readFileSync(MODES_JSON_PATH, "utf-8")) as {
 			modelAliases?: Record<string, string>;
+			modelAllowlist?: Record<string, string[]>;
 		};
-		return raw?.modelAliases ?? {};
+		return {
+			aliases: raw?.modelAliases ?? {},
+			allowlist: raw?.modelAllowlist ?? {},
+		};
 	} catch {
-		return {};
+		return { aliases: {}, allowlist: {} };
 	}
 }
 
@@ -45,6 +52,29 @@ function findAlias(
 		if (aliases[fq]) return aliases[fq];
 	}
 	return aliases[id];
+}
+
+/** Apply per-provider allowlist. Semantics:
+ *   - provider key missing → no filter (all models visible)
+ *   - provider key = [...]  → only those ids visible
+ *   - provider key = []     → 0 visible (explicit hide-all) */
+function applyAllowlist(models: ModelEntry[], allowlist: Record<string, string[]>): ModelEntry[] {
+	const hasFilters = Object.keys(allowlist).length > 0;
+	if (!hasFilters) return models;
+	return models.filter((m) => {
+		const allowed = allowlist[m.provider];
+		if (!allowed) return true;
+		return allowed.includes(m.id);
+	});
+}
+
+/** Attach aliases to a raw Pi model list — used for the static cache that
+ *  feeds the settings panel (which wants ALL models, no allowlist filter). */
+function attachAliases(raw: ModelEntry[], aliases: Record<string, string>): ModelEntry[] {
+	return raw.map((m) => {
+		const alias = findAlias(aliases, m.provider, m.id);
+		return alias ? { ...m, alias } : m;
+	});
 }
 
 export interface ModelEntry {
@@ -111,6 +141,35 @@ export class ChatBackend {
 	static cachedModels(): ModelEntry[] {
 		return ChatBackend._cachedModels;
 	}
+	/** Observers (settings panel) fired whenever the static cache changes —
+	 *  lets the settings panel refresh its dropdowns when the chat side pulls
+	 *  fresh models, so opening Settings before any chat session has run no
+	 *  longer leaves provider lists empty. */
+	private static _cacheObservers = new Set<() => void>();
+	static onCacheUpdate(fn: () => void): () => void {
+		ChatBackend._cacheObservers.add(fn);
+		return () => ChatBackend._cacheObservers.delete(fn);
+	}
+	private static setCache(models: ModelEntry[]): void {
+		ChatBackend._cachedModels = models;
+		for (const fn of ChatBackend._cacheObservers) {
+			try {
+				fn();
+			} catch (err) {
+				console.error("[hmm-code:chat-backend] cache observer threw:", err);
+			}
+		}
+	}
+	/** Trigger a model fetch on the first available live backend. Used by the
+	 *  settings panel when it opens before any chat has run, so dropdowns
+	 *  populate without requiring the user to open chat first. No-op if no
+	 *  live backend exists yet. */
+	static requestModelsOnce(): void {
+		for (const b of ChatBackend._live) {
+			b.scheduleModelRefresh(0);
+			return;
+		}
+	}
 	/** Live instances (sidebar + every open ChatPanel). The settings panel
 	 *  triggers `restartAll()` after auth changes so every Pi process picks
 	 *  up the new auth.json — not just the sidebar. */
@@ -146,13 +205,14 @@ export class ChatBackend {
 				if (!res.success) return;
 				const data = res.data as { models?: any[] };
 				const raw = (data.models ?? []) as ModelEntry[];
-				const aliases = readModelAliases();
-				const models = raw.map((m) => {
-					const alias = findAlias(aliases, m.provider, m.id);
-					return alias ? { ...m, alias } : m;
-				});
-				ChatBackend._cachedModels = models;
-				this.post({ kind: TO_WEBVIEW.MODELS, models });
+				const { aliases, allowlist } = readModelMaps();
+				const withAliases = attachAliases(raw, aliases);
+				// Static cache stays UNFILTERED so the settings panel can
+				// expose every model in the allowlist UI. Filter is only
+				// applied to what we push to the chat webview's picker.
+				ChatBackend.setCache(withAliases);
+				const visible = applyAllowlist(withAliases, allowlist);
+				this.post({ kind: TO_WEBVIEW.MODELS, models: visible });
 			} catch (err) {
 				console.error("[hmm-code:chat-backend] post-reload model refresh failed:", err);
 			}
@@ -421,17 +481,16 @@ export class ChatBackend {
 						// even when state.model is incomplete.
 						const data = res.data as { models?: any[] };
 						const raw = (data.models ?? []) as ModelEntry[];
-						// Attach modelAliases (from modes.json) so pickers can show
-						// the user's friendly name instead of the raw model id.
-						// Read on every request — modes.json is small and may have
-						// been edited since the last call.
-						const aliases = readModelAliases();
-						const models = raw.map((m) => {
-							const alias = findAlias(aliases, m.provider, m.id);
-							return alias ? { ...m, alias } : m;
-						});
-						ChatBackend._cachedModels = models;
-						this.post({ kind: TO_WEBVIEW.MODELS, models });
+						// Read modes.json on every request — small file, may have
+						// been edited since last pull.
+						const { aliases, allowlist } = readModelMaps();
+						const withAliases = attachAliases(raw, aliases);
+						// Cache is UNFILTERED so the settings panel can offer every
+						// model in the allowlist UI; the chat webview gets the
+						// filtered subset for its picker.
+						ChatBackend.setCache(withAliases);
+						const visible = applyAllowlist(withAliases, allowlist);
+						this.post({ kind: TO_WEBVIEW.MODELS, models: visible });
 					}
 				} catch (err) {
 					this.post({
