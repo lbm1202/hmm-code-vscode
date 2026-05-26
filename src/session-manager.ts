@@ -111,18 +111,25 @@ export function listSessions(cwd: string): SessionEntry[] {
 /** Compute the cascade set for `file` — the file itself plus every
  *  descendant (transitive children via parentFile). Returned as a Set
  *  so callers can do O(1) membership tests (e.g. "is the active session
- *  about to be wiped?"). */
+ *  about to be wiped?"). Paths compared case-insensitively because the
+ *  workspace cwd and Pi's stored parentSession can differ in case on
+ *  macOS/Windows (case-insensitive FS, case-preserving strings). */
 export function collectCascade(file: string, cwd: string): Set<string> {
 	const all = listSessions(cwd);
+	const lowerToFile = new Map<string, string>();
+	for (const s of all) lowerToFile.set(s.file.toLowerCase(), s.file);
 	const childrenOf = new Map<string, string[]>();
 	for (const s of all) {
 		if (!s.parentFile) continue;
-		const list = childrenOf.get(s.parentFile) ?? [];
+		const parentCanonical = lowerToFile.get(s.parentFile.toLowerCase());
+		if (!parentCanonical) continue;
+		const list = childrenOf.get(parentCanonical) ?? [];
 		list.push(s.file);
-		childrenOf.set(s.parentFile, list);
+		childrenOf.set(parentCanonical, list);
 	}
+	const startCanonical = lowerToFile.get(file.toLowerCase()) ?? file;
 	const set = new Set<string>();
-	const queue: string[] = [file];
+	const queue: string[] = [startCanonical];
 	while (queue.length > 0) {
 		const f = queue.shift()!;
 		if (set.has(f)) continue;

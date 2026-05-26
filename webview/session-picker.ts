@@ -39,12 +39,22 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 	if (sessions.length) {
 		const childrenByParent = new Map<string, SessionEntry[]>();
 		const roots: SessionEntry[] = [];
-		const fileSet = new Set(sessions.map((s) => s.file));
+		// macOS + Windows filesystems are case-insensitive, but path strings
+		// preserve the case they were created with. VS Code's workspace cwd
+		// and Pi's stored `parentSession` can differ in case (e.g. `dev` vs
+		// `Dev`) for the same on-disk directory — exact equality misses, all
+		// children fall to roots, tree collapses to a flat list. Compare
+		// lowercased copies and map back to the canonical file for grouping.
+		const lowerToFile = new Map<string, string>();
+		for (const s of sessions) lowerToFile.set(s.file.toLowerCase(), s.file);
 		for (const s of sessions) {
-			if (s.parentFile && fileSet.has(s.parentFile)) {
-				const list = childrenByParent.get(s.parentFile) ?? [];
+			const parentCanonical = s.parentFile
+				? lowerToFile.get(s.parentFile.toLowerCase())
+				: undefined;
+			if (parentCanonical) {
+				const list = childrenByParent.get(parentCanonical) ?? [];
 				list.push(s);
-				childrenByParent.set(s.parentFile, list);
+				childrenByParent.set(parentCanonical, list);
 			} else {
 				roots.push(s);
 			}

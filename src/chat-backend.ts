@@ -427,9 +427,18 @@ export class ChatBackend {
 								// Treat as "current is being deleted" whenever the active
 								// session is in the cascade set — covers the case where the
 								// user deletes an ancestor and cascade wipes the active
-								// child too.
+								// child too. Case-insensitive contains() because macOS/Win
+								// preserve case in path strings but the FS is case-folded —
+								// Pi's sessionFile and the cascade entries may differ
+								// (`/Users/foo/dev/...` vs `/Users/foo/Dev/...`).
 								const cascade = collectCascade(raw.file, this.workspaceCwd());
-								if (cascade.has(f)) isCurrent = true;
+								const fLower = f.toLowerCase();
+								for (const c of cascade) {
+									if (c.toLowerCase() === fLower) {
+										isCurrent = true;
+										break;
+									}
+								}
 							}
 						}
 					} catch {
