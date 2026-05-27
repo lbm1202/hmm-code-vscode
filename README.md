@@ -3,7 +3,7 @@
 VS Code UI for the [Pi coding agent](https://github.com/badlogic/pi-mono).
 `pi --mode rpc` 를 Claude-Code 스타일 native 채팅 surface 로 감싸고, 자매
 extension [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) (위치:
-`~/.pi/agent/extensions/modes`) 와 짝지어 plan/code/debug/ask 워크플로우
+`~/.pi/agent/extensions/hmm-code-pi`) 와 짝지어 plan/code/debug/ask 워크플로우
 + 권한 시스템 + AGENTS.md + auto-approve 등 제공.
 
 ---
@@ -70,7 +70,7 @@ Webview (HTML/CSS/TS, 14+ modules)
   └── helpers/dom/state/protocol/types
 
 Pi process
-  └── loads ~/.pi/agent/extensions/modes/   ← hmm-code-pi
+  └── loads ~/.pi/agent/extensions/hmm-code-pi/
         ├── 4-mode system
         ├── finalize_plan / request_mode_switch / ask_user / todo_write
         ├── permissions/* (Layer 2 — tool_call hook)

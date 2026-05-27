@@ -41,6 +41,9 @@ e.btnSettings.addEventListener("click", () => {
 // command runs Pi-side without appending a user bubble. Pi extension flips
 // state.autoApprove and broadcasts setStatus("auto-approve", "on"|"off")
 // back, which dispatch.ts handler renders on the button.
+// (No webview-level keyboard shortcut: VS Code grabs most Ctrl/Cmd-modified
+//  combos before the webview sees them. Use the button or Pi TUI's
+//  Ctrl+Shift+A shortcut instead.)
 e.btnAutoApprove.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve" });
 });

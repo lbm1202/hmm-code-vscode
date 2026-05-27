@@ -224,4 +224,4 @@ mode picker chip + plan handoff 알림 + 푸터 mode label 에 일관 적용.
 - Pi `@earendil-works/pi-coding-agent` 4.x 이상 (글로벌 npm 또는
   homebrew 로 설치된 `pi` CLI 가 PATH 에 있어야 함)
 - Pi 확장 [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) 가
-  `~/.pi/agent/extensions/modes/` 에 설치되어 있어야 함
+  `~/.pi/agent/extensions/hmm-code-pi/` 에 설치되어 있어야 함
