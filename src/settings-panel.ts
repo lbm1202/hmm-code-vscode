@@ -453,27 +453,43 @@ export class SettingsPanel {
 	}
 
 	private static writeModels(models: any): void {
-		// Full replacement of providers dict. The webview sends the entire
-		// edited state, so we trust it as the new source of truth.
+		// Preserve any fields the user added manually in models.json that our
+		// UI doesn't expose (`compat.thinkingFormat: "qwen-chat-template"`,
+		// `headers`, `oauth`, `thinkingLevelMap`, `cost`, etc.). Start from
+		// the existing object and only patch the fields we own.
 		const next: any = { providers: {} };
 		if (models?.providers && typeof models.providers === "object") {
 			for (const [name, cfg] of Object.entries(models.providers as any)) {
 				if (!name) continue;
 				const c = cfg as any;
-				const provider: any = {};
-				if (c.name) provider.name = c.name;
-				if (c.baseUrl) provider.baseUrl = c.baseUrl;
-				if (c.apiKey) provider.apiKey = c.apiKey;
-				if (c.api) provider.api = c.api;
+				// Clone unknown provider-level fields. Drop empty stringy
+				// values so we don't write `"baseUrl": ""` etc.
+				const provider: any = { ...c };
+				delete provider.models;
+				if (!c.name) delete provider.name;
+				if (!c.baseUrl) delete provider.baseUrl;
+				if (!c.apiKey) delete provider.apiKey;
+				if (!c.api) delete provider.api;
 				if (Array.isArray(c.models) && c.models.length > 0) {
 					provider.models = c.models
 						.filter((m: any) => m?.id)
 						.map((m: any) => {
-							const out: any = { id: String(m.id).trim() };
-							if (m.name) out.name = m.name;
-							if (m.contextWindow != null && m.contextWindow !== "") out.contextWindow = Number(m.contextWindow);
-							if (m.maxTokens != null && m.maxTokens !== "") out.maxTokens = Number(m.maxTokens);
+							// Clone the entire model so user-added `compat`, etc.
+							// survive. Then re-assert / clear the fields the UI owns.
+							const out: any = { ...m, id: String(m.id).trim() };
+							if (!m.name) delete out.name;
+							if (m.contextWindow != null && m.contextWindow !== "") {
+								out.contextWindow = Number(m.contextWindow);
+							} else {
+								delete out.contextWindow;
+							}
+							if (m.maxTokens != null && m.maxTokens !== "") {
+								out.maxTokens = Number(m.maxTokens);
+							} else {
+								delete out.maxTokens;
+							}
 							if (m.reasoning) out.reasoning = true;
+							else delete out.reasoning;
 							return out;
 						});
 				}
