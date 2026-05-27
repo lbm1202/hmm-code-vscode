@@ -255,11 +255,14 @@ export class ChatBackend {
 			this.post({ kind: TO_WEBVIEW.UI_HINT, hint }),
 		);
 		c.on("stderr", (text: string) => {
-			// Suppress only the routine success log ("[auto-title] using ..."),
-			// so error/diagnostic lines stay visible for troubleshooting.
+			// Suppress ALL auto-title diagnostics from the chat surface — they
+			// are an internal background job (separate LLM call to name the
+			// session) that the user shouldn't see in chat. Errors still go
+			// to Pi's process stderr so they're recoverable via Output panel /
+			// terminal logs, just not in the user's conversation view.
 			const filtered = text
 				.split(/\r?\n/)
-				.filter((line) => !/^\s*\[auto-title\] using\s/.test(line))
+				.filter((line) => !/^\s*\[auto-title\]/.test(line))
 				.join("\n");
 			if (filtered.trim()) this.post({ kind: TO_WEBVIEW.STDERR, text: filtered });
 		});
