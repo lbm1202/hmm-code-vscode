@@ -1328,7 +1328,11 @@ function renderProviders() {
 			if (!n) return;
 			delete modelsDraft.providers[n];
 			delete discoveryState[n];
+			// Whole provider gone → every mode pinned to it needs fallback.
+			autoFallbackModes();
 			renderProviders();
+			renderModes();
+			renderAutoTitle();
 			updateSaveBar();
 		});
 	});
@@ -1401,6 +1405,13 @@ function renderModelRows(container, provName, models) {
 			const cfg = modelsDraft.providers[p];
 			if (!cfg?.models?.[i]) return;
 			cfg.models[i][f] = isCheckbox ? el.checked : el.value;
+			// id change can rename a model — any mode pinned to the old id
+			// loses its target and needs fallback.
+			if (f === 'id') {
+				autoFallbackModes();
+				renderModes();
+				renderAutoTitle();
+			}
 			updateSaveBar();
 			const card = el.closest('.provider-card');
 			if (card) card.classList.toggle('dirty', provDirty(p));
@@ -1414,7 +1425,11 @@ function renderModelRows(container, provName, models) {
 			const cfg = modelsDraft.providers[p];
 			if (cfg?.models) {
 				cfg.models.splice(i, 1);
+				// Delete may have removed a model that modes/autoTitle reference.
+				autoFallbackModes();
 				renderProviders();
+				renderModes();
+				renderAutoTitle();
 				updateSaveBar();
 			}
 		});
@@ -1520,6 +1535,50 @@ function renderDiscoveryFor(container, provName) {
 	});
 }
 
+/** If a mode (or autoTitle) is configured to a model that's no longer
+ *  visible (allowlist removed it, custom provider deleted it, model id
+ *  edited), auto-replace with another visible model. Prefers same provider,
+ *  falls back to any provider, finally clears to default if nothing exists.
+ *  Returns true if any draft was modified so callers can re-render. */
+function autoFallbackModes() {
+	const providerIndex = buildProviderIndex(true);
+	const firstVisible = () => {
+		for (const [prov, entries] of providerIndex.entries()) {
+			if (entries.length > 0) return { provider: prov, id: entries[0].id };
+		}
+		return null;
+	};
+	const replacements = [];
+	const fixOne = (label, draft) => {
+		if (!draft.provider || !draft.id) return;
+		const entries = providerIndex.get(draft.provider) || [];
+		if (entries.some((e) => e.id === draft.id)) return;
+		const old = draft.provider + '/' + draft.id;
+		if (entries.length > 0) {
+			draft.id = entries[0].id;
+			replacements.push(label + ': ' + old + ' → ' + draft.provider + '/' + draft.id);
+		} else {
+			const fb = firstVisible();
+			if (fb) {
+				draft.provider = fb.provider;
+				draft.id = fb.id;
+				replacements.push(label + ': ' + old + ' → ' + fb.provider + '/' + fb.id);
+			} else {
+				draft.provider = '';
+				draft.id = '';
+				replacements.push(label + ': ' + old + ' → (default)');
+			}
+		}
+	};
+	for (const m of MODE_NAMES) fixOne(m + ' 모드', modesDraft[m] || { provider: '', id: '' });
+	fixOne('자동 제목', autoTitleDraft);
+	if (replacements.length) {
+		showToast(replacements.length + '개 모델 자동 대체: ' + replacements[0]
+			+ (replacements.length > 1 ? ' 외 ' + (replacements.length - 1) + '건' : ''));
+	}
+	return replacements.length > 0;
+}
+
 function renderAutoTitle() {
 	const card = document.getElementById('autotitle-card');
 	if (!card) return;
@@ -1604,9 +1663,11 @@ function renderAllowlist() {
 			// If user re-checked everything, drop the key entirely (= no filter).
 			if (current.size === entries.length) delete allowlistDraft[prov];
 			else allowlistDraft[prov] = [...current];
+			// Auto-fallback any mode (or autoTitle) whose model just dropped
+			// out of the visible set. Toast surfaces the replacement so the
+			// user notices before they save.
+			autoFallbackModes();
 			renderAllowlist();
-			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
-			// hidden models disappear from their selects too.
 			renderModes();
 			renderAutoTitle();
 			updateSaveBar();
@@ -1616,9 +1677,11 @@ function renderAllowlist() {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-all');
 			if (prov) delete allowlistDraft[prov];
+			// Auto-fallback any mode (or autoTitle) whose model just dropped
+			// out of the visible set. Toast surfaces the replacement so the
+			// user notices before they save.
+			autoFallbackModes();
 			renderAllowlist();
-			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
-			// hidden models disappear from their selects too.
 			renderModes();
 			renderAutoTitle();
 			updateSaveBar();
@@ -1628,9 +1691,11 @@ function renderAllowlist() {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-none');
 			if (prov) allowlistDraft[prov] = [];
+			// Auto-fallback any mode (or autoTitle) whose model just dropped
+			// out of the visible set. Toast surfaces the replacement so the
+			// user notices before they save.
+			autoFallbackModes();
 			renderAllowlist();
-			// Mode + autoTitle dropdowns mirror the allowlist — re-render so
-			// hidden models disappear from their selects too.
 			renderModes();
 			renderAutoTitle();
 			updateSaveBar();

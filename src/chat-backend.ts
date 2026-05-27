@@ -165,12 +165,38 @@ export class ChatBackend {
 	}
 	/** Trigger a model fetch on the first available live backend. Used by the
 	 *  settings panel when it opens before any chat has run, so dropdowns
-	 *  populate without requiring the user to open chat first. No-op if no
-	 *  live backend exists yet. */
+	 *  populate without requiring the user to open chat first. Falls back to
+	 *  a transient PiClient when no live backend exists yet — settings can
+	 *  work standalone. */
 	static requestModelsOnce(): void {
 		for (const b of ChatBackend._live) {
 			b.scheduleModelRefresh(0);
 			return;
+		}
+		ChatBackend.fetchModelsStandalone().catch((err) => {
+			console.error("[hmm-code:chat-backend] standalone model fetch failed:", err);
+		});
+	}
+
+	/** Spawn a one-shot pi --mode rpc, pull get_available_models, hydrate the
+	 *  static cache (which fires observers → settings panel auto-refreshes),
+	 *  then stop. Lets the settings panel function without ever opening a
+	 *  chat tab. */
+	private static async fetchModelsStandalone(): Promise<void> {
+		const cwd =
+			vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME ?? undefined;
+		const client = new PiClient();
+		try {
+			client.start({ cwd });
+			const res = await client.send({ type: "get_available_models" }, 30_000);
+			if (!res.success) return;
+			const data = res.data as { models?: any[] };
+			const raw = (data.models ?? []) as ModelEntry[];
+			const { aliases } = readModelMaps();
+			const withAliases = attachAliases(raw, aliases);
+			ChatBackend.setCache(withAliases);
+		} finally {
+			client.stop();
 		}
 	}
 	/** Live instances (sidebar + every open ChatPanel). The settings panel
