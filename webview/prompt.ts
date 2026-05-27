@@ -76,9 +76,30 @@ export function wirePrompt(): void {
 		else doSend();
 	});
 	e.prompt.addEventListener("keydown", (ev) => {
+		// IME composing: never intercept — let the input method finish first.
+		if ((ev as any).isComposing || ev.keyCode === 229) return;
 		if (ev.key === "Enter" && !ev.shiftKey) {
 			ev.preventDefault();
 			doSend();
+			return;
+		}
+		// Shift+Enter — insert newline EXPLICITLY. Relying on the textarea's
+		// default newline behavior turned out to be unreliable in SSH-remote
+		// VS Code webviews (some intermediate layer eats the keystroke before
+		// the textarea sees it). Doing the splice ourselves guarantees it
+		// works in every environment.
+		if (ev.key === "Enter" && ev.shiftKey) {
+			ev.preventDefault();
+			const ta = e.prompt;
+			const start = ta.selectionStart ?? ta.value.length;
+			const end = ta.selectionEnd ?? ta.value.length;
+			const before = ta.value.slice(0, start);
+			const after = ta.value.slice(end);
+			ta.value = before + "\n" + after;
+			ta.selectionStart = ta.selectionEnd = start + 1;
+			// Fire an input event so any consumer (e.g. autosize / dirty
+			// tracking) reacts the same as a real keystroke would.
+			ta.dispatchEvent(new Event("input", { bubbles: true }));
 			return;
 		}
 		if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
