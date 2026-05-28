@@ -64,24 +64,6 @@
         }
       ]
     },
-    "keybindings": [
-      {
-        "command": "hmm-code.cycleMode",
-        "key": "shift+tab",
-        "mac": "shift+tab",
-        "when": "hmm-code.chat.focus || activeWebviewPanelId == 'hmm-code.chatPanel'"
-      },
-      {
-        "command": "hmm-code.toggleThinking",
-        "key": "alt+t",
-        "when": "hmm-code.chat.focus || activeWebviewPanelId == 'hmm-code.chatPanel'"
-      },
-      {
-        "command": "hmm-code.resetDefaults",
-        "key": "alt+x",
-        "when": "hmm-code.chat.focus || activeWebviewPanelId == 'hmm-code.chatPanel'"
-      }
-    ],
     "viewsContainers": {
       "activitybar": [
         {
