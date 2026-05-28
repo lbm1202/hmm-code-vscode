@@ -1,5 +1,6 @@
 // Pure stateless utilities: markdown, escaping, JSON, arg summarization.
 
+import DOMPurify from "dompurify";
 import { marked } from "marked";
 
 // Configure marked once at module load. async:false because streaming needs
@@ -7,9 +8,22 @@ import { marked } from "marked";
 // single \n is NOT treated as <br> (lists/paragraphs stay tight).
 marked.setOptions({ gfm: true, breaks: false, async: false });
 
+// DOMPurify hardening on top of its safe defaults. DOMPurify already strips
+// <script>, inline event handlers (onload/onclick/...), and javascript: URLs.
+// We additionally forbid <iframe>/<object>/<embed>/<form>/<input>/<button>
+// (no use case in chat markdown), block data:* attributes, and tighten the
+// URI allowlist to a small set of safe schemes.
+const PURIFY_CONFIG = {
+	FORBID_TAGS: ["iframe", "object", "embed", "form", "input", "button"],
+	FORBID_ATTR: ["formaction", "onfocus", "onblur", "onload", "onerror"],
+	ALLOW_DATA_ATTR: false,
+	ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|sms|ftp):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+};
+
 export function md(s: string): string {
 	try {
-		return marked.parse(s) as string;
+		const raw = marked.parse(s) as string;
+		return DOMPurify.sanitize(raw, PURIFY_CONFIG);
 	} catch {
 		return escapeHtml(s);
 	}
