@@ -59,7 +59,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
 			provider.cyclePrompt("/mode");
 		}),
 		vscode.commands.registerCommand("hmm-code.toggleThinking", () => {
-			provider.cyclePrompt("/mode-set");
+			provider.cyclePrompt("/thinking-toggle");
 		}),
 		vscode.commands.registerCommand("hmm-code.resetDefaults", () => {
 			provider.cyclePrompt("/reset");
