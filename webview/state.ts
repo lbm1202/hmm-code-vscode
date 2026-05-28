@@ -85,6 +85,12 @@ export const runtime = {
 	isOverridden: false,
 	/** Active session file path (from Pi's get_state). */
 	currentSessionFile: undefined as string | undefined,
+	/** Set while a switch_session command is in flight. Suppresses
+	 * rememberSessionFile so the user's PREVIOUS session (the one we're
+	 * switching TO) isn't overwritten by interim STATE messages reporting
+	 * Pi's bootstrap temp session. Cleared when STATE arrives with this
+	 * exact sessionFile. */
+	pendingSwitchTarget: undefined as string | undefined,
 	/** finalize_plan handoff queue: plan written, awaiting new session start. */
 	pendingPlanHandoff: null as { path: string; targetMode: string } | null,
 	/** Most recent state.model object — used to recompute thinking levels when

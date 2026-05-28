@@ -62,6 +62,11 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		// by default; this transitions to the previous one once it's ready.
 		const last = persistedSessionFile();
 		if (last) {
+			// Set the guard BEFORE the setTimeout so any STATE message that
+			// arrives in the 300ms window (reporting Pi's bootstrap temp
+			// session) won't overwrite `last` in persisted storage. Cleared
+			// in renderState when the target session reports back.
+			runtime.pendingSwitchTarget = last;
 			// Small delay so Pi's initial session bootstrap finishes before
 			// we tell it to switch — racing it can cause "session not found"
 			// errors on cold-start.
@@ -286,17 +291,35 @@ function renderState(state: any): void {
 	}
 	if (typeof state.sessionFile === "string") {
 		runtime.currentSessionFile = state.sessionFile;
-		// Persist for auto-resume after window reload.
-		rememberSessionFile(state.sessionFile);
+		// Guard against the auto-resume race: while a switch_session is in
+		// flight, Pi's bootstrap temp session may report here first and
+		// silently overwrite the user's previous session in persisted storage,
+		// breaking auto-resume on the next reload. Skip until the target lands.
+		if (runtime.pendingSwitchTarget) {
+			if (state.sessionFile === runtime.pendingSwitchTarget) {
+				runtime.pendingSwitchTarget = undefined;
+				rememberSessionFile(state.sessionFile);
+			}
+		} else {
+			rememberSessionFile(state.sessionFile);
+		}
 	}
 }
 
-/** Async sequence: wait for session settle, switch mode if needed, fire plan body. */
+/** Async sequence: wait for session settle, switch mode if needed, fire plan body.
+ *  Mode-switch wait is condition-based (poll ui.mode until it matches), with a
+ *  hard ceiling — replaces the fixed 200ms delay that could let the body fire
+ *  before Pi finished applying the mode under load. */
 async function runPlanHandoff(path: string, targetMode: string): Promise<void> {
 	await delay(300);
 	if (targetMode && targetMode !== ui.mode) {
 		post({ kind: FROM_WEBVIEW.PROMPT, text: `/mode ${targetMode}` });
-		await delay(200);
+		await waitFor(() => ui.mode === targetMode, 2000);
+		if (ui.mode !== targetMode) {
+			appendSystem(
+				`Warning: mode did not settle to "${targetMode}" within 2s; sending plan anyway.`,
+			);
+		}
 	}
 	const body = buildPlanExecutionBody(path, targetMode);
 	appendSystem(`Implementing plan from ${path}`);
@@ -306,6 +329,14 @@ async function runPlanHandoff(path: string, targetMode: string): Promise<void> {
 
 function delay(ms: number): Promise<void> {
 	return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Poll predicate every 50ms up to timeoutMs. Returns when true or timeout. */
+async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
+	const start = Date.now();
+	while (!pred() && Date.now() - start < timeoutMs) {
+		await delay(50);
+	}
 }
 
 // Re-export `updatePromptDisabled` so other modules can import from a single barrel.
