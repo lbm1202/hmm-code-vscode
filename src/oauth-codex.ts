@@ -10,6 +10,7 @@
 
 import { randomBytes, createHash } from "node:crypto";
 import * as http from "node:http";
+import { t } from "./i18n";
 
 const CALLBACK_HOST = process.env.PI_OAUTH_CALLBACK_HOST || "127.0.0.1";
 const CALLBACK_PORT = 1455;
@@ -83,12 +84,12 @@ function buildAuthorizeUrl(state: string, challenge: string): string {
 	return url.toString();
 }
 
-const SUCCESS_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Login complete</title>
+const successHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Login complete</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:80px 20px;background:#0d1117;color:#c9d1d9}h1{color:#3fb950}p{color:#8b949e;font-size:14px}</style>
-</head><body><h1>✓ 로그인 완료</h1><p>창을 닫아도 됩니다.</p></body></html>`;
+</head><body><h1>${t("oauth.page.successTitle")}</h1><p>${t("oauth.page.successBody")}</p></body></html>`;
 const ERROR_HTML = (msg: string) => `<!doctype html><html><head><meta charset="utf-8"><title>Login failed</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:80px 20px;background:#0d1117;color:#c9d1d9}h1{color:#f85149}p{color:#8b949e;font-size:14px}</style>
-</head><body><h1>✗ 로그인 실패</h1><p>${msg}</p></body></html>`;
+</head><body><h1>${t("oauth.page.failTitle")}</h1><p>${msg}</p></body></html>`;
 
 interface CallbackResult { code: string }
 
@@ -104,24 +105,24 @@ function startCallbackServer(state: string, signal: AbortSignal): Promise<Callba
 					// Stray probe (favicon, etc.) — respond but keep listening for
 					// the real callback. (The old code tore the server down here.)
 					res.statusCode = 404;
-					res.end(ERROR_HTML("Callback 경로가 아닙니다."));
+					res.end(ERROR_HTML(t("oauth.err.notCallbackPath")));
 					return;
 				}
 				if (url.searchParams.get("state") !== state) {
 					res.statusCode = 400;
-					res.end(ERROR_HTML("state 불일치 (보안 검증 실패)."));
+					res.end(ERROR_HTML(t("oauth.err.stateMismatch")));
 					settle(() => reject(new Error("OAuth state mismatch")));
 					return;
 				}
 				const code = url.searchParams.get("code");
 				if (!code) {
 					res.statusCode = 400;
-					res.end(ERROR_HTML("Authorization code 없음."));
+					res.end(ERROR_HTML(t("oauth.err.noCode")));
 					settle(() => reject(new Error("Missing authorization code")));
 					return;
 				}
 				res.statusCode = 200;
-				res.end(SUCCESS_HTML);
+				res.end(successHtml());
 				settle(() => resolve({ code }));
 			} catch (err) {
 				res.statusCode = 500;
@@ -148,7 +149,7 @@ function startCallbackServer(state: string, signal: AbortSignal): Promise<Callba
 			const e = err as NodeJS.ErrnoException;
 			const msg =
 				e.code === "EADDRINUSE"
-					? `포트 ${CALLBACK_PORT} 사용 중입니다. 다른 로그인(pi /login 등)을 닫고 다시 시도하세요.`
+					? t("oauth.err.portInUse", { port: CALLBACK_PORT })
 					: e.message;
 			if (!settled) {
 				settled = true;
@@ -230,18 +231,18 @@ export async function codexOAuthLogin(
 
 	callbacks.onAuth({
 		url,
-		instructions: "브라우저에서 OpenAI 로그인을 완료하세요. 로그인 완료 시 자동으로 토큰이 저장됩니다.",
+		instructions: t("oauth.codex.instructions"),
 	});
 
-	callbacks.onProgress?.("Callback 서버 대기 중 (127.0.0.1:1455)…");
+	callbacks.onProgress?.(t("oauth.progress.waiting", { addr: "127.0.0.1:1455" }));
 	const { code } = await startCallbackServer(state, signal);
 
-	callbacks.onProgress?.("Token 교환 중…");
+	callbacks.onProgress?.(t("oauth.progress.exchanging"));
 	const tokens = await exchangeCodeForTokens(code, verifier);
 
 	const accountId = getAccountId(tokens.access);
 	if (!accountId) {
-		throw new Error("accessToken 에서 chatgpt_account_id 추출 실패");
+		throw new Error(t("oauth.codex.extractFail"));
 	}
 
 	return {

@@ -6,6 +6,7 @@
 import { cssEscape, escapeHtml, md, safeStringify, summarizeArgs } from "./helpers";
 import { highlightBlock, highlightLine, langFromPath } from "./syntax";
 import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
+import { t } from "./i18n";
 
 /** Tools whose primary UX is a question card. Pretty-render their result block. */
 export const INTERACTIVE_TOOLS = new Set([
@@ -54,7 +55,7 @@ export function buildToolCallBlock(
 	summary.innerHTML =
 		`<span class="tool-name">${escapeHtml(toolName)}</span>` +
 		summaryHtmlForTool(toolName, args) +
-		(opts.spinner ? `<span class="tool-spinner" title="실행 중…">⏳</span>` : "");
+		(opts.spinner ? `<span class="tool-spinner" title="${escapeHtml(t("tool.running"))}">⏳</span>` : "");
 	block.appendChild(summary);
 
 	// Args JSON block only when (a) not interactive (those use a card UI),
@@ -192,7 +193,7 @@ function renderFinalizePlanPreview(args: any): string {
 		);
 	}
 	parts.push(
-		`<div class="plan-target">→ <code>${escapeHtml(target)}</code> 모드로 핸드오프</div>`,
+		`<div class="plan-target">${t("tool.planHandoff", { target: `<code>${escapeHtml(target)}</code>` })}</div>`,
 	);
 	return `<div class="plan-preview">${parts.join("")}</div>`;
 }
@@ -434,7 +435,7 @@ export function shouldShowArgsBlock(args: unknown): boolean {
 function interactiveSummaryArgs(toolName: string, args: any): string {
 	if (toolName === "ask_user" && Array.isArray(args?.questions)) {
 		const topics = args.questions.map((q: any) => q?.topic).filter(Boolean);
-		return topics.length ? topics.join(" / ") : `${args.questions.length}개 질문`;
+		return topics.length ? topics.join(" / ") : t("tool.questions", { n: args.questions.length });
 	}
 	if (toolName === "request_mode_switch") {
 		return `→ ${args?.target_mode ?? "?"}${args?.reason ? ` · ${String(args.reason).slice(0, 50)}` : ""}`;
@@ -574,7 +575,7 @@ function formatBuiltInResult(
 				open: true,
 			};
 		}
-		const firstLine = text.split("\n").find((l) => l.trim()) ?? "완료";
+		const firstLine = text.split("\n").find((l) => l.trim()) ?? t("tool.done");
 		return {
 			html: `<span class="builtin-ok">✓ ${escapeHtml(firstLine.slice(0, 200))}</span>`,
 			open: true,
@@ -620,31 +621,31 @@ export function extractToolText(output: any): string {
 export function formatInteractiveResult(toolName: string, output: any, ok: boolean): string {
 	const details = output?.details ?? {};
 	if (toolName === "ask_user") {
-		if (details?.cancelled) return `<span class="status-text">사용자가 취소함</span>`;
+		if (details?.cancelled) return `<span class="status-text">${escapeHtml(t("tool.cancelled"))}</span>`;
 		const answers: any[] = details?.answers ?? [];
-		if (answers.length === 0) return `<span class="status-text">응답 없음</span>`;
+		if (answers.length === 0) return `<span class="status-text">${escapeHtml(t("tool.noResponse"))}</span>`;
 		return (
 			`<ul class="qa-list">` +
 			answers
 				.map(
 					(a) =>
 						`<li><span class="qa-topic">${escapeHtml(String(a.topic ?? "?"))}</span>` +
-						`<span class="qa-answer">${escapeHtml(String(a.selected ?? ""))}${a.wasOther ? ' <em class="qa-other">(직접 입력)</em>' : ""}</span></li>`,
+						`<span class="qa-answer">${escapeHtml(String(a.selected ?? ""))}${a.wasOther ? ` <em class="qa-other">${escapeHtml(t("tool.custom"))}</em>` : ""}</span></li>`,
 				)
 				.join("") +
 			`</ul>`
 		);
 	}
 	if (toolName === "request_mode_switch") {
-		if (details?.cancelled) return `<span class="status-text">사용자가 취소함</span>`;
+		if (details?.cancelled) return `<span class="status-text">${escapeHtml(t("tool.cancelled"))}</span>`;
 		const accepted = details?.accepted;
-		if (accepted === true) return `<span class="status-text">전환 승인 → ${escapeHtml(String(details?.to ?? "?"))}</span>`;
-		if (accepted === false) return `<span class="status-text">전환 거절</span>`;
+		if (accepted === true) return `<span class="status-text">${escapeHtml(t("tool.switchAccepted", { to: String(details?.to ?? "?") }))}</span>`;
+		if (accepted === false) return `<span class="status-text">${escapeHtml(t("tool.switchRejected"))}</span>`;
 		return "";
 	}
 	if (toolName === "todo_write") {
 		const todos: any[] = details?.todos ?? [];
-		if (todos.length === 0) return `<span class="status-text">빈 목록</span>`;
+		if (todos.length === 0) return `<span class="status-text">${escapeHtml(t("tool.empty"))}</span>`;
 		const ICON: Record<string, string> = {
 			pending: "☐",
 			in_progress: "▶",
@@ -663,7 +664,7 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 			})
 			.join("");
 		return (
-			`<div class="todo-header">진행 ${done}/${todos.length}</div>` +
+			`<div class="todo-header">${escapeHtml(t("tool.todoHeader", { done, total: todos.length }))}</div>` +
 			`<ul class="todo-list">${items}</ul>`
 		);
 	}
@@ -671,14 +672,14 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 		const branch = details?.branch ?? "?";
 		const path = details?.planPath ?? details?.path ?? "";
 		const labels: Record<string, string> = {
-			new_session_auto: "새 세션에서 실행",
-			new_session_via_client: "새 세션에서 실행",
-			new_session_pending: "새 세션 대기",
-			current_session: "현재 세션에서 실행",
-			current_session_deferred: "현재 세션에서 실행 (turn 종료 후)",
-			current_session_headless: "현재 세션에서 실행 (headless)",
-			revise: "수정 요청",
-			deferred: "사용자 보류",
+			new_session_auto: t("tool.branch.newSession"),
+			new_session_via_client: t("tool.branch.newSession"),
+			new_session_pending: t("tool.branch.newSessionPending"),
+			current_session: t("tool.branch.currentSession"),
+			current_session_deferred: t("tool.branch.currentSessionDeferred"),
+			current_session_headless: t("tool.branch.currentSessionHeadless"),
+			revise: t("tool.branch.revise"),
+			deferred: t("tool.branch.deferred"),
 		};
 		const label = labels[String(branch)] ?? String(branch);
 		// Plan path → Ctrl/Cmd-clickable file-link, same mechanism as

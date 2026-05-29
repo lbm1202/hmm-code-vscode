@@ -2,6 +2,8 @@
 // Imported once at boot by main.ts; the exported `els` map and helper fns
 // are the single source of truth for DOM access in the rest of the webview.
 
+import { t } from "./i18n";
+
 // Inline SVG logo (avoids CSP / webview-asset URI plumbing for static art).
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 64" aria-hidden="true">
 	<g style="font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-weight: 900;">
@@ -21,9 +23,9 @@ const APP_HTML = `
 	<div class="topbar">
 		<div class="topbar-title">Hmm-code</div>
 		<div class="topbar-actions">
-			<button class="iconbtn" id="btn-new-session" title="New session">＋</button>
-			<button class="iconbtn" id="btn-sessions" title="Resume session">🕘</button>
-			<button class="iconbtn" id="btn-settings" title="설정 (공급자 인증 / 모델 / 설정)">⚙</button>
+			<button class="iconbtn" id="btn-new-session" title="${t("chat.newSessionBtn")}">＋</button>
+			<button class="iconbtn" id="btn-sessions" title="${t("chat.resumeSessionBtn")}">🕘</button>
+			<button class="iconbtn" id="btn-settings" title="${t("chat.settingsBtn")}">⚙</button>
 		</div>
 	</div>
 	<div class="messages" id="messages"></div>
@@ -33,19 +35,19 @@ const APP_HTML = `
 		<div class="empty-version">${VERSION_LINE}</div>
 		<div class="empty-subtitle">Plan · Code · Debug · Ask</div>
 		<div class="recent-section">
-			<div class="recent-header">최근 세션</div>
+			<div class="recent-header">${t("chat.recentSessions")}</div>
 			<div class="recent-list" id="recent-list"></div>
 		</div>
 	</div>
 	<div class="prompt-area">
-		<textarea id="prompt-input" rows="3" placeholder="메시지를 입력하세요… (Enter로 전송, Shift+Enter 줄바꿈, Tab 모드 전환)" autofocus></textarea>
+		<textarea id="prompt-input" rows="3" placeholder="${t("chat.promptPlaceholder")}" autofocus></textarea>
 		<div class="prompt-footer">
 			<div class="picker-row">
 				<button class="picker" id="picker-mode"><span class="picker-label">code</span><span class="picker-caret">▲</span></button>
 				<button class="picker" id="picker-model"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
 				<button class="picker" id="picker-thinking"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
-				<button class="picker hidden" id="btn-reset" title="모드 기본값으로 모델/추론 재설정">↺ 기본값</button>
-				<button class="picker autoapprove off" id="btn-autoapprove" title="권한 ask 자동승인 토글 (세션 한정)">🔒 Auto</button>
+				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺ ${t("chat.resetLabel")}</button>
+				<button class="picker autoapprove off" id="btn-autoapprove" title="${t("chat.autoApproveTitle")}">🔒 Auto</button>
 			</div>
 			<div class="footer-right">
 				<span class="ctx-pill" id="ctx-pill">ctx —</span>

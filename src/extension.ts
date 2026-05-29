@@ -4,8 +4,25 @@ import { ChatViewProvider } from "./chat-view";
 import { ChatPanel } from "./chat-panel";
 import { getPiLaunchConfig } from "./pi-launcher";
 import { SettingsPanel } from "./settings-panel";
+import { clearI18nCache, initI18n, t } from "./i18n";
 
 export function activate(ctx: vscode.ExtensionContext): void {
+	// Load locale dictionaries (l10n/<locale>.json) before any webview renders.
+	initI18n(ctx.extensionPath);
+	// Language is baked into each webview's HTML at render time, so a change
+	// needs a window reload to take effect everywhere. Offer it.
+	ctx.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration((e) => {
+			if (!e.affectsConfiguration("hmm-code.language")) return;
+			clearI18nCache();
+			vscode.window
+				.showInformationMessage(t("host.languageChanged"), t("host.reloadNow"))
+				.then((pick) => {
+					if (pick) vscode.commands.executeCommand("workbench.action.reloadWindow");
+				});
+		}),
+	);
+
 	// Resolve how to spawn Pi (bundled / user-override / system fallback) once.
 	// Every ChatBackend instance pulls from this central config so we can swap
 	// modes by changing a setting and reloading the window.

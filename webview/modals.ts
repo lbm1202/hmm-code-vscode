@@ -4,6 +4,7 @@
 
 import { els, setEmptyVisibility } from "./dom";
 import { safeStringify } from "./helpers";
+import { t } from "./i18n";
 import { FROM_WEBVIEW } from "./protocol";
 import { pendingUiRequests, post, runtime } from "./state";
 import { ensureTurn, removeStatus } from "./turn-lifecycle";
@@ -60,7 +61,7 @@ export function showModal(req: any): void {
 		card.appendChild(dbg);
 		const okBtn = document.createElement("button");
 		okBtn.className = "ghost";
-		okBtn.textContent = "닫기";
+		okBtn.textContent = t("chat.modal.close");
 		okBtn.addEventListener("click", cancel);
 		card.appendChild(okBtn);
 	}
@@ -83,9 +84,9 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 	);
 
 	// Multi-select detection: Pi side prefixes the title with
-	// "(선택 가능: 다중)" for ask_user questions where multiple options
-	// can be picked. Render checkboxes + a "선택 완료" submit button.
-	const isMulti = typeof req.title === "string" && /\(선택 가능: 다중\)/.test(req.title);
+	// "(multi-select)" for ask_user questions where multiple options
+	// can be picked. Render checkboxes + a submit button.
+	const isMulti = typeof req.title === "string" && /\(multi-select\)/.test(req.title);
 
 	if (isMulti) {
 		const list = document.createElement("div");
@@ -110,19 +111,19 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 		// the textarea has content.
 		const customLabel = document.createElement("div");
 		customLabel.className = "question-message";
-		customLabel.textContent = "또는 직접 입력 (선택 사항, 함께 제출됨):";
+		customLabel.textContent = t("chat.modal.customLabelOptional");
 		card.appendChild(customLabel);
 		const customInput = document.createElement("textarea");
 		customInput.rows = 2;
 		customInput.className = "question-input";
-		customInput.placeholder = "추가하고 싶은 답 (선택)";
+		customInput.placeholder = t("chat.modal.customPlaceholderOptional");
 		card.appendChild(customInput);
 
 		const row = document.createElement("div");
 		row.className = "question-row";
 		const submit = document.createElement("button");
 		submit.className = "primary";
-		submit.textContent = "선택 완료";
+		submit.textContent = t("chat.modal.submitMulti");
 		const doSubmit = () => {
 			const picked = checks.filter((c) => c.checked).map((c) => stripNumbering(c.value));
 			const extra = customInput.value.trim();
@@ -133,7 +134,7 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 		submit.addEventListener("click", doSubmit);
 		const cancelBtn = document.createElement("button");
 		cancelBtn.className = "ghost";
-		cancelBtn.textContent = "취소";
+		cancelBtn.textContent = t("chat.modal.cancel");
 		cancelBtn.addEventListener("click", cancel);
 		row.appendChild(submit);
 		row.appendChild(cancelBtn);
@@ -158,18 +159,18 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 	// Inline free-text channel — ask_user treats any non-matching string as "Other".
 	const customLabel = document.createElement("div");
 	customLabel.className = "question-message";
-	customLabel.textContent = "또는 직접 입력:";
+	customLabel.textContent = t("chat.modal.customLabel");
 	card.appendChild(customLabel);
 	const customInput = document.createElement("textarea");
 	customInput.rows = 2;
 	customInput.className = "question-input";
-	customInput.placeholder = "자유롭게 답을 적고 Enter 또는 '전송'…";
+	customInput.placeholder = t("chat.modal.customPlaceholder");
 	card.appendChild(customInput);
 	const customRow = document.createElement("div");
 	customRow.className = "question-row";
 	const sendCustom = document.createElement("button");
 	sendCustom.className = "primary";
-	sendCustom.textContent = "전송";
+	sendCustom.textContent = t("chat.modal.send");
 	const submitCustom = () => {
 		const v = customInput.value.trim();
 		if (!v) return;
@@ -184,7 +185,7 @@ function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => voi
 	});
 	const cancelBtn = document.createElement("button");
 	cancelBtn.className = "ghost";
-	cancelBtn.textContent = "취소";
+	cancelBtn.textContent = t("chat.modal.cancel");
 	cancelBtn.addEventListener("click", cancel);
 	customRow.appendChild(sendCustom);
 	customRow.appendChild(cancelBtn);
@@ -209,13 +210,13 @@ function renderConfirm(card: HTMLElement, req: any, reply: (r: UiResponse) => vo
 	row.className = "question-row";
 	const yes = document.createElement("button");
 	yes.className = "primary";
-	yes.textContent = "예";
+	yes.textContent = t("chat.modal.yes");
 	yes.addEventListener("click", () =>
 		reply({ type: "extension_ui_response", id: req.id, confirmed: true }),
 	);
 	const no = document.createElement("button");
 	no.className = "ghost";
-	no.textContent = "아니오";
+	no.textContent = t("chat.modal.no");
 	no.addEventListener("click", () =>
 		reply({ type: "extension_ui_response", id: req.id, confirmed: false }),
 	);
@@ -242,7 +243,7 @@ function renderInputOrEditor(
 	row.className = "question-row";
 	const ok = document.createElement("button");
 	ok.className = "primary";
-	ok.textContent = "전송";
+	ok.textContent = t("chat.modal.send");
 	const submit = () => reply({ type: "extension_ui_response", id: req.id, value: ta.value });
 	ok.addEventListener("click", submit);
 	(ta as HTMLElement).addEventListener("keydown", ((e: KeyboardEvent) => {
@@ -253,7 +254,7 @@ function renderInputOrEditor(
 	}) as EventListener);
 	const cancelBtn = document.createElement("button");
 	cancelBtn.className = "ghost";
-	cancelBtn.textContent = "취소";
+	cancelBtn.textContent = t("chat.modal.cancel");
 	cancelBtn.addEventListener("click", cancel);
 	row.appendChild(ok);
 	row.appendChild(cancelBtn);
@@ -278,14 +279,14 @@ export function showConfirmDialog(message: string): Promise<boolean> {
 		row.className = "modal-row";
 		const yes = document.createElement("button");
 		yes.className = "primary";
-		yes.textContent = "예";
+		yes.textContent = t("chat.modal.yes");
 		yes.addEventListener("click", () => {
 			modalRoot.innerHTML = "";
 			resolve(true);
 		});
 		const no = document.createElement("button");
 		no.className = "ghost";
-		no.textContent = "아니오";
+		no.textContent = t("chat.modal.no");
 		no.addEventListener("click", () => {
 			modalRoot.innerHTML = "";
 			resolve(false);
@@ -317,7 +318,7 @@ export function showInputDialog(message: string, initial = ""): Promise<string |
 		row.className = "modal-row";
 		const ok = document.createElement("button");
 		ok.className = "primary";
-		ok.textContent = "확인";
+		ok.textContent = t("chat.modal.ok");
 		const submit = () => {
 			modalRoot.innerHTML = "";
 			resolve(input.value);
@@ -325,7 +326,7 @@ export function showInputDialog(message: string, initial = ""): Promise<string |
 		ok.addEventListener("click", submit);
 		const cancel = document.createElement("button");
 		cancel.className = "ghost";
-		cancel.textContent = "취소";
+		cancel.textContent = t("chat.modal.cancel");
 		cancel.addEventListener("click", () => {
 			modalRoot.innerHTML = "";
 			resolve(null);

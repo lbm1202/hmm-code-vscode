@@ -27,11 +27,11 @@
     "commands": [
       {
         "command": "hmm-code.open",
-        "title": "Hmm-code: Open Chat in Sidebar"
+        "title": "%cmd.open%"
       },
       {
         "command": "hmm-code.openInPanel",
-        "title": "Hmm-code: New Chat Panel",
+        "title": "%cmd.openInPanel%",
         "icon": {
           "light": "media/icon-32.png",
           "dark": "media/icon-32.png"
@@ -39,23 +39,23 @@
       },
       {
         "command": "hmm-code.openSettings",
-        "title": "Hmm-code: Open Settings"
+        "title": "%cmd.openSettings%"
       },
       {
         "command": "hmm-code.cycleMode",
-        "title": "Hmm-code: Cycle Mode"
+        "title": "%cmd.cycleMode%"
       },
       {
         "command": "hmm-code.toggleThinking",
-        "title": "Hmm-code: Toggle Thinking Level"
+        "title": "%cmd.toggleThinking%"
       },
       {
         "command": "hmm-code.resetDefaults",
-        "title": "Hmm-code: Reset Model + Thinking to Mode Defaults"
+        "title": "%cmd.resetDefaults%"
       },
       {
         "command": "hmm-code.abort",
-        "title": "Hmm-code: Cancel Current Turn"
+        "title": "%cmd.abort%"
       }
     ],
     "menus": {
@@ -80,9 +80,30 @@
         {
           "type": "webview",
           "id": "hmm-code.chat",
-          "name": "Chat"
+          "name": "%view.chat.name%"
         }
       ]
+    },
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "hmm-code.language": {
+          "type": "string",
+          "enum": ["auto", "en", "ko"],
+          "enumDescriptions": [
+            "%config.language.auto%",
+            "%config.language.en%",
+            "%config.language.ko%"
+          ],
+          "default": "auto",
+          "description": "%config.language.desc%"
+        },
+        "hmm-code.autoApproveDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.autoApproveDefault.desc%"
+        }
+      }
     }
   },
   "scripts": {

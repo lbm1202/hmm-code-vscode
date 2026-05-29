@@ -6,12 +6,12 @@
 // not at module top-level evaluation.
 
 import { appendUserBubble, els } from "./dom";
+import { t } from "./i18n";
 import { FROM_WEBVIEW, MODE_NAMES } from "./protocol";
 import { post, runtime, ui } from "./state";
 import { ensureTurn } from "./turn-lifecycle";
 
-const DEFAULT_PLACEHOLDER =
-	"메시지를 입력하세요… (Enter로 전송, Shift+Enter 줄바꿈, Tab 모드 전환)";
+const DEFAULT_PLACEHOLDER = t("chat.promptPlaceholder");
 
 export function doSend(): void {
 	if (runtime.turnInFlight || runtime.pendingQuestionCount > 0) return; // blocked
@@ -31,7 +31,7 @@ export function updateSendButton(): void {
 	const e = els();
 	const send = e.send;
 	send.textContent = runtime.turnInFlight ? "■" : "↑";
-	send.title = runtime.turnInFlight ? "중지 (Abort)" : "Send (Enter)";
+	send.title = runtime.turnInFlight ? t("chat.abortTitle") : t("chat.sendTitle");
 	send.classList.toggle("stop", runtime.turnInFlight);
 	updatePromptDisabled();
 }
@@ -47,8 +47,8 @@ export function updatePromptDisabled(): void {
 		"placeholder",
 		blocked
 			? runtime.turnInFlight
-				? "모델이 작업 중…"
-				: "사용자 입력 대기 중…"
+				? t("chat.modelWorking")
+				: t("chat.waitingInput")
 			: DEFAULT_PLACEHOLDER,
 	);
 	// Block session-switching while a turn is mid-flight: switching mid-stream
@@ -58,9 +58,9 @@ export function updatePromptDisabled(): void {
 	(e.btnSessions as HTMLButtonElement).disabled = blockSession;
 	e.btnNew.classList.toggle("disabled", blockSession);
 	e.btnSessions.classList.toggle("disabled", blockSession);
-	const reason = blockSession ? "응답 중 — 먼저 중지(■) 후 전환" : "";
-	e.btnNew.title = blockSession ? reason : "New session";
-	e.btnSessions.title = blockSession ? reason : "Resume session";
+	const reason = blockSession ? t("chat.blockSwitchReason") : "";
+	e.btnNew.title = blockSession ? reason : t("chat.newSessionBtn");
+	e.btnSessions.title = blockSession ? reason : t("chat.resumeSessionBtn");
 }
 
 /** Show/hide the "reset to defaults" button based on runtime.isOverridden. */

@@ -3,6 +3,7 @@
 
 import { appendBubble, appendUserBubble, els, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
+import { t } from "./i18n";
 import { showModal } from "./modals";
 import { FROM_WEBVIEW } from "./protocol";
 import { pendingUiRequests, post, ui } from "./state";
@@ -111,7 +112,7 @@ export function renderRecentList(): void {
 	if (ui.sessions.length === 0) {
 		const empty = document.createElement("div");
 		empty.className = "recent-empty";
-		empty.textContent = "이 워크스페이스의 저장된 세션이 없습니다.";
+		empty.textContent = t("chat.noSessions");
 		recentList.appendChild(empty);
 		return;
 	}

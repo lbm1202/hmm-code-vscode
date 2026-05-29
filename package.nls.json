@@ -1,0 +1,16 @@
+{
+  "cmd.open": "Hmm-code: Open Chat in Sidebar",
+  "cmd.openInPanel": "Hmm-code: New Chat Panel",
+  "cmd.openSettings": "Hmm-code: Open Settings",
+  "cmd.cycleMode": "Hmm-code: Cycle Mode",
+  "cmd.toggleThinking": "Hmm-code: Toggle Thinking Level",
+  "cmd.resetDefaults": "Hmm-code: Reset Model + Thinking to Mode Defaults",
+  "cmd.abort": "Hmm-code: Cancel Current Turn",
+  "view.chat.name": "Chat",
+  "config.title": "Hmm-code",
+  "config.language.desc": "UI display language for Hmm-code. \"auto\" follows VS Code's display language; otherwise falls back to English. Changing this prompts a window reload.",
+  "config.language.auto": "Follow VS Code's display language",
+  "config.language.en": "English",
+  "config.language.ko": "Korean (한국어)",
+  "config.autoApproveDefault.desc": "Start new chat sessions with permission auto-approve turned ON. When enabled, tool actions that would normally prompt for permission are auto-approved for the session. Off by default."
+}

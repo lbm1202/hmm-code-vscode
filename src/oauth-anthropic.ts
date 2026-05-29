@@ -10,6 +10,7 @@
 
 import { randomBytes, createHash } from "node:crypto";
 import * as http from "node:http";
+import { t } from "./i18n";
 
 const CALLBACK_HOST = process.env.PI_OAUTH_CALLBACK_HOST || "127.0.0.1";
 const CALLBACK_PORT = 53692;
@@ -58,12 +59,12 @@ function buildAuthorizeUrl(state: string, challenge: string): string {
 	return url.toString();
 }
 
-const SUCCESS_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Login complete</title>
+const successHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Login complete</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:80px 20px;background:#0d1117;color:#c9d1d9}h1{color:#3fb950}p{color:#8b949e;font-size:14px}</style>
-</head><body><h1>✓ 로그인 완료</h1><p>창을 닫아도 됩니다.</p></body></html>`;
+</head><body><h1>${t("oauth.page.successTitle")}</h1><p>${t("oauth.page.successBody")}</p></body></html>`;
 const ERROR_HTML = (msg: string) => `<!doctype html><html><head><meta charset="utf-8"><title>Login failed</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:80px 20px;background:#0d1117;color:#c9d1d9}h1{color:#f85149}p{color:#8b949e;font-size:14px}</style>
-</head><body><h1>✗ 로그인 실패</h1><p>${msg}</p></body></html>`;
+</head><body><h1>${t("oauth.page.failTitle")}</h1><p>${msg}</p></body></html>`;
 
 interface CallbackResult { code: string }
 
@@ -77,31 +78,31 @@ function startCallbackServer(state: string, signal: AbortSignal): Promise<Callba
 				const url = new URL(req.url ?? "/", `http://${CALLBACK_HOST}:${CALLBACK_PORT}`);
 				if (url.pathname !== CALLBACK_PATH) {
 					res.statusCode = 404;
-					res.end(ERROR_HTML("Callback 경로가 아닙니다."));
+					res.end(ERROR_HTML(t("oauth.err.notCallbackPath")));
 					return;
 				}
 				const err = url.searchParams.get("error");
 				if (err) {
 					res.statusCode = 400;
-					res.end(ERROR_HTML(`인증이 완료되지 않았습니다: ${err}`));
+					res.end(ERROR_HTML(t("oauth.err.notCompleted", { err })));
 					settle(() => reject(new Error(`Anthropic auth error: ${err}`)));
 					return;
 				}
 				if (url.searchParams.get("state") !== state) {
 					res.statusCode = 400;
-					res.end(ERROR_HTML("state 불일치 (보안 검증 실패)."));
+					res.end(ERROR_HTML(t("oauth.err.stateMismatch")));
 					settle(() => reject(new Error("OAuth state mismatch")));
 					return;
 				}
 				const code = url.searchParams.get("code");
 				if (!code) {
 					res.statusCode = 400;
-					res.end(ERROR_HTML("Authorization code 없음."));
+					res.end(ERROR_HTML(t("oauth.err.noCode")));
 					settle(() => reject(new Error("Missing authorization code")));
 					return;
 				}
 				res.statusCode = 200;
-				res.end(SUCCESS_HTML);
+				res.end(successHtml());
 				settle(() => resolve({ code }));
 			} catch (e) {
 				res.statusCode = 500;
@@ -124,7 +125,7 @@ function startCallbackServer(state: string, signal: AbortSignal): Promise<Callba
 			const err = e as NodeJS.ErrnoException;
 			const msg =
 				err.code === "EADDRINUSE"
-					? `포트 ${CALLBACK_PORT} 사용 중입니다. 다른 로그인(pi /login 등)을 닫고 다시 시도하세요.`
+					? t("oauth.err.portInUse", { port: CALLBACK_PORT })
 					: err.message;
 			if (!settled) {
 				settled = true;
@@ -205,13 +206,13 @@ export async function anthropicOAuthLogin(
 
 	callbacks.onAuth({
 		url,
-		instructions: "브라우저에서 Claude(Anthropic) 로그인을 완료하세요. 완료 시 자동으로 토큰이 저장됩니다.",
+		instructions: t("oauth.anthropic.instructions"),
 	});
 
-	callbacks.onProgress?.("Callback 서버 대기 중 (127.0.0.1:53692)…");
+	callbacks.onProgress?.(t("oauth.progress.waiting", { addr: "127.0.0.1:53692" }));
 	const { code } = await startCallbackServer(state, signal);
 
-	callbacks.onProgress?.("Token 교환 중…");
+	callbacks.onProgress?.(t("oauth.progress.exchanging"));
 	const tokens = await exchangeCodeForTokens(code, state, verifier);
 
 	return { type: "oauth", access: tokens.access, refresh: tokens.refresh, expires: tokens.expires };

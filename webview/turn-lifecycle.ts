@@ -2,7 +2,7 @@
 //
 //   - Status row (turn-scoped, ensureStatus..removeStatus). Stays pinned at
 //     the bottom of messagesEl through tool-execution gaps so the user sees
-//     "도구 실행 중 (name)" while tools run.
+//     "tool running (name)" while tools run.
 //   - Bubble (per-message, ensureBubble..finalizeBubble). New bubble for each
 //     assistant message_start; finalized on message_end.
 //
@@ -12,6 +12,7 @@
 
 import { appendBubble, els, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
+import { t } from "./i18n";
 import { runtime } from "./state";
 import type { BubbleState, StatusState } from "./types";
 import { updateSendButton } from "./prompt";
@@ -26,7 +27,7 @@ export function ensureStatus(): StatusState {
 	dots.innerHTML = "<span></span><span></span><span></span>";
 	const textEl = document.createElement("span");
 	textEl.className = "status-text";
-	textEl.textContent = "응답 대기 중";
+	textEl.textContent = t("chat.status.waiting");
 	const time = document.createElement("span");
 	time.className = "status-time";
 	time.textContent = "0s";
@@ -122,7 +123,7 @@ export function streamThinking(delta: string): void {
 	if (!delta) return;
 	const b = ensureBubble();
 	b.thinking += delta;
-	setStatusPhase("생각하는 중");
+	setStatusPhase(t("chat.status.thinking"));
 	if (!b.thinkingEl) {
 		const wrap = document.createElement("details");
 		wrap.className = "msg-thinking";
