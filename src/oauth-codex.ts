@@ -94,49 +94,80 @@ interface CallbackResult { code: string }
 
 function startCallbackServer(state: string, signal: AbortSignal): Promise<CallbackResult> {
 	return new Promise((resolve, reject) => {
+		let settled = false;
 		const server = http.createServer((req, res) => {
+			res.setHeader("Connection", "close");
+			res.setHeader("Content-Type", "text/html; charset=utf-8");
 			try {
-				const url = new URL(req.url ?? "/", `http://localhost:${CALLBACK_PORT}`);
+				const url = new URL(req.url ?? "/", `http://${CALLBACK_HOST}:${CALLBACK_PORT}`);
 				if (url.pathname !== "/auth/callback") {
+					// Stray probe (favicon, etc.) — respond but keep listening for
+					// the real callback. (The old code tore the server down here.)
 					res.statusCode = 404;
-					res.setHeader("Content-Type", "text/html; charset=utf-8");
 					res.end(ERROR_HTML("Callback 경로가 아닙니다."));
 					return;
 				}
 				if (url.searchParams.get("state") !== state) {
 					res.statusCode = 400;
-					res.setHeader("Content-Type", "text/html; charset=utf-8");
 					res.end(ERROR_HTML("state 불일치 (보안 검증 실패)."));
-					reject(new Error("OAuth state mismatch"));
+					settle(() => reject(new Error("OAuth state mismatch")));
 					return;
 				}
 				const code = url.searchParams.get("code");
 				if (!code) {
 					res.statusCode = 400;
-					res.setHeader("Content-Type", "text/html; charset=utf-8");
 					res.end(ERROR_HTML("Authorization code 없음."));
-					reject(new Error("Missing authorization code"));
+					settle(() => reject(new Error("Missing authorization code")));
 					return;
 				}
 				res.statusCode = 200;
-				res.setHeader("Content-Type", "text/html; charset=utf-8");
 				res.end(SUCCESS_HTML);
-				resolve({ code });
+				settle(() => resolve({ code }));
 			} catch (err) {
 				res.statusCode = 500;
-				res.setHeader("Content-Type", "text/html; charset=utf-8");
 				res.end(ERROR_HTML("Internal error."));
-				reject(err);
-			} finally {
-				// Give the browser a moment to render before tearing down the socket
-				setTimeout(() => server.close(), 200);
+				settle(() => reject(err instanceof Error ? err : new Error(String(err))));
 			}
 		});
-		server.on("error", (err) => reject(err));
+
+		const closeServer = (): void => {
+			// Drop keep-alive sockets (browsers hold the callback connection
+			// open) so the listening port frees immediately — otherwise the next
+			// login can hit EADDRINUSE.
+			try { (server as { closeAllConnections?: () => void }).closeAllConnections?.(); } catch { /* ignore */ }
+			try { server.close(); } catch { /* ignore */ }
+		};
+		const settle = (action: () => void): void => {
+			if (settled) return;
+			settled = true;
+			// Let the browser render the response, then tear down.
+			setTimeout(() => { closeServer(); action(); }, 200);
+		};
+
+		server.on("error", (err) => {
+			const e = err as NodeJS.ErrnoException;
+			const msg =
+				e.code === "EADDRINUSE"
+					? `포트 ${CALLBACK_PORT} 사용 중입니다. 다른 로그인(pi /login 등)을 닫고 다시 시도하세요.`
+					: e.message;
+			if (!settled) {
+				settled = true;
+				reject(new Error(msg));
+			}
+		});
+		if (signal.aborted) {
+			closeServer();
+			settled = true;
+			reject(new Error("Login cancelled"));
+			return;
+		}
 		server.listen(CALLBACK_PORT, CALLBACK_HOST, () => { /* listening */ });
 		signal.addEventListener("abort", () => {
-			try { server.close(); } catch { /* ignore */ }
-			reject(new Error("Login cancelled"));
+			closeServer();
+			if (!settled) {
+				settled = true;
+				reject(new Error("Login cancelled"));
+			}
 		});
 	});
 }
@@ -155,11 +186,20 @@ async function exchangeCodeForTokens(code: string, verifier: string) {
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => "");
-		throw new Error(`Token exchange ${res.status}: ${text || res.statusText}`);
+		throw new Error(`Token exchange ${res.status}: ${(text || res.statusText).slice(0, 200)}`);
 	}
 	const json: any = await res.json();
 	if (!json.access_token || !json.refresh_token || typeof json.expires_in !== "number") {
-		throw new Error(`Token response missing fields: ${JSON.stringify(json)}`);
+		// Report which fields are missing — never stringify `json`, which can
+		// carry token material into an error message shown in the UI.
+		const missing = [
+			!json.access_token && "access_token",
+			!json.refresh_token && "refresh_token",
+			typeof json.expires_in !== "number" && "expires_in",
+		]
+			.filter(Boolean)
+			.join(", ");
+		throw new Error(`Token response missing/invalid fields: ${missing}`);
 	}
 	return {
 		access: String(json.access_token),
