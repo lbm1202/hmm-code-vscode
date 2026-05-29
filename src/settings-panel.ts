@@ -44,6 +44,9 @@ const API_TYPES = [
 export class SettingsPanel {
 	public static readonly viewType = VIEW_TYPE;
 	private static instance: vscode.WebviewPanel | undefined;
+	/** In-flight OAuth login (codex/anthropic) — process-global single-flight,
+	 *  aborted on panel dispose so the callback server can't leak. */
+	private static _oauthLoginAbort: AbortController | undefined;
 
 	static open(ctx: vscode.ExtensionContext): void {
 		if (SettingsPanel.instance) {
@@ -106,8 +109,8 @@ export class SettingsPanel {
 			// Abort any in-flight OAuth login so its callback server is torn down
 			// with the panel — otherwise it leaks and the next login attempt
 			// fails with EADDRINUSE until the host restarts.
-			(SettingsPanel as any)._oauthLoginAbort?.abort?.();
-			(SettingsPanel as any)._oauthLoginAbort = undefined;
+			SettingsPanel._oauthLoginAbort?.abort?.();
+			SettingsPanel._oauthLoginAbort = undefined;
 			if (SettingsPanel.instance === panel) SettingsPanel.instance = undefined;
 		});
 
@@ -207,12 +210,12 @@ export class SettingsPanel {
 			) => Promise<unknown>;
 		},
 	): Promise<void> {
-		if ((SettingsPanel as any)._oauthLoginAbort) {
+		if (SettingsPanel._oauthLoginAbort) {
 			panel.webview.postMessage({ kind: opts.statusKind, state: "running" });
 			return;
 		}
 		const abort = new AbortController();
-		(SettingsPanel as any)._oauthLoginAbort = abort;
+		SettingsPanel._oauthLoginAbort = abort;
 		panel.webview.postMessage({ kind: opts.statusKind, state: "starting", message: "OAuth 플로우 시작…" });
 		try {
 			const creds = await opts.run(
@@ -257,22 +260,12 @@ export class SettingsPanel {
 				message: (err as Error).message,
 			});
 		} finally {
-			(SettingsPanel as any)._oauthLoginAbort = undefined;
+			SettingsPanel._oauthLoginAbort = undefined;
 		}
 	}
 
 	private static async handleMessage(panel: vscode.WebviewPanel, msg: any): Promise<void> {
 		switch (msg?.kind) {
-			case "open-file": {
-				const path = String(msg.path ?? "");
-				if (!path || !existsSync(path)) {
-					vscode.window.showWarningMessage(`파일이 없습니다: ${path}`);
-					return;
-				}
-				const doc = await vscode.workspace.openTextDocument(path);
-				await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
-				return;
-			}
 			case "codex-login": {
 				await SettingsPanel.runOAuthLogin(panel, {
 					statusKind: "codex-status",
@@ -293,7 +286,7 @@ export class SettingsPanel {
 			}
 			case "codex-login-cancel":
 			case "anthropic-login-cancel": {
-				(SettingsPanel as any)._oauthLoginAbort?.abort?.();
+				SettingsPanel._oauthLoginAbort?.abort?.();
 				return;
 			}
 			case "save": {

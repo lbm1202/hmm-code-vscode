@@ -57,12 +57,6 @@ export function activate(ctx: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("hmm-code.openSettings", () => {
 			SettingsPanel.open(ctx);
 		}),
-		// Used by the settings panel to dispatch a slash command to the sidebar
-		// chat. Settings panel posts {kind:"run-slash"} → opens sidebar →
-		// executes this command with the slash string.
-		vscode.commands.registerCommand("hmm-code.sendSlash", (slash: string) => {
-			if (typeof slash === "string" && slash) provider.cyclePrompt(slash);
-		}),
 		// Restart every live Pi process (sidebar + any open editor panels).
 		// Used by the settings panel after auth changes — Pi caches
 		// AuthStorage in memory, so editing auth.json alone is invisible
