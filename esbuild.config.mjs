@@ -1,7 +1,14 @@
 import { build, context } from "esbuild";
+import { execSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// SSH form so private-repo clones work without a PAT. Requires the build
+// machine to have a GitHub SSH key. Override via HMM_CODE_PI_REPO env var
+// (e.g. set to https URL with embedded token for CI).
+const HMM_CODE_PI_REPO =
+	process.env.HMM_CODE_PI_REPO ?? "git@github.com:lbm1202/hmm-code-pi.git";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const watch = process.argv.includes("--watch");
@@ -41,22 +48,51 @@ const webviewCssConfig = {
 	logLevel: "info",
 };
 
+/** Resolve where to pick up hmm-code-pi source:
+ *   1. $HMM_CODE_PI_PATH env var if set (escape hatch for custom layouts)
+ *   2. ../hmm-code-pi sibling (the dev-friendly layout — edit + rebuild loop)
+ *   3. node_modules/.cache/hmm-code-pi (auto-cloned once per machine)
+ *  Last one runs git clone the first time, then reuses the cache. */
+function resolveHmmCodePiSrc() {
+	const envPath = process.env.HMM_CODE_PI_PATH;
+	if (envPath && existsSync(envPath)) return envPath;
+
+	const sibling = join(__dirname, "..", "hmm-code-pi");
+	if (existsSync(sibling)) return sibling;
+
+	const cacheDir = join(__dirname, "node_modules", ".cache", "hmm-code-pi");
+	if (existsSync(cacheDir)) {
+		console.log(`[vendor] reusing cached hmm-code-pi at ${cacheDir}`);
+		console.log(`[vendor] (run \`rm -rf ${cacheDir} && npm run build\` to refresh)`);
+		return cacheDir;
+	}
+
+	console.log(`[vendor] hmm-code-pi not found locally — cloning ${HMM_CODE_PI_REPO}`);
+	try {
+		execSync(`git clone --depth 1 ${HMM_CODE_PI_REPO} "${cacheDir}"`, { stdio: "inherit" });
+	} catch (err) {
+		throw new Error(
+			`Failed to clone hmm-code-pi from ${HMM_CODE_PI_REPO}.\n\n` +
+				`The repo is private — set up a GitHub SSH key or override the URL:\n` +
+				`  HMM_CODE_PI_REPO="https://<PAT>@github.com/lbm1202/hmm-code-pi.git" npm run build\n` +
+				`Or point at an existing clone:\n` +
+				`  HMM_CODE_PI_PATH="/path/to/hmm-code-pi" npm run build\n`,
+		);
+	}
+	return cacheDir;
+}
+
 /** Copy Pi runtime + hmm-code-pi extension into out/vendor/ so the packaged
  *  .vsix is self-contained. esbuild can't bundle Pi (dynamic requires, native
  *  optional deps), so we ship raw files and spawn cli.js with Node. */
 function vendorBundle() {
 	const piSrc = join(__dirname, "node_modules", "@earendil-works", "pi-coding-agent");
 	const piDst = join(__dirname, "out", "vendor", "pi");
-	const hmmSrc = join(__dirname, "..", "hmm-code-pi");
+	const hmmSrc = resolveHmmCodePiSrc();
 	const hmmDst = join(__dirname, "out", "vendor", "hmm-code-pi");
 
 	if (!existsSync(piSrc)) {
 		throw new Error(`Pi not installed at ${piSrc}. Run \`npm install\` first.`);
-	}
-	if (!existsSync(hmmSrc)) {
-		throw new Error(
-			`hmm-code-pi not found at ${hmmSrc}. Expected sibling directory (clone https://github.com/lbm1202/hmm-code-pi next to hmm-code-vscode).`,
-		);
 	}
 
 	// Wipe stale vendor copies so removed files don't linger.
