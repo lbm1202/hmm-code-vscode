@@ -2,7 +2,7 @@
   "name": "hmm-code",
   "displayName": "Hmm-code",
   "description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/debug/ask modes.",
-  "version": "0.1.0",
+  "version": "0.1.1-rc1",
   "publisher": "lbm1202",
   "private": true,
   "license": "MIT",
@@ -89,7 +89,11 @@
       "properties": {
         "hmm-code.language": {
           "type": "string",
-          "enum": ["auto", "en", "ko"],
+          "enum": [
+            "auto",
+            "en",
+            "ko"
+          ],
           "enumDescriptions": [
             "%config.language.auto%",
             "%config.language.en%",

@@ -7,6 +7,10 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.1-rc1] — 2026-05-29
+
+Pre-release (release candidate). Stable remains 0.1.0.
+
 ### Added
 - **Internationalization (i18n).** UI strings externalized to `l10n/{en,ko}.json` (+ `package.nls{,.ko}.json` for commands). English is the source/default; Korean ships as a locale. New `hmm-code.language` setting (`auto`/`en`/`ko`) — `auto` follows VS Code's display language.
 - **Tabbed settings panel** — General / Authentication / Models / Modes. Custom providers now live under Authentication.

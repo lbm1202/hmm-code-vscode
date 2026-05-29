@@ -65,6 +65,9 @@ jobs:
           files: hmm-code-${{ steps.version.outputs.version }}.vsix
           generate_release_notes: true
           fail_on_unmatched_files: true
+          # Tags with a pre-release identifier (v0.1.1-rc1, v0.2.0-beta…) are
+          # published as GitHub pre-releases; clean vX.Y.Z tags are full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
             ## Install
 
