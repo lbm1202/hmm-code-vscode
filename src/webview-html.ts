@@ -14,6 +14,13 @@ export function makeNonce(): string {
 	return out;
 }
 
+/** JSON-serialize a value for embedding inside an inline `<script>`. Escapes
+ *  `<` to `<` so a string containing `</script>` (or `<!--`) can't break
+ *  out of the script element. Author-controlled today, but cheap insurance. */
+export function jsonForScript(value: unknown): string {
+	return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
 /** Restrictive Content-Security-Policy for our webviews: only nonce'd scripts,
  *  styles from the webview source (+ inline for our injected `<style>`), images
  *  from source + data:. `fontSrc` differs per panel — the chat view serves

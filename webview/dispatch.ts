@@ -159,7 +159,7 @@ function handlePiEvent(ev: any): void {
 				appendSystem("⚠️ " + formatTurnError(m.errorMessage));
 			}
 			// Bubble is per-message. Status stays alive across messages so the
-			// the "tool running" indicator remains visible during tool gaps.
+			// "tool running" indicator remains visible during tool gaps.
 			finalizeBubble();
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 			return;
@@ -172,9 +172,10 @@ function handlePiEvent(ev: any): void {
 			post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			post({ kind: FROM_WEBVIEW.REQUEST_MESSAGES });
-			// hmm-code.autoApproveDefault: force auto-approve ON for a freshly
-			// started/resumed session (not on plain switches between existing
-			// sessions, where the user may have deliberately turned it off).
+			// hmm-code.autoApproveDefault: the user opted into auto-approve as a
+			// default, so (re)assert it ON whenever a session starts or loads
+			// (new session + boot-resume). SESSION_SWITCH is excluded to avoid
+			// re-enabling on every navigation between existing sessions.
 			// `/auto-approve on` is idempotent, so a redundant send is harmless.
 			if (
 				autoApproveDefault &&

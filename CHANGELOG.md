@@ -7,17 +7,24 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- **Internationalization (i18n).** UI strings externalized to `l10n/{en,ko}.json` (+ `package.nls{,.ko}.json` for commands). English is the source/default; Korean ships as a locale. New `hmm-code.language` setting (`auto`/`en`/`ko`) — `auto` follows VS Code's display language.
+- **Tabbed settings panel** — General / Authentication / Models / Modes. Custom providers now live under Authentication.
+- **Per-mode system-prompt editor** in the Modes tab. Defaults are read from the bundled Pi `config.ts`; saving the unchanged default writes no override.
+- **`hmm-code.autoApproveDefault`** — start new/resumed sessions with permission auto-approve ON.
+- **Configurable context auto-summarization threshold** (General tab) — writes `modes.json:autoCompactThreshold`; default is the bundled Pi `AUTO_COMPACT_THRESHOLD`.
+- `LICENSE` (MIT), `CHANGELOG.md`, `RELEASING.md`.
+
 ### Changed
 - READMEs and `docs/*` translated to English and updated for the bundled-`.vsix` install flow.
 - Internal cleanup — removed dead exports, deduped helpers (`escapeHtml`, `ansi24`), demoted internal-only `export`s.
 - Switched from `--skip-license` packaging to a real LICENSE file.
 
+### Fixed
+- Session-picker badge now counts all descendant sessions (children + grandchildren), not just direct children.
+
 ### Removed
 - `hmm-code.piBinary` setting — single-distribution Pi only. Bundle is always used; if missing the .vsix is broken, not a config opportunity.
-
-### Added
-- `LICENSE` (MIT).
-- `CHANGELOG.md`, `RELEASING.md`.
 
 ## [0.1.0] — 2026-05-29
 

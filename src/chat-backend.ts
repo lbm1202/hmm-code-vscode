@@ -19,7 +19,7 @@ import {
 	type SessionEntry,
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
-import { buildCsp, makeNonce } from "./webview-html";
+import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -703,9 +703,9 @@ export function renderChatHtml(
 	// Inject version/publisher + the locale dict BEFORE the main script loads
 	// so dom.ts (empty-state HTML) and i18n.ts can read them. JSON.stringify
 	// escapes any quotes/control chars so it's safe inside a <script>.
-	const infoLiteral = JSON.stringify(info);
-	const i18nLiteral = JSON.stringify(getWebviewMessages());
-	const cfgLiteral = JSON.stringify({
+	const infoLiteral = jsonForScript(info);
+	const i18nLiteral = jsonForScript(getWebviewMessages());
+	const cfgLiteral = jsonForScript({
 		autoApproveDefault: vscode.workspace
 			.getConfiguration("hmm-code")
 			.get<boolean>("autoApproveDefault", false),

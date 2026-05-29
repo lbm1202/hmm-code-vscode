@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { ChatBackend } from "./chat-backend";
 import { codexOAuthLogin } from "./oauth-codex";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
-import { buildCsp, makeNonce } from "./webview-html";
+import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
 const VIEW_TYPE = "hmm-code.settingsPanel";
@@ -489,8 +489,11 @@ export class SettingsPanel {
 		if (autoCompactThreshold !== undefined) {
 			const def = SettingsPanel.defaultCompactThreshold();
 			const n = Number(autoCompactThreshold);
-			if (autoCompactThreshold !== null && Number.isFinite(n) && Math.round(n) !== def) {
-				raw.autoCompactThreshold = Math.round(n);
+			// Clamp to the same [40, 95] range Pi enforces on load, so the stored
+			// value always equals the one Pi actually uses (no panel/runtime drift).
+			const clamped = Number.isFinite(n) ? Math.min(95, Math.max(40, Math.round(n))) : NaN;
+			if (autoCompactThreshold !== null && Number.isFinite(clamped) && clamped !== def) {
+				raw.autoCompactThreshold = clamped;
 			} else {
 				delete raw.autoCompactThreshold;
 			}
@@ -655,7 +658,7 @@ export class SettingsPanel {
 		const jsUri = webview.asWebviewUri(
 			vscode.Uri.joinPath(extensionUri, "out", "webview", "settings.js"),
 		);
-		const i18nLiteral = JSON.stringify(getWebviewMessages());
+		const i18nLiteral = jsonForScript(getWebviewMessages());
 		const locale = resolveLocale();
 		const langSetting = vscode.workspace.getConfiguration("hmm-code").get<string>("language", "auto");
 		const langOpt = (v: string, label: string) =>
