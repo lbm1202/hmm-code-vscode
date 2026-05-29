@@ -2,6 +2,7 @@
 
 import { els } from "./dom";
 import { escapeHtml } from "./helpers";
+import { t } from "./i18n";
 import { showConfirmDialog, showInputDialog } from "./modals";
 import { FROM_WEBVIEW } from "./protocol";
 import { expandedSessions, post, ui } from "./state";
@@ -33,7 +34,7 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 	modal.className = "modal modal-wide";
 	const title = document.createElement("div");
 	title.className = "modal-prompt";
-	title.textContent = sessions.length ? "세션 이어가기" : "이 워크스페이스의 저장된 세션이 없습니다";
+	title.textContent = sessions.length ? t("chat.sessions.title") : t("chat.noSessions");
 	modal.appendChild(title);
 
 	if (sessions.length) {
@@ -92,7 +93,10 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 			titleBtn.className = "session-item session-item-title";
 			const label = sessionLabel(s);
 			const idShort = s.name.split("_")[1]?.slice(0, 6) ?? "";
-			const kidCount = hasKids ? `<span class="session-kid-count">(${kids.length})</span>` : "";
+			// Badge counts ALL descendants (children + grandchildren + …), not
+			// just direct children — matches the delete-cascade count.
+			const descendants = hasKids ? countDescendants(s.file, childrenByParent) : 0;
+			const kidCount = descendants > 0 ? `<span class="session-kid-count">(${descendants})</span>` : "";
 			// Title-bar layout: title on the left, then kid count, then id. We
 			// keep them in flow order (no space-between) so spacing stays even
 			// regardless of row width. ID truncates first when space is tight.
@@ -100,7 +104,7 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 				`<span class="session-time">${escapeHtml(label)}</span>` +
 				kidCount +
 				`<span class="session-id">${escapeHtml(idShort)}</span>`;
-			// Click on title = toggle expand (NOT switch). User must press "이동" to switch.
+			// Click on title = toggle expand (NOT switch). User must press the Go button to switch.
 			titleBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
 				if (!hasKids) return;
@@ -118,8 +122,8 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 
 			const goBtn = document.createElement("button");
 			goBtn.className = "session-iconbtn primary";
-			goBtn.textContent = "이동";
-			goBtn.title = "이 세션으로 전환";
+			goBtn.textContent = t("chat.sessions.go");
+			goBtn.title = t("chat.sessions.goTitle");
 			goBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
 				modalRoot.innerHTML = "";
@@ -133,11 +137,11 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 			const renameBtn = document.createElement("button");
 			renameBtn.className = "session-iconbtn";
 			renameBtn.textContent = "✎";
-			renameBtn.title = "이름 변경";
+			renameBtn.title = t("chat.sessions.renameTitle");
 			renameBtn.addEventListener("click", async (e) => {
 				e.stopPropagation();
 				try {
-					const next = await showInputDialog("세션 이름 (비우면 기본값으로 복귀):", s.name);
+					const next = await showInputDialog(t("chat.sessions.renamePrompt"), s.name);
 					if (next == null) return;
 					post({ kind: FROM_WEBVIEW.RENAME_SESSION, file: s.file, name: next });
 				} catch (err) {
@@ -151,14 +155,14 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 			delBtn.textContent = "🗑";
 			const descendantCount = countDescendants(s.file, childrenByParent);
 			delBtn.title = descendantCount > 0
-				? `세션 삭제 (하위 세션 ${descendantCount}개 함께 삭제)`
-				: "세션 삭제";
+				? t("chat.sessions.deleteWithChildren", { n: descendantCount })
+				: t("chat.sessions.delete");
 			delBtn.addEventListener("click", async (e) => {
 				e.stopPropagation();
 				try {
 					const msg = descendantCount > 0
-						? `정말 삭제할까요?\n${label}\n하위 세션 ${descendantCount}개도 함께 삭제됩니다.`
-						: `정말 삭제할까요?\n${label}`;
+						? t("chat.sessions.confirmDeleteWithChildren", { label, n: descendantCount })
+						: t("chat.sessions.confirmDelete", { label });
 					const ok = await showConfirmDialog(msg);
 					if (!ok) return;
 					post({ kind: FROM_WEBVIEW.DELETE_SESSION, file: s.file });
