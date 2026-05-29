@@ -1,6 +1,6 @@
 import { build, context } from "esbuild";
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -47,6 +47,20 @@ const webviewCssConfig = {
 	logLevel: "info",
 };
 
+// Settings-panel webview script. Plain JS (extracted from settings-panel.ts),
+// loaded via <script src> with a CSP nonce — same delivery as the chat main.js.
+const settingsConfig = {
+	entryPoints: ["webview/settings.js"],
+	bundle: true,
+	outfile: "out/webview/settings.js",
+	platform: "browser",
+	target: "es2022",
+	format: "iife",
+	sourcemap: true,
+	minify,
+	logLevel: "info",
+};
+
 /** Resolve where to pick up hmm-code-pi source:
  *   1. $HMM_CODE_PI_PATH env var if set (escape hatch for custom layouts)
  *   2. ../hmm-code-pi sibling (the dev-friendly layout — edit + rebuild loop)
@@ -81,6 +95,64 @@ function resolveHmmCodePiSrc() {
 	return cacheDir;
 }
 
+/** Pull the string values out of a `STATUS_KEYS = { ... } as const` block. */
+function extractStatusValues(file) {
+	const text = readFileSync(file, "utf-8");
+	const block = text.match(/STATUS_KEYS\s*=\s*\{([\s\S]*?)\}\s*as const/);
+	if (!block) throw new Error(`[contract-check] STATUS_KEYS not found in ${file}`);
+	const vals = new Set();
+	for (const m of block[1].matchAll(/:\s*"([^"]+)"/g)) vals.add(m[1]);
+	return vals;
+}
+
+/** Pull the members out of a `BINARY_THINKING_FORMATS = new Set([...])`. */
+function extractBinarySet(file) {
+	const text = readFileSync(file, "utf-8");
+	const block = text.match(/BINARY_THINKING_FORMATS\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
+	if (!block) return null;
+	const vals = new Set();
+	for (const m of block[1].matchAll(/"([^"]+)"/g)) vals.add(m[1]);
+	return vals;
+}
+
+/** Fail the build if the cross-repo contracts CLAUDE.md flags drift. Cheap
+ *  (regex over 3 files) and runs on every `npm run build`, so the release
+ *  workflow (which calls build) gates on it too. Pi's constants.ts is the
+ *  source of truth; the two VS Code mirrors must contain every Pi STATUS key. */
+function assertContractsInSync(hmmSrc) {
+	const piConstants = join(hmmSrc, "constants.ts");
+	if (!existsSync(piConstants)) {
+		console.warn(`[contract-check] skipped — ${piConstants} not found`);
+		return;
+	}
+	const srcProto = join(__dirname, "src", "protocol.ts");
+	const webProto = join(__dirname, "webview", "protocol.ts");
+	const piKeys = extractStatusValues(piConstants);
+	for (const [label, file] of [["src", srcProto], ["webview", webProto]]) {
+		const mirror = extractStatusValues(file);
+		const missing = [...piKeys].filter((v) => !mirror.has(v));
+		if (missing.length) {
+			throw new Error(
+				`[contract-check] STATUS_KEYS drift: ${label}/protocol.ts is missing ` +
+					`${JSON.stringify(missing)} (present in hmm-code-pi/constants.ts). ` +
+					`Add them so the RPC status contract stays in sync.`,
+			);
+		}
+	}
+	const piBin = extractBinarySet(piConstants);
+	const webBin = extractBinarySet(webProto);
+	if (piBin && webBin) {
+		const a = [...piBin].sort().join(",");
+		const b = [...webBin].sort().join(",");
+		if (a !== b) {
+			throw new Error(
+				`[contract-check] BINARY_THINKING_FORMATS drift: pi={${a}} vs webview={${b}}.`,
+			);
+		}
+	}
+	console.log("[contract-check] STATUS_KEYS + BINARY_THINKING_FORMATS in sync ✓");
+}
+
 /** Copy Pi runtime + hmm-code-pi extension into out/vendor/ so the packaged
  *  .vsix is self-contained. esbuild can't bundle Pi (dynamic requires, native
  *  optional deps), so we ship raw files and spawn cli.js with Node. */
@@ -89,6 +161,8 @@ function vendorBundle() {
 	const piDst = join(__dirname, "out", "vendor", "pi");
 	const hmmSrc = resolveHmmCodePiSrc();
 	const hmmDst = join(__dirname, "out", "vendor", "hmm-code-pi");
+
+	assertContractsInSync(hmmSrc);
 
 	if (!existsSync(piSrc)) {
 		throw new Error(`Pi not installed at ${piSrc}. Run \`npm install\` first.`);
@@ -134,10 +208,16 @@ if (watch) {
 	const ctxA = await context(extensionConfig);
 	const ctxB = await context(webviewConfig);
 	const ctxC = await context(webviewCssConfig);
-	await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch()]);
+	const ctxD = await context(settingsConfig);
+	await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch(), ctxD.watch()]);
 	console.log("[esbuild] watching… (vendor copy only on initial build — re-run `npm run build` after Pi update)");
 	vendorBundle();
 } else {
-	await Promise.all([build(extensionConfig), build(webviewConfig), build(webviewCssConfig)]);
+	await Promise.all([
+		build(extensionConfig),
+		build(webviewConfig),
+		build(webviewCssConfig),
+		build(settingsConfig),
+	]);
 	vendorBundle();
 }
