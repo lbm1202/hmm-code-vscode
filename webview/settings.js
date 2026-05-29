@@ -936,7 +936,33 @@ function render(s) {
 	renderAuth();
 	renderProviders();
 	renderCompact();
+	updateOAuthButtons();
 	updateSaveBar();
+}
+
+// Disable an OAuth login button when its provider already has an oauth-type
+// credential on disk (api-key creds don't count — the user may still want to
+// add an OAuth login). Leaves a button alone while its login flow is mid-air
+// (cancel button visible).
+const OAUTH_BTN_PROVIDERS = [
+	{ statusKind: 'codex-status', providerId: 'openai-codex' },
+	{ statusKind: 'anthropic-status', providerId: 'anthropic' },
+];
+function updateOAuthButtons() {
+	for (const { statusKind, providerId } of OAUTH_BTN_PROVIDERS) {
+		const ui = oauthUis[statusKind];
+		if (!ui) continue;
+		const cred = diskAuth()[providerId];
+		const authed = !!(cred && cred.type === 'oauth');
+		const inFlight = !ui.cancel.classList.contains('hidden');
+		if (authed) {
+			ui.btn.disabled = true;
+			ui.status.textContent = t('settings.oauth.authed');
+			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
+		} else if (!inFlight) {
+			ui.btn.disabled = false;
+		}
+	}
 }
 
 // Codex OAuth inline

@@ -70,10 +70,13 @@ If the sibling isn't there, the build auto-clones `hmm-code-pi` into `node_modul
 | 🖱️ **Ctrl/Cmd-click on file paths** | Tool-call paths open in the editor area. |
 | 🔓 **Auto-approve toggle** | Session-scoped bypass for permission `ask` prompts (inline button). |
 | 🛡️ **Permission confirm modal** | Pi's `ctx.ui.confirm` surfaced as a webview modal — UI for the Pi permission system. |
-| ⚙️ **Settings panel** | Modes / models / filters / auth / custom providers — opens as an editor tab. |
+| ⚙️ **Settings panel** | Tabbed editor (General / Authentication / Models / Modes) — language, auto-approve default, auto-compact threshold, per-mode prompts, API keys, OAuth logins, custom providers. |
+| 🌐 **Localized UI** | English (default) + Korean, via `l10n/*.json`. `hmm-code.language` = `auto`/`en`/`ko` (`auto` follows VS Code's display language). |
 | 🗂️ **Session picker** | Parent-child tree with rename + cascade delete. Active-session delete auto-spawns a replacement. |
 | ✨ **Auto-generated titles** | First message pair → GPT-mini → session title (via the bundled Pi extension). |
 | 🧼 **Sanitized markdown** | DOMPurify on every render — strips `<script>`, `on*` handlers, `javascript:` URLs, `<iframe>`. |
+
+> **Claude (Anthropic) subscription auth:** using a Claude Pro/Max plan with third-party agent tools like this one is officially supported by Anthropic from **2026-06-15** onward — see [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan). Before that date, prefer an Anthropic **API key** (or another provider). ChatGPT Plus/Pro (Codex) subscription auth is available via the OAuth button in the settings panel.
 
 ---
 

@@ -179,5 +179,6 @@
   "settings.compact.desc": "컨텍스트 사용량이 이 퍼센트에 도달하면 대화를 자동으로 요약(compact)해 공간을 확보합니다. 낮을수록 더 자주/일찍, 높을수록 늦게 요약합니다. 범위 40–95.",
   "settings.compact.reset": "기본값으로 복원",
   "settings.compact.defaultHint": "(기본 {n}%)",
-  "settings.dirty.compact": "자동요약 임계값"
+  "settings.dirty.compact": "자동요약 임계값",
+  "settings.oauth.authed": "✓ 인증됨"
 }

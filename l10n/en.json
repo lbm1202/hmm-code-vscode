@@ -179,5 +179,6 @@
   "settings.compact.desc": "When context usage reaches this percent, the conversation is automatically summarized (compacted) to free up room. Lower = compact earlier/more often; higher = later. Range 40–95.",
   "settings.compact.reset": "Reset to default",
   "settings.compact.defaultHint": "(default {n}%)",
-  "settings.dirty.compact": "auto-summarize threshold"
+  "settings.dirty.compact": "auto-summarize threshold",
+  "settings.oauth.authed": "✓ Authenticated"
 }
