@@ -322,12 +322,6 @@ function inlineWordDiff(oldS: string, newS: string): [string, string] {
 	return [`${oldPre}${oldMark}${oldSuf}`, `${newPre}${newMark}${newSuf}`];
 }
 
-function abbreviateHome(path: string): string {
-	// Best-effort: webview can't see process.env.HOME. Show as-is; the host
-	// usually sends absolute paths already.
-	return path;
-}
-
 /** Cleanest one-line summary for a tool call, regardless of category. */
 export function summaryForTool(toolName: string, args: any): string {
 	if (INTERACTIVE_TOOLS.has(toolName)) {
@@ -386,7 +380,7 @@ function builtInSummaryArgs(toolName: string, args: any): string {
 /** Extract the primary file path from a tool's args, if there is one.
  *  Used to make tool summaries Ctrl/Cmd-clickable (opens the file in editor).
  *  Returns undefined for tools whose args aren't path-shaped. */
-export function filePathFromArgs(toolName: string, args: any): string | undefined {
+function filePathFromArgs(toolName: string, args: any): string | undefined {
 	if (!args || typeof args !== "object") return undefined;
 	if (
 		toolName === "edit" ||
@@ -421,7 +415,7 @@ export function shouldShowArgsBlock(args: unknown): boolean {
 }
 
 /** Compact one-line description for interactive tool args. */
-export function interactiveSummaryArgs(toolName: string, args: any): string {
+function interactiveSummaryArgs(toolName: string, args: any): string {
 	if (toolName === "ask_user" && Array.isArray(args?.questions)) {
 		const topics = args.questions.map((q: any) => q?.topic).filter(Boolean);
 		return topics.length ? topics.join(" / ") : `${args.questions.length}개 질문`;

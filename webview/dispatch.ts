@@ -339,5 +339,3 @@ async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
 	}
 }
 
-// Re-export `updatePromptDisabled` so other modules can import from a single barrel.
-export { updatePromptDisabled };

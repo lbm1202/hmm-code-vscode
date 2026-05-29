@@ -18,8 +18,6 @@ export const TO_WEBVIEW = {
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
-export type ToWebviewKind = (typeof TO_WEBVIEW)[keyof typeof TO_WEBVIEW];
-
 /** kind values on FromWebview (webview → host). */
 export const FROM_WEBVIEW = {
 	PROMPT: "prompt",
@@ -42,8 +40,6 @@ export const FROM_WEBVIEW = {
 	 *  directly to Pi via prompt/no-reply. */
 	SLASH: "slash",
 } as const;
-export type FromWebviewKind = (typeof FROM_WEBVIEW)[keyof typeof FROM_WEBVIEW];
-
 /** setStatus keys we receive from Pi modes ext (and synthesize ourselves). */
 export const STATUS_KEYS = {
 	MODE: "mode",
@@ -53,7 +49,6 @@ export const STATUS_KEYS = {
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
 	AUTO_APPROVE: "auto-approve",
-	TODOS: "todos",
 } as const;
 
 /** Pi RPC commands that imply we should resync get_state and emit session_start. */

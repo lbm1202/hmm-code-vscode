@@ -5,6 +5,8 @@
   "version": "0.1.0",
   "publisher": "lbm1202",
   "private": true,
+  "license": "MIT",
+  "author": "lbm1202",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
@@ -81,16 +83,6 @@
           "name": "Chat"
         }
       ]
-    },
-    "configuration": {
-      "title": "Hmm-code",
-      "properties": {
-        "hmm-code.piBinary": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Path to an external `pi` binary. Leave blank to use the Pi runtime bundled with this extension (recommended). Set to a system path like `/opt/homebrew/bin/pi` when you want to drive the chat with a separately-installed Pi (e.g. to test a newer version)."
-        }
-      }
     }
   },
   "scripts": {

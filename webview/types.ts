@@ -23,7 +23,6 @@ export type ModelEntry = {
 	reasoning?: boolean;
 	thinkingLevelMap?: Record<string, string | null>;
 	compat?: { thinkingFormat?: string; [k: string]: unknown };
-	thinkingLevels?: string[];
 	[k: string]: unknown;
 };
 

@@ -132,7 +132,7 @@ function renderAssistantHistory(m: any): void {
 	}
 }
 
-export function extractText(content: any): string {
+function extractText(content: any): string {
 	if (typeof content === "string") return content;
 	if (!Array.isArray(content)) return "";
 	return content

@@ -11,6 +11,7 @@
 
 import { createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+import { escapeHtml } from "./helpers";
 
 import darkPlus from "shiki/themes/dark-plus.mjs";
 
@@ -119,14 +120,6 @@ export function langFromPath(path: string | undefined): string | undefined {
 	const ext = m[1].toLowerCase();
 	const lang = EXT_TO_LANG[ext];
 	return lang || undefined;
-}
-
-function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
 }
 
 function escapeAttr(s: string): string {

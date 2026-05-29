@@ -80,7 +80,7 @@ export interface DomRefs {
 }
 
 /** Mounts the app scaffold into #app and returns refs to all interactive nodes. */
-export function mountDom(root: HTMLElement): DomRefs {
+function mountDom(root: HTMLElement): DomRefs {
 	root.innerHTML = APP_HTML;
 	const pickerMode = document.getElementById("picker-mode")!;
 	const pickerModel = document.getElementById("picker-model")!;

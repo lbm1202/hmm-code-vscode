@@ -10,7 +10,6 @@
 
 import { randomBytes, createHash } from "node:crypto";
 import * as http from "node:http";
-import type { AddressInfo } from "node:net";
 
 const CALLBACK_HOST = process.env.PI_OAUTH_CALLBACK_HOST || "127.0.0.1";
 const CALLBACK_PORT = 1455;

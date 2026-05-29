@@ -194,7 +194,3 @@ export function showSessionPicker(sessions: SessionEntry[]): void {
 	modalRoot.appendChild(backdrop);
 }
 
-/** True iff the session picker modal is currently visible. */
-export function isSessionPickerOpen(): boolean {
-	return els().modalRoot.querySelector(".session-list, .session-tree") !== null;
-}

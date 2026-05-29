@@ -88,7 +88,6 @@ export interface ModelEntry {
 	reasoning?: boolean;
 	thinkingLevelMap?: Record<string, string | null>;
 	compat?: { thinkingFormat?: string; [k: string]: unknown };
-	thinkingLevels?: string[]; // legacy convenience; unused if thinkingLevelMap present
 	[k: string]: unknown;
 }
 

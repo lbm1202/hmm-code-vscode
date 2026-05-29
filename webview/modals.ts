@@ -2,7 +2,7 @@
 // confirm/input modal dialogs. Question cards render in the messages area as
 // part of the conversation; the dialogs use a backdrop overlay.
 
-import { appendBubble, els, setEmptyVisibility } from "./dom";
+import { els, setEmptyVisibility } from "./dom";
 import { safeStringify } from "./helpers";
 import { FROM_WEBVIEW } from "./protocol";
 import { pendingUiRequests, post, runtime } from "./state";
@@ -259,7 +259,6 @@ function renderInputOrEditor(
 	row.appendChild(cancelBtn);
 	card.appendChild(row);
 	setTimeout(() => ta.focus(), 0);
-	void appendBubble; // satisfy import (kept for future use)
 }
 
 // ── Inline replacement dialogs (window.prompt/confirm are blocked in webviews) ─

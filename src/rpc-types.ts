@@ -90,14 +90,6 @@ export const RESPONDING_METHODS = new Set([
 	"input",
 	"editor",
 ]);
-/** Methods Pi treats as fire-and-forget (no response expected). */
-export const HINT_METHODS = new Set([
-	"notify",
-	"setStatus",
-	"setWidget",
-	"setTitle",
-	"set_editor_text",
-]);
 
 // Lifecycle / streaming events — Pi forwards SessionEvents as-is. The exact
 // union is large; we type loosely and special-case the events we render.
@@ -105,12 +97,5 @@ export interface RpcEvent {
 	type: string;
 	[k: string]: unknown;
 }
-
-// AssistantMessageEvent variants (carried inside message_update.assistantMessageEvent).
-// From @earendil-works/pi-ai types.d.ts:AssistantMessageEvent.
-export interface AssistantTextDelta { type: "text_delta"; contentIndex: number; delta: string; partial: unknown }
-export interface AssistantThinkingDelta { type: "thinking_delta"; contentIndex: number; delta: string; partial: unknown }
-export interface AssistantToolCallStart { type: "toolcall_start"; contentIndex: number; partial: unknown }
-export interface AssistantToolCallEnd { type: "toolcall_end"; contentIndex: number; toolCall: { id: string; name: string; arguments: unknown }; partial: unknown }
 
 export type IncomingMessage = RpcResponse | RpcExtensionUiRequest | RpcEvent;

@@ -42,7 +42,6 @@ export const STATUS_KEYS = {
 	OVERRIDDEN: "overridden",
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
-	TODOS: "todos",
 	AUTO_APPROVE: "auto-approve",
 } as const;
 
@@ -61,7 +60,6 @@ export const PI_EVENT = {
 	TURN_START: "turn_start",
 	TURN_END: "turn_end",
 	EXTENSION_ERROR: "extension_error",
-	SESSION_INFO_CHANGED: "session_info_changed",
 } as const;
 
 export const ASSISTANT_DELTA = {
