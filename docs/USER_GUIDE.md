@@ -1,117 +1,113 @@
-# Hmm-code 사용자 가이드
+# Hmm-code User Guide
 
-VS Code 확장의 모든 UI 기능 walkthrough.
+A walkthrough of every UI feature in the VS Code extension.
 
-> 기능 자체의 의미 / 워크플로우는 자매 repo
-> [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) 의 문서 참조:
+> Feature semantics and workflow live in the companion repo
+> [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi):
 > - [Workflow](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/WORKFLOW.md)
 > - [Permissions](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/PERMISSIONS.md)
 > - [AGENTS.md](https://github.com/lbm1202/hmm-code-pi/blob/main/docs/AGENTS-MD.md)
 >
-> 이 문서는 그것들을 "VS Code 안에서 어떻게 쓰느냐" 만 다룸.
+> This guide only covers *how to use them inside VS Code*.
 
 ---
 
-## 1. 채팅 화면 진입
+## 1. Opening a chat
 
-### 사이드바
-- 액티비티 바의 Hmm 아이콘 클릭
-- 또는 `Cmd+Shift+P` → "Hmm-code: Open Chat in Sidebar"
+### Sidebar
+- Click the Hmm icon in the Activity Bar
+- Or run `Cmd+Shift+P` → "Hmm-code: Open Chat in Sidebar"
 
-### 편집기 패널 (새 탭)
-- 편집기 타이틀바의 `H` 아이콘 (PNG 로고)
-- 또는 `Cmd+Shift+P` → "Hmm-code: New Chat Panel"
-- 여러 개 동시에 열 수 있음 — 각 탭은 독립된 Pi 프로세스
+### Editor panel (new tab)
+- Click the `H` icon (PNG logo) in the editor title bar
+- Or run `Cmd+Shift+P` → "Hmm-code: New Chat Panel"
+- Multiple panels can coexist — each tab is an independent Pi process
 
-### 패널 영속성
-VS Code 윈도우 reload / 재시작 → 모든 탭 자동 복원. 마지막 열고 있던
-세션 파일도 자동 재진입 (webview 의 persisted state).
+### Panel persistence
+VS Code window reload / restart → every tab restores automatically. The session file you had open last reattaches as well (webview persisted state).
 
 ---
 
-## 2. 채팅 푸터 (picker row)
+## 2. The chat footer (picker row)
 
-왼쪽부터: **mode picker** · **model picker** · **thinking picker** · **↺ 기본값** (조건부) · **🔒 Auto** 토글 · 우측 끝: **ctx 사용률** · **↑ 전송 / ■ 중단**
+Left to right: **mode picker** · **model picker** · **thinking picker** · **↺ reset** (conditional) · **🔒 Auto** toggle · right end: **ctx %** · **↑ send / ■ stop**
 
-| 버튼 | 동작 |
+| Button | Action |
 |---|---|
-| **mode picker** | 클릭 → 4모드 picker. 모드별 색상 (code=흰, plan=파랑, debug=보라, ask=주황) |
-| **model picker** | 클릭 → 사용 가능한 모델 목록. alias 가 있으면 alias 표시 + raw id 는 sublabel |
-| **thinking picker** | 클릭 → 모델 지원 thinking 레벨 |
-| **↺ 기본값** | 현재 모델/thinking 이 모드 기본과 다를 때만 표시. 클릭 → 모드 default 복원 |
-| **🔒 Auto / 🔓 Auto** | 권한 ask 자동승인 토글 ([§5](#5-auto-approve)) |
-| **ctx XX%** | 컨텍스트 사용률 |
-| **↑ / ■** | 전송 / 중단 |
+| **mode picker** | Click → 4-mode picker. Mode-colored chip (code = white, plan = blue, debug = purple, ask = orange). |
+| **model picker** | Click → available models. Alias is shown as the primary label with the raw id as a sublabel. |
+| **thinking picker** | Click → supported thinking levels for the active model. |
+| **↺ reset** | Only visible when the current model/thinking differs from the mode default. Click → restore mode defaults. |
+| **🔒 Auto / 🔓 Auto** | Toggles permission auto-approve (see [§5](#5-auto-approve)). |
+| **ctx XX%** | Context window usage. |
+| **↑ / ■** | Send / abort the in-flight turn. |
 
 ---
 
-## 3. 키보드 단축키
+## 3. Keyboard shortcuts
 
-| 단축키 | 동작 |
+| Shortcut | Action |
 |---|---|
-| `Enter` | 메시지 전송 |
-| `Shift+Enter` | 줄바꿈 |
-| `Tab` / `Shift+Tab` | 모드 순환 (focus 가 prompt 안에 있을 때) |
-| `Cmd/Ctrl + 클릭` (도구 호출의 파일 경로 위) | 그 파일을 편집기로 열기 |
+| `Enter` | Send the message |
+| `Shift+Enter` | Newline |
+| `Tab` / `Shift+Tab` | Cycle modes (when the prompt has focus) |
+| `Cmd/Ctrl + click` on a file path inside a tool call | Open that file in the editor |
 
-전역 단축키 (커맨드 팔레트 등):
-- `Hmm-code: Cycle Mode` — `Shift+Tab`
-- `Hmm-code: Toggle Thinking` — `/mode-set` 단축
-- `Hmm-code: Reset to Defaults` — `/reset`
-- `Hmm-code: Abort` — 진행 중인 응답 중단
+The extension's VS Code commands (mode cycle, thinking toggle, reset, abort, restart, etc.) live in the Command Palette without default keybindings — VS Code intercepts most modifier combos before they reach the webview, so binding them would be a lie. Use `keybindings.json` to add your own if you want shortcuts.
+
+Pi TUI shortcuts (`Alt+T`, `Alt+X`, `Ctrl+Shift+A`) are described in the [Pi extension README](https://github.com/lbm1202/hmm-code-pi#tui-keybindings). They apply only when driving Hmm-code from the terminal.
 
 ---
 
-## 4. 도구 호출 렌더링
+## 4. Tool-call rendering
 
-### 일반 도구 (read / grep / find / ls / bash)
-- 한 줄 요약: `bash` 면 첫 줄 명령 + `(+N lines)` 힌트, `read` 면 path + `[start-end]`
-- 결과 10 줄 초과면 자동 collapse (`N lines` 힌트)
-- 실패는 빨강 `✗`, 성공은 자동 표시 없음 (raw 출력 그대로)
+### Generic tools (`read` / `grep` / `find` / `ls` / `bash`)
+- One-line summary: `bash` shows the first command line + `(+N lines)` hint; `read` shows path + `[start-end]`.
+- Outputs longer than 10 lines collapse with an `N lines` hint.
+- Errors get a red `✗`; successes have no badge (raw output stands on its own).
 
-### edit / write / multi_edit (diff view)
-- **Path 헤더 클릭 가능** — Ctrl/Cmd + 클릭 → 편집기로 열기
-- 라인별 unified diff (LCS 기반):
-  - 삭제: 빨강 배경 + `-` prefix
-  - 추가: 초록 배경 + `+` prefix
-  - 변경 없는 라인: 회색 (context)
-- 단일 라인 edit 은 inline word-diff (변경된 부분만 하이라이트)
-- 모든 다이프는 [**Shiki syntax highlighting**](https://shiki.style/) —
-  Dark+ 테마, 25개 언어 지원 (ts/tsx/js/py/css/html/json/md/sh/go/rust/
-  java/c/cpp/yaml/toml/sql/vue/svelte/xml/diff/ini/scss/jsx/jsonc 등)
-- 미지원 확장자나 Shiki 로딩 전엔 plain text fallback
+### `edit` / `write` / `multi_edit` (diff view)
+- **Clickable path header** — Ctrl/Cmd + click opens the file in the editor.
+- Line-level unified diff (LCS-based):
+  - Deletions: red background + `-` prefix
+  - Additions: green background + `+` prefix
+  - Unchanged lines: gray (context)
+- Single-line edits get inline word-diff — only the changed slice is highlighted.
+- All diffs use [**Shiki syntax highlighting**](https://shiki.style/) — Dark+ theme across 25+ languages (ts / tsx / js / py / css / html / json / md / sh / go / rust / java / c / cpp / yaml / toml / sql / vue / svelte / xml / diff / ini / scss / jsx / jsonc, etc.)
+- Unsupported extensions or pre-Shiki-init falls back to plain text.
 
-### read 결과
-- 파일 path 추정 → Shiki 로 syntax highlight
-- 전체 블록 토큰화 (multi-line 주석/string 컨텍스트 유지)
+### `read` results
+- File extension → Shiki block tokenization (preserves multi-line comment / string context).
 
-### 인터랙티브 도구 (ask_user / todo_write / finalize_plan / request_mode_switch)
-- 카드형 UI — 질문 + 선택지, todo 체크리스트, accept/decline 등
-- 토큰 절약 위해 raw JSON 안 보여줌
+### Interactive tools (`ask_user` / `todo_write` / `finalize_plan` / `request_mode_switch`)
+- Card UI — question + options, todo checklists, accept/decline buttons.
+- Raw JSON is suppressed to save context.
+
+### Sanitized markdown
+- Model output is rendered via marked → DOMPurify. `<script>`, `on*` handlers, `javascript:` URLs, `<iframe>` / `<object>` / `<embed>` / `<form>` are stripped before reaching the DOM.
 
 ---
 
 ## 5. Auto-approve
 
-채팅 푸터의 **🔒 Auto** 버튼.
+The **🔒 Auto** button in the chat footer.
 
-- **꺼짐 (회색 자물쇠)**: 권한 시스템이 `ask` 를 판정하면 confirm
-  다이얼로그 뜸
-- **켜짐 (주황 🔓)**: 모든 `ask` 자동 통과. `deny` 는 여전히 차단
+- **Off (gray padlock)**: every `ask` verdict from the permission system surfaces a confirm dialog.
+- **On (orange 🔓)**: every `ask` verdict auto-passes. `deny` still blocks (`ask` is the only thing being bypassed).
 
-세션 한정 — 새 세션 시작 시 자동 OFF. 영구화 X (의도적).
+Session-scoped — flipping to a new session resets to OFF. Never persisted (deliberate).
 
-**응답 도중 토글해도 즉시 적용** — 다음 도구 호출부터 새 상태 봄.
-이미 떠 있는 confirm 은 사용자가 직접 처리 (다이얼로그가 갑자기
-사라지면 더 혼란).
+**Toggles take effect mid-turn** — the next tool call sees the new state. Dialogs that are already on screen need to be answered by the user (auto-dismissing them would be more confusing than helpful).
 
-토글 시 채팅에 슬래시가 안 보임 — 인라인 RPC 채널로 처리.
+The toggle goes over an internal RPC channel, so the slash command doesn't appear as a user bubble.
+
+The TUI equivalent is `Ctrl+Shift+A`. There is no VS Code keybinding because the combo gets intercepted before reaching the webview — use the button.
 
 ---
 
-## 6. 권한 confirm 다이얼로그
+## 6. Permission confirm dialog
 
-권한 시스템이 `ask` 판정하면 webview modal 뜸:
+When the permission system returns `ask`, the webview shows a modal:
 
 > **Permission**
 >
@@ -119,109 +115,99 @@ VS Code 윈도우 reload / 재시작 → 모든 탭 자동 복원. 마지막 열
 >
 > Allow this action?
 >
-> **[거절]** &nbsp;&nbsp; **[허용]**
+> **[Deny]** &nbsp;&nbsp; **[Allow]**
 
-- **허용**: 그 한 번만 통과. 같은 명령 다시 호출되면 또 ask
-- **거절**: tool result 가 `isError: true` + "User denied" 로 LLM 에
-  전달 → LLM 이 알아서 다른 접근 시도
+- **Allow**: this call only. The next time the same command is invoked, it asks again.
+- **Deny**: tool result returns to Pi as `isError: true` + "User denied" — the LLM can choose another approach.
 
-여러 번 통과시키고 싶으면 Auto 버튼 켜기, 또는 `permissions.json` 에
-직접 `"allow"` 룰 추가.
+For repeated approvals, either toggle Auto on or add an `allow` rule under `permissions` in `modes.json`.
 
 ---
 
-## 7. 세션 picker (🕘)
+## 7. Session picker (🕘)
 
-상단 🕘 버튼 클릭 → 세션 트리 모달.
+Click the 🕘 button at the top → session tree modal.
 
-- **부모-자식 트리**: `finalize_plan` 의 새 세션 분기로 만든 세션은
-  parent 와 연결되어 트리로 묶임
-- **`▶ / ▼`**: 자식 expand/collapse
-- **클릭 (이동)**: 그 세션으로 전환
-- **✏️**: 세션 이름 변경 (sidecar `.pi-modes-names.json` 에 저장, Pi
-  session 파일은 immutable)
-- **🗑**: 삭제. 자식이 있으면 cascade 경고.
-  - **활성 세션 삭제 시 자동으로 새 세션 시작** — 죽은 세션 표시 방지
+- **Parent-child tree**: sessions spawned via `finalize_plan` (new-session branch) link to their parent and render as a tree.
+- **`▶ / ▼`**: expand/collapse children.
+- **Row click**: switch to that session.
+- **✏️**: rename (stored in the sidecar `.pi-modes-names.json` — Pi's session files stay immutable).
+- **🗑**: delete. If the session has children, a cascade warning appears.
+  - **Deleting the active session auto-spawns a fresh one** so the UI never shows a dead session.
 
 ---
 
-## 8. 설정 패널
+## 8. Settings panel
 
-푸터의 ⚙ 버튼 또는 `Cmd+Shift+P` → "Hmm-code: Open Settings". 자세히는
-[SETTINGS.md](SETTINGS.md).
+Footer ⚙ button or `Cmd+Shift+P` → "Hmm-code: Open Settings". Full reference: [SETTINGS.md](SETTINGS.md).
 
-요약:
-- **모드**: 각 모드의 model / thinking 편집
-- **기타 모델 설정**: 자동 제목 생성 모델 (백그라운드 작업용)
-- **공급자별 모델 필터**: picker 에 보일 모델 화이트리스트
-- **공급자 인증**: API key / Codex OAuth 로그인
-- **커스텀 공급자**: vLLM/Ollama 같은 자체 호스팅 endpoint 등록
+Summary:
+- **Modes**: edit each mode's model / thinking.
+- **Other model settings**: auto-title model (background job).
+- **Model filter per provider**: allowlist that controls which models appear in the picker.
+- **Provider auth**: API keys, Codex OAuth login.
+- **Custom providers**: register self-hosted endpoints (vLLM / Ollama).
 
-저장 시 자동 reload — 모든 채팅 탭이 새 설정 적용.
-
----
-
-## 9. 빈 상태 (최근 세션)
-
-새 탭 / 세션 없음 → 가운데 Hmm 로고 + "최근 세션" 목록 (최근 5개).
-클릭하면 그 세션으로 진입.
+Saving triggers an auto-reload — every open chat tab picks up the new config.
 
 ---
 
-## 10. 색상 코드
+## 9. Empty state (recent sessions)
 
-| 모드 | 색 |
+A fresh tab with no session shows the centered Hmm logo + a "Recent sessions" list (top 5). Click any row to enter that session.
+
+---
+
+## 10. Color codes
+
+| Mode | Color |
 |---|---|
-| code | 흰색 |
-| plan | 파랑 |
-| debug | 보라 |
-| ask | 주황 |
+| code | white |
+| plan | blue |
+| debug | purple |
+| ask | orange |
 
-mode picker chip + plan handoff 알림 + 푸터 mode label 에 일관 적용.
-
----
-
-## 11. 트러블슈팅
-
-### 채팅이 응답 안 함
-- 사이드바 우상단 ↺ 버튼 보이면 클릭 — `restartChat` 트리거 (Pi 프로세스
-  재시작)
-- 또는 `Cmd+Shift+P` → "Developer: Reload Window"
-
-### Pi 가 새 코드 안 봄
-- Pi 프로세스는 startup 시점에만 확장 코드 로드
-- 채팅 탭에서 `/reload-runtime` 슬래시 (해당 탭만 reload)
-- 또는 설정 패널에서 저장 한 번 → `reloadAll` 자동 발화
-
-### 권한 ask 가 무한 deny 되는 듯
-- 헤드리스 모드 (UI 없는 RPC) 에선 ask 자동 deny — Pi 가 RPC 모드에서
-  `ctx.hasUI` false 인 경우. 정상 동작
-- 일반 채팅에선 confirm 다이얼로그가 떠야 정상. 안 뜨면 modal-root 가
-  뭔가 가려져 있거나 webview console 에러 가능 — VS Code 의 "Developer:
-  Open Webview Developer Tools" 로 확인
-
-### Codex 로그인 후 모델이 안 뜸
-- 로그인 성공 시 자동으로 모든 채팅 탭 재시작 (`restartAll`)
-- 그래도 안 뜨면 윈도우 reload
-
-### Settings 패널의 모델 dropdown 이 비어있음
-- 채팅 한 번도 안 열린 상태라 model cache 가 비어있을 수 있음
-- 채팅 탭 한 번 열어서 모델 fetch 가 일어나면 자동으로 settings 패널이
-  refresh (cache observer 패턴)
-- 또는 settings 패널이 처음 열릴 때 first live backend 에 자동 요청을
-  보냄 → 잠시 후 dropdown 채워짐
-
-### Edit/write diff 가 plain text 로만 보임
-- Shiki 로딩 전 (extension 초기화 직후 1~2초) 거나 미지원 확장자
-- 지원 언어 목록은 [README.md](README.md#features) 참조
-- 안전한 fallback — diff structure 는 그대로 보임
+Used consistently across the mode picker chip, plan-handoff notifications, and the footer mode label.
 
 ---
 
-## 12. 환경 정보
+## 11. Troubleshooting
+
+### Chat doesn't respond
+- The sidebar's top-right ↺ button (when visible) triggers `restartChat` — respawns the Pi process.
+- Or `Cmd+Shift+P` → "Developer: Reload Window".
+
+### Pi doesn't pick up new extension code
+- The Pi process only loads extensions at startup.
+- Send `/reload-runtime` in a chat tab (reloads that tab only).
+- Or save anything in the settings panel — it triggers `reloadAll` automatically.
+
+### Permission ask seems to deny forever
+- Headless RPC sessions (no UI) auto-deny `ask` — Pi reports `ctx.hasUI === false` and the extension blocks. This is by design.
+- Inside a normal chat the confirm modal should appear; if it doesn't, the modal-root may be hidden by another overlay or the webview is throwing — open "Developer: Open Webview Developer Tools" to inspect.
+
+### Codex login completed but the models are missing
+- A successful login auto-restarts every chat tab (`restartAll`).
+- If they still don't appear, run "Developer: Reload Window".
+
+### Settings panel model dropdown is empty
+- If no chat has ever run, the model cache is empty.
+- Open a chat tab once — when models are fetched, the settings panel auto-refreshes via the cache-observer pattern.
+- The settings panel also issues a one-shot model fetch via the first live backend when it opens; the dropdown populates a moment later.
+
+### Edit/write diffs render as plain text
+- Shiki is still loading (first ~1-2 seconds after the extension activates) or the file extension isn't supported.
+- The supported language list is in [README.md](../README.md#at-a-glance).
+- Safe fallback — the diff structure is still rendered.
+
+### `Pi launch source: system` in the Hmm-code output channel
+- The bundled Pi wasn't shipped or wasn't extracted — usually means the installed `.vsix` predates the bundling commit, or the user override is misconfigured.
+- Reinstall the `.vsix` from the [Releases page](https://github.com/lbm1202/hmm-code-vscode/releases) to fix.
+
+---
+
+## 12. Requirements
 
 - VS Code 1.85+
-- Pi `@earendil-works/pi-coding-agent` 4.x 이상 (글로벌 npm 또는
-  homebrew 로 설치된 `pi` CLI 가 PATH 에 있어야 함)
-- Pi 확장 [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) 가
-  `~/.pi/agent/extensions/hmm-code-pi/` 에 설치되어 있어야 함
+- macOS / Linux / Windows (the bundled Pi runs on Electron's Node runtime — no separate Node install required).
+- For source builds: Node 20+ and a GitHub SSH key (the build clones the private `hmm-code-pi` repo on first run unless a sibling clone or `HMM_CODE_PI_PATH` is provided).

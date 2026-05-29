@@ -1,219 +1,192 @@
-# 설정 패널 가이드
+# Settings panel reference
 
-`Cmd+Shift+P` → "Hmm-code: Open Settings" 또는 채팅 푸터의 ⚙ 버튼.
+Open via `Cmd+Shift+P` → "Hmm-code: Open Settings" or the ⚙ button in the chat footer.
 
-별도 편집기 탭으로 열리고, 모든 변경사항은 화면 우하단 "저장" 버튼으로
-한꺼번에 저장됨. dirty 표시 (보더 강조) 가 변경된 카드에 뜸.
+The panel opens in its own editor tab. Every change is staged in-memory and committed by the **Save** button in the bottom-right. Dirty cards get an emphasized border.
 
-저장 후 자동 reload — auth 변경은 모든 Pi 프로세스 재시작
-(`restartAll`), modes/models 변경은 `/reload-runtime` broadcast
-(`reloadAll`). 모든 채팅 탭이 새 설정 즉시 적용.
+Saving triggers an auto-reload — auth changes respawn every Pi process (`restartAll`), while modes/models-only changes broadcast `/reload-runtime` (`reloadAll`). All chat tabs pick up the new config instantly.
 
 ---
 
-## 1. 모드
+## 1. Modes
 
-각 모드 (plan / code / debug / ask) 별 model + thinking level 편집.
+Edit the model + thinking level for each of the four modes (plan / code / debug / ask).
 
-| 모드  | 공급자 ▾ | 모델 ▾ | thinking ▾ |
-|-------|----------|--------|------------|
-| plan  | ...      | ...    | ...        |
-| code  | ...      | ...    | ...        |
-| debug | ...      | ...    | ...        |
-| ask   | ...      | ...    | ...        |
+| Mode  | Provider ▾ | Model ▾ | Thinking ▾ |
+|-------|-----------|---------|------------|
+| plan  | …         | …       | …          |
+| code  | …         | …       | …          |
+| debug | …         | …       | …          |
+| ask   | …         | …       | …          |
 
-### 공급자 dropdown
-- `(default)` — 모드 default 모델 사용
-- 등록된 모든 공급자 (Pi 내장 + 커스텀)
+### Provider dropdown
+- `(default)` — use the mode default
+- Every registered provider (Pi built-ins + custom providers)
 
-### 모델 dropdown
-- 선택된 공급자의 모델 목록
-- **alias 가 있으면 alias 표시** — 예: `Hmm` (raw id `Qwen3.6-35B-A3B-MLX-VL-oQ5`)
-- raw id 는 hover title 로 노출
-- **모델 필터 적용됨** — 공급자별 모델 필터에서 hidden 처리한 모델은
-  여기서도 안 보임 (단 이미 선택된 hidden 모델은 유지 — modelOptionsHtml
-  의 currentValue inject)
+### Model dropdown
+- Models for the selected provider
+- **Aliases show as the primary label** — e.g. `Hmm` (raw id `Qwen3.6-35B-A3B-MLX-VL-oQ5`)
+- The raw id appears in the hover tooltip
+- **Filter-aware** — models hidden by the per-provider model filter don't show here, *except* the currently selected one (`modelOptionsHtml` injects `currentValue` so you can see what's set)
 
-### thinking dropdown
-- 모델이 지원하는 thinking level만 (모델별 `thinkingLevelMap` 기준)
-- `(default)` = 모드 default
+### Thinking dropdown
+- Only the levels the model supports (per its `thinkingLevelMap`)
+- `(default)` = mode default
 
 ---
 
-## 2. 기타 모델 설정
+## 2. Other model settings
 
-### 자동 제목 모델
-세션 자동 제목 생성에 쓸 모델 (`auto-title.ts`).
+### Auto-title model
+The model used to generate session titles in the background (`auto-title.ts`).
 
-- 빈 값: GPT-mini 후보 → code 모드 모델 → 활성 모델 순으로 fallback
-- 지정: 그 모델 강제 사용 (`modes.json:autoTitle.{provider,id}` 저장)
+- **Empty**: falls back through the GPT-mini candidate list → code mode's model → the currently active model.
+- **Set**: that model is used unconditionally (saved as `modes.json:autoTitle.{provider,id}`).
 
-`Pi 가 컨텍스트 요약 (compact) 에 어떤 모델을 쓰지?` — 항상 **현재
-활성 모델**. Pi 내부 로직이라 따로 설정 불가.
+> "Which model does Pi use for context compaction?" — always **the currently active model**. That's Pi's internal behavior and isn't configurable here.
 
 ---
 
-## 3. 공급자별 모델 필터
+## 3. Per-provider model filter
 
-채팅의 모델 picker 에 보일 모델을 공급자별로 화이트리스트.
+Allowlists which models appear in the chat model picker.
 
-공급자별 카드 — 각 카드 헤더에 공급자 이름 + "N / M 노출" + **전체** / **해제** 버튼. 본문에 모델 체크박스 그리드.
+One card per provider — header shows the name + `N / M visible` + **All** / **None** buttons. Body is a checkbox grid of every model in that provider.
 
-| 카드 | 모델 체크박스 |
+| Card | Model checkboxes |
 |---|---|
-| **Hmmgent** (전체 1 노출) | ☑ Hmm |
-| **openai-codex** (1 / 6 노출) | ☐ gpt-5.2 · ☐ gpt-5.3-codex · ☐ gpt-5.3-codex-spark · ☐ gpt-5.4 · ☐ gpt-5.4-mini · ☑ gpt-5.5 |
+| **Custom-Provider** (1 / 1 visible) | ☑ ModelA |
+| **openai** (1 / 4 visible) | ☐ gpt-4o-mini · ☐ o1 · ☐ o1-mini · ☑ gpt-4o |
 
-### 동작 의미
+### State semantics
 
-| 상태 | 결과 |
+| State | Result |
 |---|---|
-| 전부 체크 | 필터 없음 — 그 공급자의 모든 모델 노출 (key 자체가 modes.json 에서 사라짐) |
-| 일부 체크 | 그 모델들만 picker / 모드 dropdown 에 노출 |
-| 전부 해제 | 그 공급자 0개 노출 (= `[]` 로 저장, 명시적 hide-all) |
+| All checked | No filter — every model visible (key is removed entirely from `modes.json`) |
+| Some checked | Only those models appear in the picker and mode dropdowns |
+| None checked | Zero models visible for this provider (explicitly saved as `[]` — "hide all") |
 
-[전체] / [해제] 버튼은 그 공급자 일괄 토글.
+The All / None buttons toggle the whole card.
 
-### 적용 범위
+### Where the filter applies
 
-- ✅ 채팅의 모델 picker
-- ✅ 설정의 모드 모델 dropdown
-- ✅ 설정의 자동 제목 dropdown
-- ❌ 이 필터 UI 자체 (그러면 본인이 본인을 못 토글)
+- ✅ Chat model picker
+- ✅ Settings panel's mode model dropdowns
+- ✅ Settings panel's auto-title dropdown
+- ❌ The filter UI itself (otherwise you couldn't re-enable a model after hiding it)
 
-이미 선택돼있는 hidden 모델은 dropdown 에 그대로 유지됨 — modelOptionsHtml
-이 currentValue 를 보고 추가 노출.
+Already-selected hidden models persist in the dropdowns — `modelOptionsHtml` injects `currentValue` so you can still see what's set.
 
-저장 위치: `~/.pi/agent/modes.json` 의 `modelAllowlist` 필드. 키 없으면
-필터 없음 (전체 노출).
+Storage: `modelAllowlist` field in `~/.pi/agent/modes.json`. Missing key = no filter (everything visible).
 
 ---
 
-## 4. 공급자 인증 (auth.json)
+## 4. Provider auth (`auth.json`)
 
-Pi 의 `AuthStorage` (= `~/.pi/agent/auth.json`) 편집 UI.
+UI for Pi's `AuthStorage` (`~/.pi/agent/auth.json`).
 
-### API key 추가
-- provider id (예: `openai`, `anthropic`, `groq`) + API key 입력
-- "Add" 클릭 — 즉시 메모리 draft 에 추가, 저장 시 디스크 반영
-- 인라인 추가 — modal 안 뜸
+### Add an API key
+- Enter the provider id (e.g. `openai`, `anthropic`, `groq`) + API key.
+- Click "Add" — staged immediately in the in-memory draft, persisted on Save.
+- Inline — no modal pops up.
 
-### OAuth 로그인 (openai-codex)
-- "Codex 로그인" 버튼 → 브라우저 OAuth 플로우 자동 시작
-  (127.0.0.1:1455 callback)
-- 성공 시 status panel 에 표시 + 모든 Pi 프로세스 재시작 (auth.json
-  메모리 캐시 갱신용)
-- 취소 가능 (인증 도중 abort 버튼)
+### OAuth login (openai-codex)
+- "Codex login" button → starts the browser OAuth flow (callback on `127.0.0.1:1455`).
+- On success, the status panel updates and every Pi process restarts (refreshes the in-memory `auth.json` cache).
+- Cancelable mid-flow (abort button).
 
-### 제거
-- 각 row 의 ✕ 버튼
+### Removal
+- The ✕ button on each row.
 
-### 보안
-- Webview 에는 API key VALUE 안 전달 — type 만 ("api_key" / "oauth")
-- 디스크 파일도 권한 0600 으로 저장
+### Security
+- API key VALUEs are never sent to the webview — only the type (`api_key` / `oauth`).
+- The on-disk file is written with `0600` permissions.
 
 ---
 
-## 5. 커스텀 공급자 (models.json)
+## 5. Custom providers (`models.json`)
 
-vLLM / Ollama / 자체 호스팅 OpenAI 호환 endpoint 등록.
+Register vLLM / Ollama / self-hosted OpenAI-compatible endpoints.
 
-상단 **+ 공급자 추가** 버튼 → 공급자별 카드 생성. 카드 내부 구조:
+The top **+ Add provider** button creates a new card. Inside each card:
 
-- **baseUrl** — endpoint (예: `https://api.hmmgent.com/v1`)
-- **apiKey** — API key (저장 시 마스킹)
-- **api** — API 종류 (`openai-completions` / `anthropic-messages` 등)
-- **모델 테이블** — 각 row: `#` · `ID` · `이름(alias)` · `추론` 체크박스 · `✕` 제거
-- 하단 버튼: **+ 수동 추가** / **모델 발견** (자동 탐색)
+- **baseUrl** — endpoint (e.g. `https://api.example.com/v1`)
+- **apiKey** — API key (masked on display)
+- **api** — API kind (`openai-completions` / `anthropic-messages` etc.)
+- **Models table** — each row: `#` · `ID` · `name (alias)` · `reasoning` checkbox · `✕` remove
+- Bottom actions: **+ Add manually** / **Discover models** (auto-detect)
 
-### 공급자 추가
-- "+ 공급자 추가" → 새 카드 생성 (자동 이름 placeholder)
-- `baseUrl` + `apiKey` + `api` (openai-completions / anthropic-messages
-  등) 입력
+### Adding a provider
+- Click "+ Add provider" → new card with a placeholder name.
+- Fill in `baseUrl` + `apiKey` + `api` (e.g. `openai-completions`).
 
-### 모델 row
-| 필드 | 의미 |
+### Model row fields
+| Field | Meaning |
 |---|---|
-| ID | 모델 id (필수) — provider 의 실제 모델 이름 |
-| 이름 | alias / 친화 라벨 (예: "Hmm"). 비우면 alias 없음 |
-| 추론 | 모델이 reasoning/thinking 지원하면 체크. 토글 시 `models.json` 에 `"reasoning": true` 저장 |
-| ✕ | row 제거 |
+| ID | Model id (required) — the provider's actual model name |
+| Name | Alias / friendly label (e.g. "ModelA"). Blank = no alias. |
+| Reasoning | Check if the model supports reasoning/thinking. Toggling saves `"reasoning": true` to `models.json`. |
+| ✕ | Remove the row. |
 
-**모델 이름이 alias** — 채팅 picker 와 mode dropdown 에서 alias 가 보임.
-별도 alias UI 없음 (예전엔 있었는데 제거됨 — model.name 이 단일 소스).
+**The model name IS the alias** — it's what shows in the chat picker and mode dropdowns. There's no separate alias UI (an older version had one — removed; `model.name` is the single source of truth).
 
-### 모델 발견 (auto-discovery)
-- "모델 발견" 버튼 → `${baseUrl}/models` 엔드포인트 호출 (OpenAI-호환)
-- 응답의 id 목록을 체크박스로 표시
-- 일괄 선택 가능 — 이미 등록된 모델은 자동 체크
-- "추가" → 선택된 모델들 자동 등록 (기본값 reasoning=false)
+### Discover models (auto-discovery)
+- "Discover models" button → calls `${baseUrl}/models` (OpenAI-compatible).
+- The response ids show as checkboxes.
+- Bulk-select supported — already-registered models are pre-checked.
+- "Add" → registers the selected models (default `reasoning=false`).
 
-저장 위치: `~/.pi/agent/models.json`.
+Storage: `~/.pi/agent/models.json`.
 
 ---
 
-## 6. 저장 동작 상세
+## 6. Save behavior in detail
 
-저장 버튼 (우하단 fixed 바) 은 dirty 변경이 있을 때만 노출.
+The Save button (fixed bottom-right bar) appears only when something is dirty.
 
 ```
-저장 (3개 모드 · 자동 제목 모델 · 모델 필터)  [저장]
+Save (3 modes · auto-title model · model filter)  [Save]
 ```
 
-내부 동작:
-1. `models.json` 먼저 쓰기 (alias 가 modes.json 의 modelAliases 로
-   파생되므로)
-2. 그 alias 를 모아서 `modes.json` 의 modelAliases 갱신 + 다른 mode
-   설정 / autoTitle / modelAllowlist 동시 저장
-3. `auth.json` 변경 분 적용 (adds + removes)
-4. 라우팅:
-   - **auth 변경** → `restartChat` (= `ChatBackend.restartAll`) — 모든
-     Pi 프로세스 재시작
-   - **modes/models 만 변경** → `ChatBackend.reloadAll()` — 모든 백엔드에
-     `/reload-runtime` slash broadcast + 800ms 후 fresh 모델 자동 pull
-5. 모든 채팅 탭이 새 설정 즉시 적용
+Internal flow:
+1. `models.json` first (aliases derived from custom models feed into `modes.json:modelAliases`).
+2. Collect those aliases and write `modes.json` — mode configs + autoTitle + modelAllowlist all at once.
+3. Apply the `auth.json` delta (adds + removes).
+4. Route:
+   - **Auth changed** → `restartChat` (`ChatBackend.restartAll`) — respawn every Pi process.
+   - **Modes / models only** → `ChatBackend.reloadAll()` — broadcasts `/reload-runtime` to every backend + auto-pulls fresh model list ~800 ms later.
+5. Every chat tab picks up the new config instantly.
 
-저장 토스트 + 저장된 파일 목록 (`modes.json`, `models.json`, `auth.json`)
-표시.
+A toast confirms the save and lists the touched files (`modes.json`, `models.json`, `auth.json`).
 
 ---
 
-## 7. 캐시 / 동기화
+## 7. Cache / sync
 
-- **모델 캐시**: `ChatBackend._cachedModels` (정적 필드) — 어느 채팅
-  탭에서 모델 fetch 가 일어나면 모든 탭 + settings 패널이 공유
-- **Settings observer**: 모델 캐시 갱신 시 자동으로 settings 패널이
-  refresh — 처음 열린 settings 패널의 dropdown 이 자동 채워짐
-- **첫 진입 자동 fetch**: settings 가 cache 비어있는 상태로 열리면
-  첫 live backend 에 자동 모델 요청 → observer 가 refresh 트리거
+- **Model cache**: `ChatBackend._cachedModels` (static field) — shared across every chat tab + settings panel; populated whenever any backend fetches.
+- **Settings observer**: when the cache updates, the settings panel auto-refreshes its dropdowns. The settings panel can open before any chat has run.
+- **First-open auto-fetch**: if the cache is empty when the settings panel opens, it asks the first live backend for models — the observer fires and the dropdowns populate moments later.
 
 ---
 
-## 8. 트러블슈팅
+## 8. Troubleshooting
 
-### 저장 후 채팅에 반영 안 됨
-- modes/models 만 바꾸면 `/reload-runtime` 으로 충분 (Pi 가 살아있고
-  설정 파일만 다시 읽음)
-- 만약 새 모델이 등록됐는데 안 보이면: Pi 의 `modelRegistry.refresh()`
-  가 `session_start(reason="reload")` 때 자동 호출되는데, 그게 안 되면
-  채팅 탭 재시작 (↺ 버튼) 시도
+### Save didn't take effect in chat
+- Modes/models-only changes go through `/reload-runtime` — Pi stays alive and re-reads config files.
+- If a newly registered model doesn't appear, Pi's `modelRegistry.refresh()` is called on `session_start(reason="reload")` — if that doesn't fire, restart the chat tab (↺ button).
 
-### Codex 로그인 후 모델 안 뜸
-- 정상이라면 로그인 성공 시 자동 `restartChat` → 모든 Pi 재시작 →
-  새 auth 로 codex 모델 노출됨
-- 그래도 안 뜨면 윈도우 reload
+### Codex login completed but no models
+- A successful login triggers `restartChat` → every Pi process restarts → new auth surfaces the codex models.
+- If nothing appears, run "Developer: Reload Window".
 
-### Settings 의 모델 dropdown 이 비어있음
-- 한 번도 채팅을 안 연 상태일 가능성 — 채팅 탭 한 번 열면 자동 fetch
-- 또는 cache observer 가 timing race 로 놓침 — 다시 settings 열기
+### Settings model dropdown is empty
+- Likely no chat has run yet — open a chat tab once to trigger an auto-fetch.
+- Or the cache-observer raced — reopen the settings panel.
 
-### 자동 제목 모델 변경이 적용 안 됨
-- modes.json 의 autoTitle 필드 직접 확인 (`cat ~/.pi/agent/modes.json |
-  jq .autoTitle`)
-- 비어있으면 fallback chain (GPT-mini 후보 → code 모드 모델 → 활성)
-  적용됨
+### Auto-title model change isn't applied
+- Check `modes.json` directly: `cat ~/.pi/agent/modes.json | jq .autoTitle`.
+- Empty → the fallback chain applies (GPT-mini candidates → code mode's model → active model).
 
-### 커스텀 공급자가 등록 안 됨
-- baseUrl 응답이 OpenAI 호환 format 인지 확인 (`/models` endpoint 가
-  `{ data: [{id, ...}] }` 반환해야 발견 가능)
-- API key 없으면 발견 + 사용 모두 실패
+### Custom provider isn't recognized
+- Confirm the `baseUrl` responds with an OpenAI-compatible `/models` endpoint (`{ data: [{id, ...}] }`) for discovery.
+- Without an API key, both discovery and use fail.
