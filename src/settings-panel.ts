@@ -585,7 +585,7 @@ export class SettingsPanel {
 	<div class="section">
 		<h2>기타 모델 설정</h2>
 		<div class="desc">
-			세션 자동 제목 생성에 사용할 모델. 빈 값이면 GPT-mini 후보 → code 모드 모델 → 활성 모델 순으로 fallback.
+			세션 자동 제목 생성에 사용할 모델. <strong>빈 값이면 현재 세션의 활성 모델</strong>을 사용합니다 (대화 중인 모델과 동일 — 별도 provider 인증 불필요). 전용 모델을 쓰려면 여기서 지정하세요.
 			컨텍스트 요약(compact)은 Pi 가 항상 <strong>현재 활성 모델</strong>을 사용 — 별도 설정 불가.
 		</div>
 		<div class="mode-card autotitle-card" id="autotitle-card">
