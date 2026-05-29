@@ -476,7 +476,9 @@ function renderModelRows(container, provName, models) {
 			'<input type="text" placeholder="model-id" value="' + esc(m.id || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="id" />' +
 			'<input type="text" placeholder="(optional)" value="' + esc(m.name || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="name" />' +
 			'<label class="reasoning-cell" title="모델이 reasoning/thinking 출력을 지원하면 체크"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
-			'<select title="thinking 토글 전송 형식 — 비워두면 provider 기준 자동 감지" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat">' + thinkingFormatOptionsHtml(tf) + '</select>' +
+			// thinking-format dropdown only applies to reasoning models — hidden
+			// (cell kept for grid alignment) until 추론 is checked.
+			'<div class="tf-cell"><select title="thinking 토글 전송 형식 — 비워두면 provider 기준 자동 감지" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat"' + (m.reasoning ? '' : ' style="display:none"') + '>' + thinkingFormatOptionsHtml(tf) + '</select></div>' +
 			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="제거">✕</button>';
 		container.appendChild(row);
 	});
@@ -503,6 +505,13 @@ function renderModelRows(container, provName, models) {
 				}
 			} else {
 				model[f] = isCheckbox ? el.checked : el.value;
+			}
+			// Reasoning toggle controls whether the thinking-format dropdown is
+			// shown (it's meaningless for non-reasoning models).
+			if (f === 'reasoning') {
+				const row = el.closest('.model-row-card');
+				const sel = row && row.querySelector('select[data-mf="thinkingFormat"]');
+				if (sel) sel.style.display = el.checked ? '' : 'none';
 			}
 			// id change can rename a model — any mode pinned to the old id
 			// loses its target and needs fallback.

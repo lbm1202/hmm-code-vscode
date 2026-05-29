@@ -186,7 +186,7 @@ th {
 }
 .model-grid {
 	display: grid;
-	grid-template-columns: 40px 1fr 1fr 70px 150px 40px;
+	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px minmax(0, 1fr) 36px;
 	gap: 8px;
 	margin-bottom: 4px;
 }
@@ -199,10 +199,26 @@ th {
 }
 .model-row-card {
 	display: grid;
-	grid-template-columns: 40px 1fr 1fr 70px 150px 40px;
+	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px minmax(0, 1fr) 36px;
 	gap: 8px;
 	align-items: center;
 	margin: 4px 0;
+}
+/* Let grid items shrink below their content width so nothing clips when the
+   panel is narrow (grid items default to min-width:auto). */
+.model-row-card > input,
+.model-row-card > select,
+.model-row-card .tf-cell,
+.model-row-card .tf-cell select {
+	min-width: 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+.model-row-card > button {
+	min-width: 0;
+	width: 100%;
+	padding-left: 2px;
+	padding-right: 2px;
 }
 .model-row-card .reasoning-cell {
 	display: flex;
