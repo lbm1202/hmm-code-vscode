@@ -2,9 +2,25 @@ import * as vscode from "vscode";
 import { ChatBackend } from "./chat-backend";
 import { ChatViewProvider } from "./chat-view";
 import { ChatPanel } from "./chat-panel";
+import { getPiLaunchConfig } from "./pi-launcher";
 import { SettingsPanel } from "./settings-panel";
 
 export function activate(ctx: vscode.ExtensionContext): void {
+	// Resolve how to spawn Pi (bundled / user-override / system fallback) once.
+	// Every ChatBackend instance pulls from this central config so we can swap
+	// modes by changing a setting and reloading the window.
+	const launch = getPiLaunchConfig(ctx);
+	ChatBackend.setLaunchConfig(launch);
+	const out = vscode.window.createOutputChannel("Hmm-code");
+	ctx.subscriptions.push(out);
+	out.appendLine(
+		`[hmm-code] Pi launch source: ${launch.source}\n` +
+			`  cmd: ${launch.cmd}\n` +
+			`  args: ${launch.args.join(" ")}\n` +
+			`  extensionPath: ${ctx.extensionPath}`,
+	);
+	console.log(`[hmm-code] Pi launch source: ${launch.source} (${launch.cmd})`);
+
 	const provider = new ChatViewProvider(ctx);
 
 	ctx.subscriptions.push(
