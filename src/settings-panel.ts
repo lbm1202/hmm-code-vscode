@@ -19,6 +19,7 @@ import { ChatBackend } from "./chat-backend";
 import { codexOAuthLogin } from "./oauth-codex";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { buildCsp, makeNonce } from "./webview-html";
+import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
 const VIEW_TYPE = "hmm-code.settingsPanel";
 const PI_DIR = join(homedir(), ".pi", "agent");
@@ -47,6 +48,11 @@ export class SettingsPanel {
 	/** In-flight OAuth login (codex/anthropic) — process-global single-flight,
 	 *  aborted on panel dispose so the callback server can't leak. */
 	private static _oauthLoginAbort: AbortController | undefined;
+	/** Extension install root — set on attach so static readState can locate the
+	 *  bundled hmm-code-pi (for the per-mode default prompts). */
+	private static _extPath = "";
+	/** Cached default mode prompts parsed from the bundled config.ts. */
+	private static _defaultPrompts: Record<string, string> | undefined;
 
 	static open(ctx: vscode.ExtensionContext): void {
 		if (SettingsPanel.instance) {
@@ -56,7 +62,7 @@ export class SettingsPanel {
 		}
 		const panel = vscode.window.createWebviewPanel(
 			VIEW_TYPE,
-			"Hmm-code 설정",
+			t("settings.panelTitle"),
 			vscode.ViewColumn.Active,
 			{
 				enableScripts: true,
@@ -82,6 +88,7 @@ export class SettingsPanel {
 	}
 
 	private static attach(panel: vscode.WebviewPanel, ctx: vscode.ExtensionContext): void {
+		SettingsPanel._extPath = ctx.extensionUri.fsPath;
 		panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, "media", "tab-icon.svg");
 		panel.webview.html = SettingsPanel.html(panel.webview, ctx.extensionUri);
 		SettingsPanel.instance = panel;
@@ -180,7 +187,58 @@ export class SettingsPanel {
 			modelAllowlist,
 			oauthProviders: OAUTH_PROVIDERS,
 			apiTypes: API_TYPES,
+			defaultPrompts: SettingsPanel.defaultPrompts(),
+			autoCompactThreshold:
+				modes && typeof modes === "object" && typeof modes.autoCompactThreshold === "number"
+					? modes.autoCompactThreshold
+					: null,
+			defaultCompactThreshold: SettingsPanel.defaultCompactThreshold(),
 		};
+	}
+
+	/** Parse the per-mode default `systemPromptAddendum` strings out of the
+	 *  bundled hmm-code-pi config.ts. They're authored as string arrays joined
+	 *  with "\n"; we extract each array literal and JSON.parse it. Cached.
+	 *  Returns {} if the bundle is absent (system-Pi fallback) — the UI then
+	 *  just shows the user's override with no default reference. */
+	private static defaultPrompts(): Record<string, string> {
+		if (SettingsPanel._defaultPrompts) return SettingsPanel._defaultPrompts;
+		const out: Record<string, string> = {};
+		try {
+			const cfgPath = join(SettingsPanel._extPath, "out", "vendor", "hmm-code-pi", "config.ts");
+			const src = readFileSync(cfgPath, "utf-8");
+			for (const mode of MODE_NAMES) {
+				const re = new RegExp(
+					`${mode}:\\s*\\{[\\s\\S]*?systemPromptAddendum:\\s*\\[([\\s\\S]*?)\\]\\.join\\(`,
+				);
+				const m = src.match(re);
+				if (!m) continue;
+				const body = m[1].replace(/,\s*$/, "");
+				try {
+					const arr = JSON.parse(`[${body}]`) as unknown[];
+					out[mode] = arr.map((s) => String(s)).join("\n");
+				} catch {
+					/* leave this mode's default empty if it won't parse */
+				}
+			}
+		} catch {
+			/* bundle missing — return whatever we have (possibly {}) */
+		}
+		SettingsPanel._defaultPrompts = out;
+		return out;
+	}
+
+	/** Parse the built-in AUTO_COMPACT_THRESHOLD out of the bundled constants.ts
+	 *  so the panel shows the real default without mirroring the number. */
+	private static defaultCompactThreshold(): number {
+		try {
+			const p = join(SettingsPanel._extPath, "out", "vendor", "hmm-code-pi", "constants.ts");
+			const m = readFileSync(p, "utf-8").match(/AUTO_COMPACT_THRESHOLD\s*=\s*(\d+)/);
+			if (m) return Number(m[1]);
+		} catch {
+			/* bundle missing */
+		}
+		return 75;
 	}
 
 	private static readJsonSafe(path: string): any {
@@ -216,7 +274,7 @@ export class SettingsPanel {
 		}
 		const abort = new AbortController();
 		SettingsPanel._oauthLoginAbort = abort;
-		panel.webview.postMessage({ kind: opts.statusKind, state: "starting", message: "OAuth 플로우 시작…" });
+		panel.webview.postMessage({ kind: opts.statusKind, state: "starting", message: t("settings.oauth.flowStart") });
 		try {
 			const creds = await opts.run(
 				{
@@ -226,7 +284,7 @@ export class SettingsPanel {
 							kind: opts.statusKind,
 							state: "browser",
 							url,
-							message: instructions ?? "브라우저에서 로그인 진행 중…",
+							message: instructions ?? t("settings.oauth.browser"),
 						});
 					},
 					onProgress: (message) => {
@@ -250,7 +308,7 @@ export class SettingsPanel {
 			panel.webview.postMessage({
 				kind: opts.statusKind,
 				state: "success",
-				message: `${opts.label} 인증 저장됨 + 채팅 재시작.`,
+				message: t("settings.oauth.saved", { label: opts.label }),
 			});
 			SettingsPanel.refresh(panel);
 		} catch (err) {
@@ -305,6 +363,7 @@ export class SettingsPanel {
 						msg.modeConfigs ?? {},
 						msg.autoTitle,
 						msg.modelAllowlist,
+						msg.autoCompactThreshold,
 					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
@@ -340,7 +399,7 @@ export class SettingsPanel {
 					panel.webview.postMessage({
 						kind: "discovered-models",
 						requestId,
-						error: "baseUrl 이 비어있습니다.",
+						error: t("settings.discover.emptyBaseUrl"),
 					});
 					return;
 				}
@@ -370,6 +429,15 @@ export class SettingsPanel {
 						error: (err as Error).message,
 					});
 				}
+				return;
+			}
+			case "set-language": {
+				const value = String(msg.value ?? "auto");
+				const allowed = ["auto", "en", "ko"];
+				await vscode.workspace
+					.getConfiguration("hmm-code")
+					.update("language", allowed.includes(value) ? value : "auto", vscode.ConfigurationTarget.Global);
+				// The config-change listener in extension.ts handles the reload prompt.
 				return;
 			}
 			case "refresh":
@@ -410,11 +478,23 @@ export class SettingsPanel {
 
 	private static writeModes(
 		derived: { aliasesByKey: Record<string, string>; managedKeys: Set<string> },
-		modes: Record<string, { provider?: string; id?: string; thinking?: string }>,
+		modes: Record<string, { provider?: string; id?: string; thinking?: string; prompt?: string }>,
 		autoTitle?: { provider?: string; id?: string } | null,
 		modelAllowlist?: Record<string, string[]> | null,
+		autoCompactThreshold?: number | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
+		// Auto-compact threshold: store only when it differs from the built-in
+		// default; otherwise drop the field so modes.json stays clean.
+		if (autoCompactThreshold !== undefined) {
+			const def = SettingsPanel.defaultCompactThreshold();
+			const n = Number(autoCompactThreshold);
+			if (autoCompactThreshold !== null && Number.isFinite(n) && Math.round(n) !== def) {
+				raw.autoCompactThreshold = Math.round(n);
+			} else {
+				delete raw.autoCompactThreshold;
+			}
+		}
 		// Auto-title model override (consumed by auto-title.ts resolveTitleModel).
 		// Both blank → delete the field so the GPT-candidate fallback applies.
 		if (autoTitle !== undefined) {
@@ -455,6 +535,7 @@ export class SettingsPanel {
 		else raw.modelAliases = merged;
 
 		if (!raw.modes || typeof raw.modes !== "object") raw.modes = {};
+		const defaults = SettingsPanel.defaultPrompts();
 		for (const name of MODE_NAMES) {
 			const draft = modes[name];
 			if (!draft) continue;
@@ -467,6 +548,16 @@ export class SettingsPanel {
 			const thinking = (draft.thinking ?? "").trim();
 			if (thinking) next.thinkingLevel = thinking;
 			else delete next.thinkingLevel;
+			// systemPromptAddendum override. The webview sends the effective text
+			// (default pre-filled). Treat "empty" or "identical to default" as
+			// no override → drop the field so the built-in default applies and
+			// modes.json stays clean.
+			if (draft.prompt !== undefined) {
+				const prompt = draft.prompt;
+				const def = defaults[name] ?? "";
+				if (prompt.trim() && prompt !== def) next.systemPromptAddendum = prompt;
+				else delete next.systemPromptAddendum;
+			}
 			raw.modes[name] = next;
 		}
 		SettingsPanel.writeJson(MODES_PATH, raw);
@@ -551,7 +642,7 @@ export class SettingsPanel {
 			mkdirSync(dirname(path), { recursive: true });
 			writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
 		} catch (err) {
-			throw new Error(`${path} 쓰기 실패: ${(err as Error).message}`);
+			throw new Error(t("settings.writeFailed", { path, err: (err as Error).message }));
 		}
 	}
 
@@ -564,113 +655,141 @@ export class SettingsPanel {
 		const jsUri = webview.asWebviewUri(
 			vscode.Uri.joinPath(extensionUri, "out", "webview", "settings.js"),
 		);
+		const i18nLiteral = JSON.stringify(getWebviewMessages());
+		const locale = resolveLocale();
+		const langSetting = vscode.workspace.getConfiguration("hmm-code").get<string>("language", "auto");
+		const langOpt = (v: string, label: string) =>
+			`<option value="${v}"${langSetting === v ? " selected" : ""}>${label}</option>`;
 		return `<!DOCTYPE html>
-<html lang="ko">
+<html lang="${locale}">
 <head>
 	<meta charset="UTF-8" />
 	<meta http-equiv="Content-Security-Policy" content="${csp}" />
-	<title>Hmm-code 설정</title>
+	<title>${t("settings.panelTitle")}</title>
 	<link rel="stylesheet" href="${cssUri}" />
 </head>
 <body>
-	<h1>Hmm-code 설정</h1>
-	<div class="subtitle">모드 · 모델 · 별명 · 인증 · 커스텀 공급자</div>
+	<h1>${t("settings.panelTitle")}</h1>
+	<div class="subtitle">${t("settings.subtitle")}</div>
 
-	<div class="section">
-		<h2>모드</h2>
-		<div class="desc">각 모드별 모델 (provider + id) 과 thinking level. 빈 값으로 두면 default 사용.</div>
-		<div id="mode-cards"></div>
-	</div>
+	<nav class="tabs">
+		<button class="tab-btn" data-tab="general">${t("settings.tab.general")}</button>
+		<button class="tab-btn" data-tab="auth">${t("settings.tab.auth")}</button>
+		<button class="tab-btn" data-tab="models">${t("settings.tab.models")}</button>
+		<button class="tab-btn" data-tab="modes">${t("settings.tab.modes")}</button>
+	</nav>
 
-	<div class="section">
-		<h2>기타 모델 설정</h2>
-		<div class="desc">
-			세션 자동 제목 생성에 사용할 모델. <strong>빈 값이면 현재 세션의 활성 모델</strong>을 사용합니다 (대화 중인 모델과 동일 — 별도 provider 인증 불필요). 전용 모델을 쓰려면 여기서 지정하세요.
-			컨텍스트 요약(compact)은 Pi 가 항상 <strong>현재 활성 모델</strong>을 사용 — 별도 설정 불가.
+	<section class="tab-panel" data-tab="general">
+		<div class="section">
+			<h2>${t("settings.general.language")}</h2>
+			<div class="desc">${t("settings.general.languageDesc")}</div>
+			<select id="lang-select">
+				${langOpt("auto", t("settings.lang.auto"))}
+				${langOpt("en", t("settings.lang.en"))}
+				${langOpt("ko", t("settings.lang.ko"))}
+			</select>
 		</div>
-		<div class="mode-card autotitle-card" id="autotitle-card">
-			<div class="mode-name" style="color: var(--vscode-foreground);">자동 제목</div>
-			<select id="autotitle-provider"></select>
-			<select id="autotitle-id"></select>
-		</div>
-	</div>
 
-	<div class="section">
-		<h2>공급자별 모델 필터</h2>
-		<div class="desc">
-			모델 picker 에 보일 모델을 공급자별로 선택. 전부 체크되어 있으면 필터 없음(전체 노출). 일부만 체크하면 그 모델들만 picker 에 보임.
-			위쪽 모드 설정 / 자동 제목 dropdown 도 동일하게 필터링됨 (이미 선택된 hidden 모델은 유지).
-		</div>
-		<div id="allowlist-cards"></div>
-	</div>
-
-	<div class="section">
-		<h2>공급자 인증 (auth.json)</h2>
-		<div class="desc">
-			<strong>API key</strong>: built-in 공급자 id + key 만 넣으면 됩니다 (커스텀 공급자 등록 불필요).
-			예) <code>anthropic</code>=Claude, <code>openai</code>=OpenAI, <code>google</code>=Gemini,
-			<code>xai</code>=Grok, <code>groq</code>, <code>deepseek</code>, <code>openrouter</code> …<br />
-			<strong>구독제(OAuth)</strong>: 아래 버튼으로 브라우저 로그인.
-		</div>
-		<table id="auth-table">
-			<thead><tr><th>Provider</th><th>Type</th><th></th></tr></thead>
-			<tbody id="auth-body"><tr><td colspan="3"><em>로딩 중…</em></td></tr></tbody>
-		</table>
-		<datalist id="provider-ids">
-			<option value="anthropic"></option>
-			<option value="openai"></option>
-			<option value="google"></option>
-			<option value="google-vertex"></option>
-			<option value="xai"></option>
-			<option value="groq"></option>
-			<option value="deepseek"></option>
-			<option value="mistral"></option>
-			<option value="moonshotai"></option>
-			<option value="together"></option>
-			<option value="openrouter"></option>
-			<option value="fireworks"></option>
-			<option value="cerebras"></option>
-		</datalist>
-		<div class="row" style="margin-top: 12px;">
-			<input type="text" id="new-auth-id" list="provider-ids" placeholder="provider id (anthropic, openai, google, groq …)" />
-			<input type="password" id="new-auth-key" placeholder="API key (sk-...)" style="max-width: 240px;" />
-			<button id="add-auth-btn">추가 (draft)</button>
-		</div>
-		<div class="note" style="margin-top: 12px;">
-			<strong>구독제 OAuth (브라우저 로그인)</strong>
-			<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-				<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
-				<button id="codex-login-btn">Codex 로그인</button>
-				<button class="ghost hidden" id="codex-cancel-btn">취소</button>
-				<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
-			</div>
-			<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-				<span style="font-size: 11px; min-width: 88px;">Claude Pro/Max</span>
-				<button id="anthropic-login-btn">Claude 로그인</button>
-				<button class="ghost hidden" id="anthropic-cancel-btn">취소</button>
-				<span id="anthropic-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
+		<div class="section">
+			<h2>${t("settings.autoTitle.heading")}</h2>
+			<div class="desc">${t("settings.autoTitle.desc")}</div>
+			<div class="mode-card autotitle-card" id="autotitle-card">
+				<div class="mode-name" style="color: var(--vscode-foreground);">${t("settings.autoTitle.label")}</div>
+				<select id="autotitle-provider"></select>
+				<select id="autotitle-id"></select>
 			</div>
 		</div>
-	</div>
 
-	<div class="section">
-		<h2>커스텀 공급자 / 모델 (models.json)</h2>
-		<div class="desc">
-			OpenAI-호환 endpoint (vLLM, Ollama, LM Studio, OpenRouter, 자체 호스팅 등) 를 등록합니다.
-			Built-in provider 의 모델은 자동 인식되므로 여기 등록할 필요 없습니다.
+		<div class="section">
+			<h2>${t("settings.compact.heading")}</h2>
+			<div class="desc">${t("settings.compact.desc")}</div>
+			<div class="row">
+				<input type="number" id="compact-threshold" min="40" max="95" step="1" style="max-width: 96px;" />
+				<span class="field-hint">%</span>
+				<span class="field-hint" id="compact-default-hint"></span>
+				<button class="ghost" id="compact-reset">${t("settings.compact.reset")}</button>
+			</div>
 		</div>
-		<div id="providers-list"></div>
-		<button id="add-provider-btn" class="ghost" style="margin-top: 10px;">+ 공급자 추가</button>
-	</div>
+	</section>
+
+	<section class="tab-panel" data-tab="auth">
+		<div class="section">
+			<h2>${t("settings.auth.heading")}</h2>
+			<div class="desc">${t("settings.auth.desc")}</div>
+			<table id="auth-table">
+				<thead><tr><th>${t("settings.auth.colProvider")}</th><th>${t("settings.auth.colType")}</th><th></th></tr></thead>
+				<tbody id="auth-body"><tr><td colspan="3"><em>${t("settings.auth.loading")}</em></td></tr></tbody>
+			</table>
+			<datalist id="provider-ids">
+				<option value="anthropic"></option>
+				<option value="openai"></option>
+				<option value="google"></option>
+				<option value="google-vertex"></option>
+				<option value="xai"></option>
+				<option value="groq"></option>
+				<option value="deepseek"></option>
+				<option value="mistral"></option>
+				<option value="moonshotai"></option>
+				<option value="together"></option>
+				<option value="openrouter"></option>
+				<option value="fireworks"></option>
+				<option value="cerebras"></option>
+			</datalist>
+			<div class="row" style="margin-top: 12px;">
+				<input type="text" id="new-auth-id" list="provider-ids" placeholder="${t("settings.auth.idPlaceholder")}" />
+				<input type="password" id="new-auth-key" placeholder="${t("settings.auth.keyPlaceholder")}" style="max-width: 240px;" />
+				<button id="add-auth-btn">${t("settings.auth.addBtn")}</button>
+			</div>
+			<div class="note" style="margin-top: 12px;">
+				<strong>${t("settings.auth.oauthTitle")}</strong>
+				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+					<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
+					<button id="codex-login-btn">${t("settings.auth.codexLogin")}</button>
+					<button class="ghost hidden" id="codex-cancel-btn">${t("settings.cancel")}</button>
+					<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
+				</div>
+				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+					<span style="font-size: 11px; min-width: 88px;">Claude Pro/Max</span>
+					<button id="anthropic-login-btn">${t("settings.auth.claudeLogin")}</button>
+					<button class="ghost hidden" id="anthropic-cancel-btn">${t("settings.cancel")}</button>
+					<span id="anthropic-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
+				</div>
+			</div>
+		</div>
+
+		<div class="section">
+			<h2>${t("settings.providers.heading")}</h2>
+			<div class="desc">${t("settings.providers.headingDesc")}</div>
+			<div id="providers-list"></div>
+			<button id="add-provider-btn" class="ghost" style="margin-top: 10px;">${t("settings.providers.addProvider")}</button>
+		</div>
+	</section>
+
+	<section class="tab-panel" data-tab="models">
+		<div class="section">
+			<h2>${t("settings.filter.heading")}</h2>
+			<div class="desc">${t("settings.filter.desc")}</div>
+			<div id="allowlist-cards"></div>
+		</div>
+	</section>
+
+	<section class="tab-panel" data-tab="modes">
+		<div class="section">
+			<h2>${t("settings.modes.heading")}</h2>
+			<div class="desc">${t("settings.modes.desc")}</div>
+			<div id="mode-cards"></div>
+		</div>
+	</section>
 
 	<div class="toast hidden" id="toast"></div>
 
 	<div class="save-bar hidden" id="save-bar">
-		<span class="dirty-label">변경사항 있음<small id="dirty-detail"></small></span>
-		<button class="ghost" id="cancel-btn">취소</button>
-		<button id="save-btn">저장 + 재로드</button>
+		<span class="dirty-label">${t("settings.save.dirty")}<small id="dirty-detail"></small></span>
+		<button class="ghost" id="cancel-btn">${t("settings.cancel")}</button>
+		<button id="save-btn">${t("settings.save.button")}</button>
 	</div>
 
+	<script nonce="${nonce}">window.__HMM_I18N = ${i18nLiteral};</script>
 	<script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

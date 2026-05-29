@@ -8,7 +8,33 @@ body {
 	line-height: 1.5;
 }
 h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px 0; }
-.subtitle { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 28px; }
+.subtitle { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 18px; }
+
+/* Top navigation tabs */
+.tabs {
+	display: flex;
+	gap: 2px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: 20px;
+	flex-wrap: wrap;
+}
+.tab-btn {
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	padding: 8px 16px;
+	font-size: 13px;
+	opacity: 0.7;
+}
+.tab-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, transparent); }
+.tab-btn.active {
+	opacity: 1;
+	font-weight: 600;
+	border-bottom-color: var(--vscode-focusBorder, var(--vscode-button-background));
+}
+.tab-panel.hidden { display: none; }
 .section {
 	background: var(--vscode-editorWidget-background);
 	border: 1px solid var(--vscode-panel-border);
@@ -95,6 +121,42 @@ th {
 	background: color-mix(in srgb, var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)) 6%, transparent);
 }
 .mode-card > select { width: 100%; min-width: 0; }
+/* Per-mode system-prompt editor — spans the full card width below the selects. */
+.mode-prompt { grid-column: 1 / -1; margin-top: 4px; }
+.mode-prompt > summary {
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	user-select: none;
+}
+.mode-prompt-badge {
+	color: var(--vscode-focusBorder);
+	font-size: 11px;
+	margin-left: 4px;
+}
+.mode-prompt-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin: 8px 0 6px 0;
+}
+.mode-prompt-ta {
+	width: 100%;
+	min-height: 120px;
+	resize: vertical;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border-radius: 3px;
+	padding: 8px;
+	box-sizing: border-box;
+	white-space: pre;
+	overflow-wrap: normal;
+}
 .mode-name { font-weight: 600; font-size: 13px; }
 .mode-name.plan { color: rgb(120, 170, 255); }
 .mode-name.code { color: var(--vscode-foreground); }

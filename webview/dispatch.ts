@@ -4,6 +4,7 @@ import { appendSystem, els, setEmptyVisibility } from "./dom";
 import { buildPlanExecutionBody, displayModel } from "./helpers";
 import { clearConversation, renderHistory, renderRecentList } from "./history";
 import { showModal } from "./modals";
+import { t } from "./i18n";
 import { updateModeColor } from "./pickers";
 import {
 	ASSISTANT_DELTA,
@@ -38,6 +39,13 @@ import {
 } from "./turn-lifecycle";
 import type { ToWebview } from "./types";
 import { updatePromptDisabled, updateResetVisibility, updateSendButton } from "./prompt";
+
+// hmm-code.autoApproveDefault — injected by the host into window.__HMM_CFG
+// (see chat-backend renderChatHtml). When true, freshly started/resumed
+// sessions force permission auto-approve ON.
+const autoApproveDefault = !!(
+	window as unknown as { __HMM_CFG?: { autoApproveDefault?: boolean } }
+).__HMM_CFG?.autoApproveDefault;
 
 /** Wire the window message listener. Call once at boot. */
 export function wireDispatch(): void {
@@ -120,7 +128,7 @@ function handlePiEvent(ev: any): void {
 		case PI_EVENT.MESSAGE_START: {
 			if (ev.message?.role !== "assistant") return;
 			ensureTurn();
-			setStatusPhase("응답 생성 중");
+			setStatusPhase(t("chat.status.generating"));
 			return;
 		}
 		case PI_EVENT.MESSAGE_UPDATE: {
@@ -151,7 +159,7 @@ function handlePiEvent(ev: any): void {
 				appendSystem("⚠️ " + formatTurnError(m.errorMessage));
 			}
 			// Bubble is per-message. Status stays alive across messages so the
-			// "도구 실행 중" indicator remains visible during tool gaps.
+			// the "tool running" indicator remains visible during tool gaps.
 			finalizeBubble();
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 			return;
@@ -164,6 +172,16 @@ function handlePiEvent(ev: any): void {
 			post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			post({ kind: FROM_WEBVIEW.REQUEST_MESSAGES });
+			// hmm-code.autoApproveDefault: force auto-approve ON for a freshly
+			// started/resumed session (not on plain switches between existing
+			// sessions, where the user may have deliberately turned it off).
+			// `/auto-approve on` is idempotent, so a redundant send is harmless.
+			if (
+				autoApproveDefault &&
+				(ev.type === PI_EVENT.SESSION_START || ev.type === PI_EVENT.SESSION_LOADED)
+			) {
+				post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve on" });
+			}
 			// Plan handoff: if finalize_plan signaled a new-session implementation,
 			// fire the implementation prompt now that the new session is ready.
 			if (runtime.pendingPlanHandoff) {
@@ -175,7 +193,7 @@ function handlePiEvent(ev: any): void {
 		}
 		case PI_EVENT.TOOL_EXEC_START: {
 			ensureStatus();
-			setStatusPhase(`도구 실행 중 (${ev.toolName ?? "?"})`);
+			setStatusPhase(t("chat.status.toolRunning", { tool: String(ev.toolName ?? "?") }));
 			return;
 		}
 		case PI_EVENT.TOOL_EXEC_UPDATE: {
@@ -186,7 +204,7 @@ function handlePiEvent(ev: any): void {
 		case PI_EVENT.TOOL_EXEC_END: {
 			const ok = !ev.error && !ev.isError;
 			updateToolResult(String(ev.toolCallId ?? "?"), ok, ev.output ?? ev.result ?? ev.error);
-			setStatusPhase("응답 대기 중");
+			setStatusPhase(t("chat.status.waiting"));
 			pinStatusToEnd();
 			return;
 		}
@@ -263,8 +281,8 @@ function handleSetStatus(key: string, value: string): void {
 		btn.classList.toggle("off", !ui.autoApprove);
 		btn.textContent = ui.autoApprove ? "🔓 Auto" : "🔒 Auto";
 		btn.title = ui.autoApprove
-			? "권한 ask 자동승인 켜짐 — 클릭해서 끄기"
-			: "권한 ask 자동승인 꺼짐 — 클릭해서 켜기";
+			? t("chat.autoApprove.on")
+			: t("chat.autoApprove.off");
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
 		e.ctxPill.textContent = `ctx ${value}`;
@@ -373,7 +391,7 @@ async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
  *  like `400 {"type":"error","error":{"message":"…"}}` — pull out the human
  *  message + status code when present, else show the (truncated) raw string. */
 function formatTurnError(raw: unknown): string {
-	if (typeof raw !== "string" || !raw.trim()) return "응답 생성 실패 (provider error).";
+	if (typeof raw !== "string" || !raw.trim()) return t("chat.error.generic");
 	const braceAt = raw.indexOf("{");
 	if (braceAt >= 0) {
 		try {

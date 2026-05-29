@@ -150,7 +150,38 @@ function assertContractsInSync(hmmSrc) {
 			);
 		}
 	}
-	console.log("[contract-check] STATUS_KEYS + BINARY_THINKING_FORMATS in sync ✓");
+	// The settings panel parses DEFAULT_MODES[*].systemPromptAddendum out of
+	// config.ts to show per-mode default prompts. Assert all four modes still
+	// parse so a format change in Pi (single string, template literal, etc.)
+	// fails the build instead of silently blanking the panel defaults.
+	const piConfig = join(hmmSrc, "config.ts");
+	if (existsSync(piConfig)) {
+		const cfgSrc = readFileSync(piConfig, "utf-8");
+		const missing = [];
+		for (const mode of ["plan", "code", "debug", "ask"]) {
+			const m = cfgSrc.match(
+				new RegExp(`${mode}:\\s*\\{[\\s\\S]*?systemPromptAddendum:\\s*\\[([\\s\\S]*?)\\]\\.join\\(`),
+			);
+			let ok = false;
+			if (m) {
+				try {
+					const arr = JSON.parse(`[${m[1].replace(/,\s*$/, "")}]`);
+					ok = Array.isArray(arr) && arr.length > 0;
+				} catch {
+					ok = false;
+				}
+			}
+			if (!ok) missing.push(mode);
+		}
+		if (missing.length) {
+			throw new Error(
+				`[contract-check] DEFAULT_MODES.systemPromptAddendum no longer parses for ${JSON.stringify(missing)}. ` +
+					`The settings panel (src/settings-panel.ts:defaultPrompts) relies on the string-array \`.join("\\n")\` format. ` +
+					`Keep it, or update the parser in both places.`,
+			);
+		}
+	}
+	console.log("[contract-check] STATUS_KEYS + BINARY_THINKING_FORMATS + mode prompts in sync ✓");
 }
 
 /** Copy Pi runtime + hmm-code-pi extension into out/vendor/ so the packaged

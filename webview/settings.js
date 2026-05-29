@@ -4,6 +4,12 @@
 // unchanged from when it was an injected string.
 const vscode = acquireVsCodeApi();
 const post = (msg) => vscode.postMessage(msg);
+const I18N = (window.__HMM_I18N) || {};
+function t(key, params) {
+	let str = I18N[key] != null ? I18N[key] : key;
+	if (params) str = str.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : '{' + k + '}'));
+	return str;
+}
 const MODE_NAMES = ["plan", "code", "debug", "ask"];
 const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
 const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
@@ -17,6 +23,7 @@ let modelsDraft = { providers: {} };
 // Per-provider model id allowlist draft. Empty obj or empty list per provider
 // = no filter for that provider. Sent to host as modelAllowlist on save.
 let allowlistDraft = {};
+let compactDraft = '';  // auto-compact threshold (effective value shown in the input)
 
 function showToast(text, isError) {
 	const t = document.getElementById('toast');
@@ -39,7 +46,11 @@ function diskMode(name) {
 		provider: isObj ? (m.provider || '') : '',
 		id: isObj ? (m.id || '') : '',
 		thinking: cfg.thinkingLevel || '',
+		promptOverride: cfg.systemPromptAddendum || '',
 	};
+}
+function defaultPrompt(name) {
+	return (diskState && diskState.defaultPrompts && diskState.defaultPrompts[name]) || '';
 }
 function diskAuth() { return (diskState && diskState.auth) || {}; }
 function diskModels() {
@@ -49,8 +60,12 @@ function diskModels() {
 
 function modeDirty(name) {
 	const d = diskMode(name);
-	const draft = modesDraft[name] || { provider: '', id: '', thinking: '' };
-	return d.provider !== draft.provider || d.id !== draft.id || d.thinking !== draft.thinking;
+	const draft = modesDraft[name] || { provider: '', id: '', thinking: '', prompt: '' };
+	const def = defaultPrompt(name);
+	// Treat "prompt identical to default" as no override.
+	const draftOverride = (draft.prompt || '') === def ? '' : (draft.prompt || '');
+	return d.provider !== draft.provider || d.id !== draft.id || d.thinking !== draft.thinking
+		|| draftOverride !== d.promptOverride;
 }
 function authDirty() {
 	return Object.keys(authAddsDraft).length > 0 || authRemovesDraft.size > 0;
@@ -88,6 +103,20 @@ function allowlistDirty() {
 	return JSON.stringify(norm(allowlistDraft)) !== JSON.stringify(norm(diskAllowlist()));
 }
 
+function diskCompactOverride() {
+	return (diskState && typeof diskState.autoCompactThreshold === 'number') ? diskState.autoCompactThreshold : null;
+}
+function defaultCompact() {
+	return (diskState && typeof diskState.defaultCompactThreshold === 'number') ? diskState.defaultCompactThreshold : 75;
+}
+function compactDirty() {
+	// Treat "equal to default" as no override.
+	const def = defaultCompact();
+	const n = parseInt(compactDraft, 10);
+	const draftOverride = (!Number.isFinite(n) || n === def) ? null : n;
+	return draftOverride !== diskCompactOverride();
+}
+
 function isDirty() {
 	if (!diskState) return false;
 	for (const n of MODE_NAMES) if (modeDirty(n)) return true;
@@ -95,6 +124,7 @@ function isDirty() {
 	if (authDirty()) return true;
 	if (modelsDirty()) return true;
 	if (allowlistDirty()) return true;
+	if (compactDirty()) return true;
 	return false;
 }
 
@@ -106,11 +136,12 @@ function updateSaveBar() {
 	for (const n of MODE_NAMES) if (modeDirty(n)) modeD++;
 	authD = Object.keys(authAddsDraft).length + authRemovesDraft.size;
 	const parts = [];
-	if (modeD) parts.push(modeD + '개 모드');
-	if (autoTitleDirty()) parts.push('자동 제목 모델');
-	if (authD) parts.push(authD + '개 인증');
-	if (modelsDirty()) parts.push('커스텀 공급자');
-	if (allowlistDirty()) parts.push('모델 필터');
+	if (modeD) parts.push(t('settings.dirty.modes', { n: modeD }));
+	if (autoTitleDirty()) parts.push(t('settings.dirty.autoTitle'));
+	if (authD) parts.push(t('settings.dirty.auth', { n: authD }));
+	if (modelsDirty()) parts.push(t('settings.dirty.providers'));
+	if (allowlistDirty()) parts.push(t('settings.dirty.filter'));
+	if (compactDirty()) parts.push(t('settings.dirty.compact'));
 	document.getElementById('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
 }
 
@@ -221,11 +252,20 @@ function renderModes() {
 		const card = document.createElement('div');
 		card.className = 'mode-card' + (modeDirty(name) ? ' dirty' : '');
 		card.dataset.mode = name;
+		const overridden = (draft.prompt || '') !== defaultPrompt(name) && (draft.prompt || '').trim() !== '';
 		card.innerHTML =
 			'<div class="mode-name ' + name + '">' + name + '</div>' +
 			'<select data-mode="' + name + '" data-field="provider">' + providerOptionsHtml(draft.provider, providerIndex) + '</select>' +
 			'<select data-mode="' + name + '" data-field="id">' + modelOptionsHtml(draft.id, draft.provider, providerIndex) + '</select>' +
-			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>';
+			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>' +
+			'<details class="mode-prompt"' + (overridden ? ' open' : '') + '>' +
+				'<summary>' + esc(t('settings.modes.promptSummary')) + (overridden ? ' <span class="mode-prompt-badge">' + esc(t('settings.modes.promptCustom')) + '</span>' : '') + '</summary>' +
+				'<div class="mode-prompt-head">' +
+					'<span class="field-hint">' + esc(t('settings.modes.promptHint')) + '</span>' +
+					'<button class="ghost" data-prompt-reset="' + esc(name) + '">' + esc(t('settings.modes.resetDefault')) + '</button>' +
+				'</div>' +
+				'<textarea class="mode-prompt-ta" rows="10" spellcheck="false" data-mode="' + esc(name) + '" data-field="prompt">' + esc(draft.prompt || '') + '</textarea>' +
+			'</details>';
 		root.appendChild(card);
 		// thinking <select> uses `selected` attributes (model-aware), so no
 		// post-hoc .value assignment.
@@ -247,6 +287,27 @@ function renderModes() {
 				const card = el.closest('.mode-card');
 				if (card) card.classList.toggle('dirty', modeDirty(name));
 			}
+			updateSaveBar();
+		});
+	});
+	// Per-mode systemPromptAddendum textarea (live, no re-render so focus stays).
+	root.querySelectorAll('textarea[data-field="prompt"]').forEach((el) => {
+		el.addEventListener('input', () => {
+			const name = el.getAttribute('data-mode');
+			if (!name || !modesDraft[name]) return;
+			modesDraft[name].prompt = el.value;
+			const card = el.closest('.mode-card');
+			if (card) card.classList.toggle('dirty', modeDirty(name));
+			updateSaveBar();
+		});
+	});
+	// "Reset to default" — restore the built-in prompt for this mode.
+	root.querySelectorAll('button[data-prompt-reset]').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			const name = btn.getAttribute('data-prompt-reset');
+			if (!name || !modesDraft[name]) return;
+			modesDraft[name].prompt = defaultPrompt(name);
+			renderModes();
 			updateSaveBar();
 		});
 	});
@@ -272,7 +333,7 @@ function renderAuth() {
 	}
 
 	if (entries.length === 0 && removedEntries.length === 0) {
-		body.innerHTML = '<tr><td colspan="3"><em>인증된 공급자 없음</em></td></tr>';
+		body.innerHTML = '<tr><td colspan="3"><em>' + esc(t('settings.auth.none')) + '</em></td></tr>';
 		return;
 	}
 	for (const e of entries) {
@@ -288,7 +349,7 @@ function renderAuth() {
 		const tr = document.createElement('tr');
 		tr.className = 'auth-row dirty';
 		tr.innerHTML =
-			'<td><s>' + esc(e.id) + '</s> <small style="color: var(--vscode-errorForeground)">(삭제 예정)</small></td>' +
+			'<td><s>' + esc(e.id) + '</s> <small style="color: var(--vscode-errorForeground)">' + esc(t('settings.tag.pendingDelete')) + '</small></td>' +
 			'<td>' + esc(e.type) + '</td>' +
 			'<td><button class="ghost" data-undo-auth="' + esc(e.id) + '">↶</button></td>';
 		body.appendChild(tr);
@@ -314,8 +375,8 @@ function renderAuth() {
 	});
 }
 
-// Each provider card stays expanded with form fields matching the reference UX:
-// 공급자 ID / 표시 이름 / 기본 URL / API 키 + 모델 목록 + 모델 발견.
+// Each provider card stays expanded with form fields:
+// provider id / display name / base URL / API key + model list + discovery.
 // The "discovery" feature queries baseUrl/models (OpenAI-compatible) and shows
 // a checkbox picker for bulk-add.
 const discoveryState = {};  // providerName -> { ids: [], filter: '', selected: Set, loading: false, error: '' }
@@ -333,7 +394,7 @@ function renderProviders() {
 	const providers = (modelsDraft && modelsDraft.providers) || {};
 	const entries = Object.entries(providers);
 	if (entries.length === 0) {
-		root.innerHTML = '<div class="note">등록된 커스텀 공급자 없음. 아래 "+ 공급자 추가" 로 시작하세요.</div>';
+		root.innerHTML = '<div class="note">' + esc(t('settings.providers.empty')) + '</div>';
 		return;
 	}
 	for (const [name, cfg] of entries) {
@@ -342,39 +403,39 @@ function renderProviders() {
 		card.dataset.prov = name;
 		card.innerHTML =
 			'<div class="card-header">' +
-				'<div class="card-title">✦ 공급자 편집</div>' +
-				'<button class="danger" data-del-prov>제거</button>' +
+				'<div class="card-title">✦ ' + esc(t('settings.providers.editTitle')) + '</div>' +
+				'<button class="danger" data-del-prov>' + esc(t('settings.providers.remove')) + '</button>' +
 			'</div>' +
-			'<p class="card-sub">OpenAI 호환 공급자를 구성합니다. Pi 의 models.json 스키마를 따릅니다.</p>' +
+			'<p class="card-sub">' + esc(t('settings.providers.sub')) + '</p>' +
 			'<div class="field">' +
-				'<label>공급자 ID</label>' +
+				'<label>' + esc(t('settings.providers.id')) + '</label>' +
 				'<input type="text" data-field="__name" value="' + esc(name) + '" placeholder="my-vllm" />' +
-				'<div class="field-hint">소문자, 숫자, 하이픈 또는 밑줄</div>' +
+				'<div class="field-hint">' + esc(t('settings.providers.idHint')) + '</div>' +
 			'</div>' +
 			'<div class="field">' +
-				'<label>표시 이름</label>' +
+				'<label>' + esc(t('settings.providers.displayName')) + '</label>' +
 				'<input type="text" data-field="name" value="' + esc(cfg.name || '') + '" placeholder="' + esc(name) + '" />' +
 			'</div>' +
 			'<div class="field">' +
-				'<label>기본 URL</label>' +
+				'<label>' + esc(t('settings.providers.baseUrl')) + '</label>' +
 				'<input type="text" data-field="baseUrl" value="' + esc(cfg.baseUrl || '') + '" placeholder="https://api.example.com/v1" />' +
 			'</div>' +
 			'<div class="field">' +
-				'<label>API 키</label>' +
+				'<label>' + esc(t('settings.providers.apiKey')) + '</label>' +
 				'<input type="password" data-field="apiKey" value="' + esc(cfg.apiKey || '') + '" placeholder="sk-..." />' +
-				'<div class="field-hint">선택사항. 환경변수나 헤더로 인증을 관리하는 경우 비워두세요.</div>' +
+				'<div class="field-hint">' + esc(t('settings.providers.apiKeyHint')) + '</div>' +
 			'</div>' +
 			'<div class="field">' +
-				'<label>API 타입</label>' +
+				'<label>' + esc(t('settings.providers.apiType')) + '</label>' +
 				'<select data-field="api">' + API_TYPE_HTML + '<option value="">(auto)</option></select>' +
-				'<div class="field-hint">대부분의 OpenAI-호환 endpoint 는 openai-completions.</div>' +
+				'<div class="field-hint">' + esc(t('settings.providers.apiTypeHint')) + '</div>' +
 			'</div>' +
 			'<div class="subsection-header">' +
-				'<h3>모델</h3>' +
-				'<button class="ghost" data-discover>모델 발견</button>' +
+				'<h3>' + esc(t('settings.providers.models')) + '</h3>' +
+				'<button class="ghost" data-discover>' + esc(t('settings.providers.discover')) + '</button>' +
 			'</div>' +
 			'<div data-models-area></div>' +
-			'<button class="ghost" data-add-model style="margin-top: 8px;">+ 수동 추가</button>' +
+			'<button class="ghost" data-add-model style="margin-top: 8px;">' + esc(t('settings.providers.addManual')) + '</button>' +
 			'<div data-disc-area></div>';
 		root.appendChild(card);
 		card.querySelector('select[data-field="api"]').value = cfg.api || '';
@@ -408,7 +469,7 @@ function renderProviders() {
 			const newName = el.value.trim();
 			if (!oldName || !newName || oldName === newName) return;
 			if (modelsDraft.providers[newName]) {
-				showToast('이미 존재하는 공급자 ID 입니다.', true);
+				showToast(t('settings.providers.idExists'), true);
 				el.value = oldName;
 				return;
 			}
@@ -457,7 +518,7 @@ function renderProviders() {
 			if (!n) return;
 			const cfg = modelsDraft.providers[n];
 			if (!cfg?.baseUrl) {
-				showToast('baseUrl 을 먼저 입력하세요.', true);
+				showToast(t('settings.providers.baseUrlFirst'), true);
 				return;
 			}
 			discoveryState[n] = { ids: [], filter: '', selected: new Set(), loading: true, error: '', requestId: 'r' + Date.now() };
@@ -491,13 +552,13 @@ function thinkingFormatOptionsHtml(selected) {
 function renderModelRows(container, provName, models) {
 	container.innerHTML = '';
 	if (models.length === 0) {
-		container.innerHTML = '<div style="font-size: 11px; color: var(--vscode-descriptionForeground); padding: 6px 0;">등록된 모델 없음 — "모델 발견" 또는 "수동 추가" 로 등록</div>';
+		container.innerHTML = '<div style="font-size: 11px; color: var(--vscode-descriptionForeground); padding: 6px 0;">' + esc(t('settings.models.empty')) + '</div>';
 		return;
 	}
 	// Header
 	const header = document.createElement('div');
 	header.className = 'model-grid';
-	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">이름</div><div class="label" style="text-align:center">추론</div><div class="label">thinking 형식</div><div></div>';
+	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">' + esc(t('settings.models.colName')) + '</div><div class="label" style="text-align:center">' + esc(t('settings.models.colReasoning')) + '</div><div class="label">' + esc(t('settings.models.colThinkingFormat')) + '</div><div></div>';
 	container.appendChild(header);
 	models.forEach((m, idx) => {
 		const row = document.createElement('div');
@@ -508,11 +569,11 @@ function renderModelRows(container, provName, models) {
 			'<div class="row-num">' + (idx + 1) + '</div>' +
 			'<input type="text" placeholder="model-id" value="' + esc(m.id || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="id" />' +
 			'<input type="text" placeholder="(optional)" value="' + esc(m.name || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="name" />' +
-			'<label class="reasoning-cell" title="모델이 reasoning/thinking 출력을 지원하면 체크"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
+			'<label class="reasoning-cell" title="' + esc(t('settings.models.reasoningTitle')) + '"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
 			// thinking-format dropdown only applies to reasoning models — hidden
-			// (cell kept for grid alignment) until 추론 is checked.
-			'<div class="tf-cell"><select title="thinking 토글 전송 형식 — 비워두면 provider 기준 자동 감지" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat"' + (m.reasoning ? '' : ' style="display:none"') + '>' + thinkingFormatOptionsHtml(tf) + '</select></div>' +
-			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="제거">✕</button>';
+			// (cell kept for grid alignment) until reasoning is checked.
+			'<div class="tf-cell"><select title="' + esc(t('settings.models.thinkingFormatTitle')) + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat"' + (m.reasoning ? '' : ' style="display:none"') + '>' + thinkingFormatOptionsHtml(tf) + '</select></div>' +
+			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="' + esc(t('settings.providers.remove')) + '">✕</button>';
 		container.appendChild(row);
 	});
 	container.querySelectorAll('[data-mf]').forEach((el) => {
@@ -582,13 +643,13 @@ function renderDiscoveryFor(container, provName) {
 	container.innerHTML = '';
 	if (!st) return;
 	if (st.loading) {
-		container.innerHTML = '<div class="disc-picker"><div class="disc-empty">모델 발견 중…</div></div>';
+		container.innerHTML = '<div class="disc-picker"><div class="disc-empty">' + esc(t('settings.disc.loading')) + '</div></div>';
 		return;
 	}
 	if (st.error) {
 		container.innerHTML =
-			'<div class="disc-picker"><div class="disc-empty" style="color: var(--vscode-errorForeground)">발견 실패: ' + esc(st.error) + '</div>' +
-			'<div class="disc-footer"><button class="ghost" data-disc-close>닫기</button></div></div>';
+			'<div class="disc-picker"><div class="disc-empty" style="color: var(--vscode-errorForeground)">' + esc(t('settings.disc.failed')) + esc(st.error) + '</div>' +
+			'<div class="disc-footer"><button class="ghost" data-disc-close>' + esc(t('settings.close')) + '</button></div></div>';
 		container.querySelector('button[data-disc-close]').addEventListener('click', () => {
 			delete discoveryState[provName];
 			renderProviders();
@@ -603,22 +664,22 @@ function renderDiscoveryFor(container, provName) {
 	picker.className = 'disc-picker';
 	picker.innerHTML =
 		'<div class="disc-header">' +
-			'<div class="disc-title">' + st.ids.length + '개 모델 발견</div>' +
+			'<div class="disc-title">' + esc(t('settings.disc.found', { n: st.ids.length })) + '</div>' +
 			'<div class="disc-actions">' +
-				'<button data-disc-all>모두 선택</button>' +
-				'<button data-disc-none>모두 선택 해제</button>' +
+				'<button data-disc-all>' + esc(t('settings.disc.selectAll')) + '</button>' +
+				'<button data-disc-none>' + esc(t('settings.disc.deselectAll')) + '</button>' +
 			'</div>' +
 		'</div>' +
-		'<input type="text" class="disc-search" placeholder="모델 검색…" value="' + esc(st.filter) + '" />' +
+		'<input type="text" class="disc-search" placeholder="' + esc(t('settings.disc.search')) + '" value="' + esc(st.filter) + '" />' +
 		'<div class="disc-list"></div>' +
 		'<div class="disc-footer">' +
-			'<button data-disc-add>' + st.selected.size + '개 모델 추가</button>' +
-			'<button class="ghost" data-disc-close>취소</button>' +
+			'<button data-disc-add>' + esc(t('settings.disc.add', { n: st.selected.size })) + '</button>' +
+			'<button class="ghost" data-disc-close>' + esc(t('settings.cancel')) + '</button>' +
 		'</div>';
 	container.appendChild(picker);
 	const list = picker.querySelector('.disc-list');
 	if (filtered.length === 0) {
-		list.innerHTML = '<div class="disc-empty">검색 결과 없음</div>';
+		list.innerHTML = '<div class="disc-empty">' + esc(t('settings.disc.noResults')) + '</div>';
 	} else {
 		for (const id of filtered) {
 			const item = document.createElement('label');
@@ -626,7 +687,7 @@ function renderDiscoveryFor(container, provName) {
 			const isExisting = existing.has(id);
 			item.innerHTML =
 				'<input type="checkbox" ' + (st.selected.has(id) ? 'checked' : '') + (isExisting ? ' disabled' : '') + ' data-disc-id="' + esc(id) + '" />' +
-				'<span>' + esc(id) + (isExisting ? ' <small style="color: var(--vscode-descriptionForeground)">(이미 등록됨)</small>' : '') + '</span>';
+				'<span>' + esc(id) + (isExisting ? ' <small style="color: var(--vscode-descriptionForeground)">' + esc(t('settings.disc.alreadyAdded')) + '</small>' : '') + '</span>';
 			list.appendChild(item);
 		}
 		list.querySelectorAll('input[data-disc-id]').forEach((cb) => {
@@ -634,7 +695,7 @@ function renderDiscoveryFor(container, provName) {
 				const id = cb.getAttribute('data-disc-id');
 				if (cb.checked) st.selected.add(id);
 				else st.selected.delete(id);
-				picker.querySelector('button[data-disc-add]').textContent = st.selected.size + '개 모델 추가';
+				picker.querySelector('button[data-disc-add]').textContent = t('settings.disc.add', { n: st.selected.size });
 			});
 		});
 	}
@@ -669,7 +730,7 @@ function renderDiscoveryFor(container, provName) {
 		for (const id of st.selected) {
 			if (!existingIds.has(id)) cfg.models.push({ id, name: '', contextWindow: '', maxTokens: '', reasoning: false });
 		}
-		showToast(st.selected.size + '개 모델 추가됨 (draft)');
+		showToast(t('settings.disc.added', { n: st.selected.size }));
 		delete discoveryState[provName];
 		renderProviders();
 		updateSaveBar();
@@ -711,11 +772,11 @@ function autoFallbackModes() {
 			}
 		}
 	};
-	for (const m of MODE_NAMES) fixOne(m + ' 모드', modesDraft[m] || { provider: '', id: '' });
-	fixOne('자동 제목', autoTitleDraft);
+	for (const m of MODE_NAMES) fixOne(t('settings.fallback.modeLabel', { mode: m }), modesDraft[m] || { provider: '', id: '' });
+	fixOne(t('settings.fallback.autoTitleLabel'), autoTitleDraft);
 	if (replacements.length) {
-		showToast(replacements.length + '개 모델 자동 대체: ' + replacements[0]
-			+ (replacements.length > 1 ? ' 외 ' + (replacements.length - 1) + '건' : ''));
+		showToast(t('settings.fallback.toast', { n: replacements.length, first: replacements[0] })
+			+ (replacements.length > 1 ? t('settings.fallback.more', { n: replacements.length - 1 }) : ''));
 	}
 	return replacements.length > 0;
 }
@@ -751,7 +812,7 @@ function renderAllowlist() {
 	const providerIndex = buildProviderIndex(false);
 	const providers = [...providerIndex.keys()].sort();
 	if (providers.length === 0) {
-		root.innerHTML = '<div class="note">사용 가능한 모델이 아직 없습니다. 채팅 세션이 시작되면 자동으로 채워집니다.</div>';
+		root.innerHTML = '<div class="note">' + esc(t('settings.allowlist.empty')) + '</div>';
 		return;
 	}
 	for (const prov of providers) {
@@ -766,11 +827,11 @@ function renderAllowlist() {
 			'<div class="provider-header">' +
 				'<div class="provider-name">' + esc(prov) + '</div>' +
 				'<div class="provider-meta">' +
-					(filtered ? esc(String(allowed.size)) + ' / ' + entries.length + ' 노출' : '전체 ' + entries.length + ' 노출') +
+					(filtered ? esc(t('settings.allowlist.shownPartial', { shown: allowed.size, total: entries.length })) : esc(t('settings.allowlist.shownAll', { total: entries.length }))) +
 				'</div>' +
 				'<div class="provider-actions">' +
-					'<button class="ghost" data-allow-all="' + esc(prov) + '">전체</button>' +
-					'<button class="ghost" data-allow-none="' + esc(prov) + '">해제</button>' +
+					'<button class="ghost" data-allow-all="' + esc(prov) + '">' + esc(t('settings.allowlist.all')) + '</button>' +
+					'<button class="ghost" data-allow-none="' + esc(prov) + '">' + esc(t('settings.allowlist.none')) + '</button>' +
 				'</div>' +
 			'</div>' +
 			'<div class="allowlist-grid" data-allow-grid="' + esc(prov) + '"></div>';
@@ -844,21 +905,37 @@ function renderAllowlist() {
 	});
 }
 
+function renderCompact() {
+	const input = document.getElementById('compact-threshold');
+	if (!input) return;
+	input.value = compactDraft;
+	const hint = document.getElementById('compact-default-hint');
+	if (hint) hint.textContent = t('settings.compact.defaultHint', { n: defaultCompact() });
+	input.oninput = () => { compactDraft = input.value; updateSaveBar(); };
+	const reset = document.getElementById('compact-reset');
+	if (reset) reset.onclick = () => { compactDraft = String(defaultCompact()); input.value = compactDraft; updateSaveBar(); };
+}
+
 function render(s) {
 	diskState = s;
 	modesDraft = {};
-	for (const n of MODE_NAMES) modesDraft[n] = diskMode(n);
+	for (const n of MODE_NAMES) {
+		const d = diskMode(n);
+		modesDraft[n] = { provider: d.provider, id: d.id, thinking: d.thinking, prompt: d.promptOverride || defaultPrompt(n) };
+	}
 	autoTitleDraft = diskAutoTitle();
 	authAddsDraft = {};
 	authRemovesDraft = new Set();
 	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
 	allowlistDraft = JSON.parse(JSON.stringify(diskAllowlist()));
+	compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
 
 	renderModes();
 	renderAutoTitle();
 	renderAllowlist();
 	renderAuth();
 	renderProviders();
+	renderCompact();
 	updateSaveBar();
 }
 
@@ -874,7 +951,7 @@ function wireOAuth(statusKind, btnId, cancelId, statusId, loginKind, cancelKind)
 	btn.addEventListener('click', () => {
 		btn.disabled = true;
 		cancel.classList.remove('hidden');
-		status.textContent = '시작 중…';
+		status.textContent = t('settings.oauth.starting');
 		post({ kind: loginKind });
 	});
 	cancel.addEventListener('click', () => post({ kind: cancelKind }));
@@ -887,7 +964,7 @@ wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'an
 document.getElementById('add-auth-btn').addEventListener('click', () => {
 	const id = document.getElementById('new-auth-id').value.trim();
 	const key = document.getElementById('new-auth-key').value;
-	if (!id || !key) { showToast('Provider id 와 API key 모두 입력해주세요.', true); return; }
+	if (!id || !key) { showToast(t('settings.auth.needBoth'), true); return; }
 	authAddsDraft[id] = key;
 	document.getElementById('new-auth-id').value = '';
 	document.getElementById('new-auth-key').value = '';
@@ -926,7 +1003,7 @@ document.getElementById('add-provider-btn').addEventListener('click', () => {
 document.getElementById('cancel-btn').addEventListener('click', () => {
 	if (!diskState) return;
 	render(diskState);
-	showToast('변경사항 취소됨');
+	showToast(t('settings.toast.reverted'));
 });
 
 // Save
@@ -940,9 +1017,10 @@ document.getElementById('save-btn').addEventListener('click', () => {
 		authAdds: authAddsDraft,
 		authRemoves: Array.from(authRemovesDraft),
 		models: modelsDraft,
+		autoCompactThreshold: (() => { const n = parseInt(compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
 	};
 	post(payload);
-	showToast('저장 + 재로드 중…');
+	showToast(t('settings.toast.saving'));
 });
 
 window.addEventListener('message', (ev) => {
@@ -950,7 +1028,7 @@ window.addEventListener('message', (ev) => {
 	if (!msg) return;
 	if (msg.kind === 'state') render(msg.state);
 	else if (msg.kind === 'error') showToast(msg.message || 'Error', true);
-	else if (msg.kind === 'saved') showToast('저장됨: ' + (msg.files || []).join(', '));
+	else if (msg.kind === 'saved') showToast(t('settings.toast.saved', { files: (msg.files || []).join(', ') }));
 	else if (msg.kind === 'codex-status' || msg.kind === 'anthropic-status') {
 		const ui = oauthUis[msg.kind];
 		if (!ui) return;
@@ -958,7 +1036,7 @@ window.addEventListener('message', (ev) => {
 		if (s === 'success') {
 			ui.btn.disabled = false;
 			ui.cancel.classList.add('hidden');
-			ui.status.textContent = '✓ ' + (msg.message || '완료');
+			ui.status.textContent = '✓ ' + (msg.message || t('settings.done'));
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
 			setTimeout(() => { ui.status.textContent = ''; ui.status.style.color = ''; }, 4000);
 		} else if (s === 'error') {
@@ -984,4 +1062,17 @@ window.addEventListener('message', (ev) => {
 	}
 });
 
+function wireTabs() {
+	const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+	const panels = Array.from(document.querySelectorAll('.tab-panel'));
+	function activate(name) {
+		tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+		panels.forEach((pn) => pn.classList.toggle('hidden', pn.dataset.tab !== name));
+	}
+	tabs.forEach((b) => b.addEventListener('click', () => activate(b.dataset.tab)));
+	if (tabs.length) activate(tabs[0].dataset.tab);
+}
+wireTabs();
+const langSel = document.getElementById('lang-select');
+if (langSel) langSel.addEventListener('change', () => post({ kind: 'set-language', value: langSel.value }));
 post({ kind: 'refresh' });

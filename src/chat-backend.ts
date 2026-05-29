@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { PiClient } from "./pi-client";
 import type { PiLaunchConfig } from "./pi-launcher";
+import { getWebviewMessages, resolveLocale, t } from "./i18n";
 import {
 	FROM_WEBVIEW,
 	STATUS_KEYS,
@@ -442,8 +443,8 @@ export class ChatBackend {
 						this.post({
 							kind: TO_WEBVIEW.STDERR,
 							text: res.error
-								? `${res.error}\n\n(설정에서 provider 인증을 추가하세요 — Hmm-code 설정 패널)`
-								: "프롬프트 실행 실패 — 사용 가능한 모델이 없습니다. 설정에서 provider 인증을 추가하세요.",
+								? t("chat.promptFail.withError", { error: res.error })
+								: t("chat.promptFail.noModel"),
 						});
 						this.post({ kind: TO_WEBVIEW.EVENT, event: { type: "turn_end" } });
 					}
@@ -699,12 +700,18 @@ export function renderChatHtml(
 		vscode.Uri.joinPath(extensionUri, "out", "webview", "styles.css"),
 	);
 	const csp = buildCsp(webview, nonce, webview.cspSource);
-	// Inject version/publisher BEFORE the main script loads so dom.ts can
-	// read them when building the empty-state HTML. JSON.stringify escapes
-	// any quotes/control chars so it's safe inside a <script>.
+	// Inject version/publisher + the locale dict BEFORE the main script loads
+	// so dom.ts (empty-state HTML) and i18n.ts can read them. JSON.stringify
+	// escapes any quotes/control chars so it's safe inside a <script>.
 	const infoLiteral = JSON.stringify(info);
+	const i18nLiteral = JSON.stringify(getWebviewMessages());
+	const cfgLiteral = JSON.stringify({
+		autoApproveDefault: vscode.workspace
+			.getConfiguration("hmm-code")
+			.get<boolean>("autoApproveDefault", false),
+	});
 	return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${resolveLocale()}">
 <head>
 	<meta charset="UTF-8" />
 	<meta http-equiv="Content-Security-Policy" content="${csp}" />
@@ -714,7 +721,7 @@ export function renderChatHtml(
 </head>
 <body>
 	<div id="app"></div>
-	<script nonce="${nonce}">window.__HMM_INFO = ${infoLiteral};</script>
+	<script nonce="${nonce}">window.__HMM_INFO = ${infoLiteral}; window.__HMM_I18N = ${i18nLiteral}; window.__HMM_CFG = ${cfgLiteral};</script>
 	<script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
