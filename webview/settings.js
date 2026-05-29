@@ -7,7 +7,6 @@ const post = (msg) => vscode.postMessage(msg);
 const MODE_NAMES = ["plan", "code", "debug", "ask"];
 const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
 const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
-const THINKING_HTML = THINKING_LEVELS.map((l) => '<option value="' + l + '">' + (l || '(default)') + '</option>').join('');
 const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '</option>').join('');
 let diskState = null;
 let modesDraft = {};
@@ -182,6 +181,37 @@ function modelOptionsHtml(currentValue, provider, providerIndex) {
 	return parts.join('');
 }
 
+const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
+
+function findAvailableModel(provider, id) {
+	const list = (diskState && diskState.availableModels) || [];
+	return list.find((m) => m.provider === provider && m.id === id) || null;
+}
+
+// Thinking <option>s for a mode, mirroring the chat picker: non-reasoning →
+// (default)+off; binary qwen/zai → (default)+off+on; leveled → (default)+off+
+// mapped levels. `selected` is the mode's stored thinkingLevel ('' = default).
+function modeThinkingOptionsHtml(provider, id, selected) {
+	const sel = selected || '';
+	const opt = (val, label, on) => '<option value="' + esc(val) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>';
+	let html = opt('', '(default)', sel === '');
+	const model = findAvailableModel(provider, id);
+	if (!model || !model.reasoning) return html + opt('off', 'off', sel === 'off');
+	const map = model.thinkingLevelMap || {};
+	if (model.thinkingFormat && BINARY_THINKING_FORMATS.includes(model.thinkingFormat)) {
+		const onLevel = THINKING_LEVELS.find((l) => l && l !== 'off' && map[l] != null) || 'medium';
+		return html + opt('off', 'off', sel === 'off') + opt(onLevel, 'on', sel !== '' && sel !== 'off');
+	}
+	for (const lvl of THINKING_LEVELS) {
+		if (lvl === '') continue;
+		const mapped = map[lvl];
+		if (mapped === null) continue;
+		if (lvl === 'xhigh' && mapped === undefined) continue;
+		html += opt(lvl, lvl, sel === lvl);
+	}
+	return html;
+}
+
 function renderModes() {
 	const root = document.getElementById('mode-cards');
 	root.innerHTML = '';
@@ -195,9 +225,10 @@ function renderModes() {
 			'<div class="mode-name ' + name + '">' + name + '</div>' +
 			'<select data-mode="' + name + '" data-field="provider">' + providerOptionsHtml(draft.provider, providerIndex) + '</select>' +
 			'<select data-mode="' + name + '" data-field="id">' + modelOptionsHtml(draft.id, draft.provider, providerIndex) + '</select>' +
-			'<select data-mode="' + name + '" data-field="thinking">' + THINKING_HTML + '</select>';
+			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>';
 		root.appendChild(card);
-		card.querySelector('select[data-field="thinking"]').value = draft.thinking;
+		// thinking <select> uses `selected` attributes (model-aware), so no
+		// post-hoc .value assignment.
 	}
 	root.querySelectorAll('select').forEach((el) => {
 		el.addEventListener('change', () => {
@@ -205,10 +236,12 @@ function renderModes() {
 			const field = el.getAttribute('data-field');
 			if (!name || !field || !modesDraft[name]) return;
 			modesDraft[name][field] = el.value;
-			// Changing provider invalidates the model selection — re-render
-			// the card so the model dropdown shows the new provider's ids.
+			// Changing provider invalidates the model selection; changing the
+			// model changes which thinking options apply — re-render either way.
 			if (field === 'provider') {
 				modesDraft[name].id = '';
+				renderModes();
+			} else if (field === 'id') {
 				renderModes();
 			} else {
 				const card = el.closest('.mode-card');

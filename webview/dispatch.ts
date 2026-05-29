@@ -14,12 +14,14 @@ import {
 } from "./protocol";
 import {
 	effectiveModel,
+	isBinaryThinking,
 	pendingUiRequests,
 	persistedSessionFile,
 	post,
 	rememberSessionFile,
 	runtime,
 	supportedThinkingLevels,
+	thinkingLabel,
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
@@ -97,6 +99,7 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		if (runtime.lastStateModel) {
 			const eff = effectiveModel(runtime.lastStateModel);
 			ui.availableThinking = supportedThinkingLevels(eff);
+			ui.thinkingBinary = isBinaryThinking(eff);
 		}
 	},
 	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages),
@@ -241,7 +244,7 @@ function handleSetStatus(key: string, value: string): void {
 		if (changed) post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 	} else if (key === STATUS_KEYS.THINKING) {
 		ui.thinking = value || "?";
-		e.pickerThinkingLabel.textContent = ui.thinking;
+		e.pickerThinkingLabel.textContent = thinkingLabel();
 	} else if (key === STATUS_KEYS.OVERRIDDEN) {
 		runtime.isOverridden = value === "1";
 		updateResetVisibility();
@@ -299,13 +302,14 @@ function renderState(state: any): void {
 		ui.modelId = eff.id;
 		ui.modelProvider = (eff.provider as string) ?? "";
 		ui.availableThinking = supportedThinkingLevels(eff);
+		ui.thinkingBinary = isBinaryThinking(eff);
 		if (eff.thinkingLevelMap !== undefined || eff.reasoning !== undefined) {
 			runtime.initialStateReady = true;
 		}
 	}
 	if (state.thinkingLevel) {
 		ui.thinking = String(state.thinkingLevel);
-		e.pickerThinkingLabel.textContent = ui.thinking;
+		e.pickerThinkingLabel.textContent = thinkingLabel();
 	}
 	if (typeof state.sessionFile === "string") {
 		runtime.currentSessionFile = state.sessionFile;

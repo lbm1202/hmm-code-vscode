@@ -114,8 +114,14 @@ export function wirePickers(): void {
 		showPopover(
 			e.pickerThinking,
 			supported.map((lvl) => ({
-				label: lvl,
-				selected: lvl === ui.thinking,
+				// Binary models (qwen/zai) show off/on; the non-off entry is a real
+				// level (e.g. "medium") sent as-is, just labeled "on".
+				label: ui.thinkingBinary && lvl !== "off" ? "on" : lvl,
+				selected: ui.thinkingBinary
+					? lvl === "off"
+						? ui.thinking === "off"
+						: ui.thinking !== "off"
+					: lvl === ui.thinking,
 				onClick: () =>
 					post({
 						kind: FROM_WEBVIEW.COMMAND,

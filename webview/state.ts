@@ -65,6 +65,9 @@ export const ui = {
 	context: "?" as string,
 	availableModels: [] as ModelEntry[],
 	availableThinking: [] as string[],
+	/** True when the active model's thinking is binary (qwen/zai) — the picker
+	 *  then shows off/on instead of the leveled list. */
+	thinkingBinary: false,
 	sessions: [] as SessionEntry[],
 	/** Mirror of Pi's setStatus("auto-approve", "on"|"off"). Session-scoped. */
 	autoApprove: false,
@@ -123,14 +126,33 @@ export function supportedThinkingLevels(model: any): string[] {
 		if (level === "xhigh") return mapped !== undefined;
 		return true;
 	});
-	const fmt = model?.compat?.thinkingFormat;
-	if (fmt && BINARY_THINKING_FORMATS.has(fmt)) {
+	if (isBinaryThinking(model)) {
+		// Binary providers (qwen/zai) only honor enable_thinking on/off — any
+		// non-off level collapses to the same thing. Show off + a single canonical
+		// "on" level. Most such models have NO thinkingLevelMap, so don't gate on
+		// an explicit entry (that was the bug); default the on-level to medium,
+		// matching the Alt+T toggle.
 		const explicitNonOff = THINKING_LEVELS.find(
 			(l) => l !== "off" && (map as any)[l] !== undefined && (map as any)[l] !== null,
 		);
-		if (explicitNonOff) return ["off", explicitNonOff];
+		return ["off", explicitNonOff ?? "medium"];
 	}
 	return [...standard];
+}
+
+/** Whether the model's thinking is binary (on/off) rather than leveled —
+ *  reasoning model served via a qwen/zai-style enable_thinking flag. */
+export function isBinaryThinking(model: any): boolean {
+	if (!model?.reasoning) return false;
+	const fmt = model?.compat?.thinkingFormat;
+	return !!fmt && BINARY_THINKING_FORMATS.has(fmt);
+}
+
+/** Footer label for the current thinking state — on/off for binary models,
+ *  the raw level otherwise. */
+export function thinkingLabel(): string {
+	if (ui.thinkingBinary) return ui.thinking === "off" ? "off" : "on";
+	return ui.thinking;
 }
 
 /** Backfill missing fields on the live state.model from the full models list. */

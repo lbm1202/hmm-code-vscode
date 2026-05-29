@@ -151,6 +151,12 @@ export class SettingsPanel {
 			provider: String(m.provider ?? ""),
 			id: String(m.id ?? ""),
 			alias: m.alias ? String(m.alias) : undefined,
+			// Thinking metadata so the mode-set thinking dropdown can mirror the
+			// chat picker (off-only for non-reasoning, off/on for binary
+			// qwen/zai, leveled otherwise).
+			reasoning: m.reasoning === true,
+			thinkingLevelMap: m.thinkingLevelMap ?? undefined,
+			thinkingFormat: m.compat?.thinkingFormat ?? undefined,
 		}));
 		// Allowlist map lives inside modes.json:modelAllowlist. Surface it as
 		// a top-level field so the allowlist UI doesn't need to reach into
