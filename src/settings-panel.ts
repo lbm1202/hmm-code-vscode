@@ -560,7 +560,7 @@ export class SettingsPanel {
 			세션 자동 제목 생성에 사용할 모델. 빈 값이면 GPT-mini 후보 → code 모드 모델 → 활성 모델 순으로 fallback.
 			컨텍스트 요약(compact)은 Pi 가 항상 <strong>현재 활성 모델</strong>을 사용 — 별도 설정 불가.
 		</div>
-		<div class="mode-card" id="autotitle-card" style="grid-template-columns: 140px 1fr 1fr;">
+		<div class="mode-card autotitle-card" id="autotitle-card">
 			<div class="mode-name" style="color: var(--vscode-foreground);">자동 제목</div>
 			<select id="autotitle-provider"></select>
 			<select id="autotitle-id"></select>

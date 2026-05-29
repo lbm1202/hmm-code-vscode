@@ -85,15 +85,16 @@ th {
 	padding: 12px 14px;
 	margin-bottom: 8px;
 	display: grid;
-	grid-template-columns: 60px 1fr 1fr 130px;
+	grid-template-columns: 60px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 130px);
 	gap: 10px;
 	align-items: center;
 }
+.autotitle-card { grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr); }
 .mode-card.dirty {
 	border-color: var(--vscode-focusBorder);
 	background: color-mix(in srgb, var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)) 6%, transparent);
 }
-.mode-card > select { width: 100%; }
+.mode-card > select { width: 100%; min-width: 0; }
 .mode-name { font-weight: 600; font-size: 13px; }
 .mode-name.plan { color: rgb(120, 170, 255); }
 .mode-name.code { color: var(--vscode-foreground); }
@@ -136,6 +137,7 @@ th {
 .provider-card .provider-header .provider-meta {
 	color: var(--vscode-descriptionForeground);
 	font-size: 11px;
+	white-space: nowrap;
 }
 .provider-card .provider-header .provider-actions { display: flex; gap: 6px; }
 .allowlist-grid {
@@ -328,4 +330,31 @@ th {
 	color: var(--vscode-descriptionForeground);
 	font-weight: 400;
 	margin-left: 6px;
+}
+
+/* ── Narrow panel (sidebar-width / split editor) ─────────────────────────────
+   The panel is designed for the editor area; below ~540px the multi-column
+   grids overflow, so collapse them to stacked / fewer-column layouts. */
+@media (max-width: 540px) {
+	body { padding: 16px 12px 100px 12px; }
+	.section, .provider-card { padding: 14px 12px; }
+
+	/* Mode + auto-title cards: stack name above its controls. */
+	.mode-card, .autotitle-card { grid-template-columns: 1fr; gap: 6px; }
+
+	/* Provider / allowlist header: name, meta, then actions each on their own
+	   row instead of squeezing the auto columns until the text char-wraps. */
+	.provider-card .provider-header { grid-template-columns: 1fr; gap: 4px; }
+	.provider-card .provider-header .provider-actions { justify-self: start; }
+
+	/* New-auth and other inline rows wrap instead of overflowing. */
+	.row { flex-wrap: wrap; }
+	.row input[type="text"], .row input[type="password"] { min-width: 0; }
+
+	/* Model rows: drop the optional 이름 + # columns to give ID/형식 room. */
+	.model-grid, .model-row-card {
+		grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr) 32px;
+	}
+	.model-grid > :nth-child(1), .model-grid > :nth-child(3),
+	.model-row-card > :nth-child(1), .model-row-card > :nth-child(3) { display: none; }
 }
