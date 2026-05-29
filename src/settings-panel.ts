@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { ChatBackend } from "./chat-backend";
 import { codexOAuthLogin } from "./oauth-codex";
+import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { buildCsp, makeNonce } from "./webview-html";
 
 const VIEW_TYPE = "hmm-code.settingsPanel";
@@ -102,11 +103,11 @@ export class SettingsPanel {
 
 		panel.onDidDispose(() => {
 			unsubscribe();
-			// Abort any in-flight codex login so its callback server (port 1455)
-			// is torn down with the panel — otherwise it leaks and the next
-			// login attempt fails with EADDRINUSE until the host restarts.
-			(SettingsPanel as any)._codexLoginAbort?.abort?.();
-			(SettingsPanel as any)._codexLoginAbort = undefined;
+			// Abort any in-flight OAuth login so its callback server is torn down
+			// with the panel — otherwise it leaks and the next login attempt
+			// fails with EADDRINUSE until the host restarts.
+			(SettingsPanel as any)._oauthLoginAbort?.abort?.();
+			(SettingsPanel as any)._oauthLoginAbort = undefined;
 			if (SettingsPanel.instance === panel) SettingsPanel.instance = undefined;
 		});
 
@@ -182,6 +183,78 @@ export class SettingsPanel {
 		}
 	}
 
+	/** Drive an inline OAuth login flow for any provider, writing the resulting
+	 *  credential to auth.json and restarting chat. Single-flight across all
+	 *  providers (one browser login at a time) via the shared _oauthLoginAbort. */
+	private static async runOAuthLogin(
+		panel: vscode.WebviewPanel,
+		opts: {
+			statusKind: string;
+			providerId: string;
+			label: string;
+			run: (
+				cb: {
+					onAuth: (info: { url: string; instructions?: string }) => void;
+					onProgress?: (message: string) => void;
+				},
+				signal: AbortSignal,
+			) => Promise<unknown>;
+		},
+	): Promise<void> {
+		if ((SettingsPanel as any)._oauthLoginAbort) {
+			panel.webview.postMessage({ kind: opts.statusKind, state: "running" });
+			return;
+		}
+		const abort = new AbortController();
+		(SettingsPanel as any)._oauthLoginAbort = abort;
+		panel.webview.postMessage({ kind: opts.statusKind, state: "starting", message: "OAuth 플로우 시작…" });
+		try {
+			const creds = await opts.run(
+				{
+					onAuth: ({ url, instructions }) => {
+						vscode.env.openExternal(vscode.Uri.parse(url));
+						panel.webview.postMessage({
+							kind: opts.statusKind,
+							state: "browser",
+							url,
+							message: instructions ?? "브라우저에서 로그인 진행 중…",
+						});
+					},
+					onProgress: (message) => {
+						panel.webview.postMessage({ kind: opts.statusKind, state: "progress", message });
+					},
+				},
+				abort.signal,
+			);
+			// Write to auth.json with the shape Pi's AuthStorage expects.
+			const raw: any = SettingsPanel.readJsonSafe(AUTH_PATH) ?? {};
+			raw[opts.providerId] = creds;
+			mkdirSync(dirname(AUTH_PATH), { recursive: true, mode: 0o700 });
+			writeFileSync(AUTH_PATH, JSON.stringify(raw, null, 2), "utf-8");
+			try {
+				chmodSync(AUTH_PATH, 0o600);
+			} catch {
+				/* non-POSIX */
+			}
+			// Full pi restart so AuthStorage picks up the new oauth entry.
+			vscode.commands.executeCommand("hmm-code.restartChat");
+			panel.webview.postMessage({
+				kind: opts.statusKind,
+				state: "success",
+				message: `${opts.label} 인증 저장됨 + 채팅 재시작.`,
+			});
+			SettingsPanel.refresh(panel);
+		} catch (err) {
+			panel.webview.postMessage({
+				kind: opts.statusKind,
+				state: "error",
+				message: (err as Error).message,
+			});
+		} finally {
+			(SettingsPanel as any)._oauthLoginAbort = undefined;
+		}
+	}
+
 	private static async handleMessage(panel: vscode.WebviewPanel, msg: any): Promise<void> {
 		switch (msg?.kind) {
 			case "open-file": {
@@ -194,69 +267,27 @@ export class SettingsPanel {
 				await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
 				return;
 			}
-			case "open-terminal-login": {
-				const t = vscode.window.createTerminal({ name: "Hmm-code: pi /login" });
-				t.show();
-				t.sendText("pi", true);
-				vscode.window.showInformationMessage(
-					"터미널에서 /login 입력 후 OAuth provider 를 선택하세요.",
-				);
-				return;
-			}
 			case "codex-login": {
-				// Run the inline OAuth flow. Single-flight: ignore if already running.
-				if ((SettingsPanel as any)._codexLoginAbort) {
-					panel.webview.postMessage({ kind: "codex-status", state: "running" });
-					return;
-				}
-				const abort = new AbortController();
-				(SettingsPanel as any)._codexLoginAbort = abort;
-				panel.webview.postMessage({ kind: "codex-status", state: "starting", message: "OAuth 플로우 시작…" });
-				try {
-					const creds = await codexOAuthLogin(
-						{
-							onAuth: ({ url, instructions }) => {
-								vscode.env.openExternal(vscode.Uri.parse(url));
-								panel.webview.postMessage({
-									kind: "codex-status",
-									state: "browser",
-									url,
-									message: instructions ?? "브라우저에서 로그인 진행 중…",
-								});
-							},
-							onProgress: (message) => {
-								panel.webview.postMessage({ kind: "codex-status", state: "progress", message });
-							},
-						},
-						abort.signal,
-					);
-					// Write to auth.json with shape Pi's AuthStorage expects
-					const raw: any = SettingsPanel.readJsonSafe(AUTH_PATH) ?? {};
-					raw["openai-codex"] = creds;
-					mkdirSync(dirname(AUTH_PATH), { recursive: true, mode: 0o700 });
-					writeFileSync(AUTH_PATH, JSON.stringify(raw, null, 2), "utf-8");
-					try { chmodSync(AUTH_PATH, 0o600); } catch { /* non-POSIX */ }
-					// Full pi restart so AuthStorage picks up the new oauth entry
-					vscode.commands.executeCommand("hmm-code.restartChat");
-					panel.webview.postMessage({
-						kind: "codex-status",
-						state: "success",
-						message: "openai-codex 인증 저장됨 + 채팅 재시작.",
-					});
-					SettingsPanel.refresh(panel);
-				} catch (err) {
-					panel.webview.postMessage({
-						kind: "codex-status",
-						state: "error",
-						message: (err as Error).message,
-					});
-				} finally {
-					(SettingsPanel as any)._codexLoginAbort = undefined;
-				}
+				await SettingsPanel.runOAuthLogin(panel, {
+					statusKind: "codex-status",
+					providerId: "openai-codex",
+					label: "openai-codex",
+					run: codexOAuthLogin,
+				});
 				return;
 			}
-			case "codex-login-cancel": {
-				(SettingsPanel as any)._codexLoginAbort?.abort?.();
+			case "anthropic-login": {
+				await SettingsPanel.runOAuthLogin(panel, {
+					statusKind: "anthropic-status",
+					providerId: "anthropic",
+					label: "anthropic (Claude Pro/Max)",
+					run: anthropicOAuthLogin,
+				});
+				return;
+			}
+			case "codex-login-cancel":
+			case "anthropic-login-cancel": {
+				(SettingsPanel as any)._oauthLoginAbort?.abort?.();
 				return;
 			}
 			case "save": {
@@ -579,23 +610,48 @@ export class SettingsPanel {
 	<div class="section">
 		<h2>공급자 인증 (auth.json)</h2>
 		<div class="desc">
-			API key 는 인라인으로 추가. OAuth (openai-codex) 는 브라우저 로그인 흐름이 자동으로 뜹니다.
+			<strong>API key</strong>: built-in 공급자 id + key 만 넣으면 됩니다 (커스텀 공급자 등록 불필요).
+			예) <code>anthropic</code>=Claude, <code>openai</code>=OpenAI, <code>google</code>=Gemini,
+			<code>xai</code>=Grok, <code>groq</code>, <code>deepseek</code>, <code>openrouter</code> …<br />
+			<strong>구독제(OAuth)</strong>: 아래 버튼으로 브라우저 로그인.
 		</div>
 		<table id="auth-table">
 			<thead><tr><th>Provider</th><th>Type</th><th></th></tr></thead>
 			<tbody id="auth-body"><tr><td colspan="3"><em>로딩 중…</em></td></tr></tbody>
 		</table>
+		<datalist id="provider-ids">
+			<option value="anthropic"></option>
+			<option value="openai"></option>
+			<option value="google"></option>
+			<option value="google-vertex"></option>
+			<option value="xai"></option>
+			<option value="groq"></option>
+			<option value="deepseek"></option>
+			<option value="mistral"></option>
+			<option value="moonshotai"></option>
+			<option value="together"></option>
+			<option value="openrouter"></option>
+			<option value="fireworks"></option>
+			<option value="cerebras"></option>
+		</datalist>
 		<div class="row" style="margin-top: 12px;">
-			<input type="text" id="new-auth-id" placeholder="provider id (e.g. openai, anthropic, groq)" />
+			<input type="text" id="new-auth-id" list="provider-ids" placeholder="provider id (anthropic, openai, google, groq …)" />
 			<input type="password" id="new-auth-key" placeholder="API key (sk-...)" style="max-width: 240px;" />
 			<button id="add-auth-btn">추가 (draft)</button>
 		</div>
 		<div class="note" style="margin-top: 12px;">
-			<strong>OpenAI Codex (ChatGPT Plus/Pro) OAuth</strong>
-			<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center;">
-				<button id="codex-login-btn">브라우저 로그인</button>
+			<strong>구독제 OAuth (브라우저 로그인)</strong>
+			<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+				<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
+				<button id="codex-login-btn">Codex 로그인</button>
 				<button class="ghost hidden" id="codex-cancel-btn">취소</button>
 				<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
+			</div>
+			<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+				<span style="font-size: 11px; min-width: 88px;">Claude Pro/Max</span>
+				<button id="anthropic-login-btn">Claude 로그인</button>
+				<button class="ghost hidden" id="anthropic-cancel-btn">취소</button>
+				<span id="anthropic-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
 			</div>
 		</div>
 	</div>

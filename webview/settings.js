@@ -830,18 +830,25 @@ function render(s) {
 }
 
 // Codex OAuth inline
-const codexBtn = document.getElementById('codex-login-btn');
-const codexCancel = document.getElementById('codex-cancel-btn');
-const codexStatus = document.getElementById('codex-status');
-codexBtn.addEventListener('click', () => {
-	codexBtn.disabled = true;
-	codexCancel.classList.remove('hidden');
-	codexStatus.textContent = '시작 중…';
-	post({ kind: 'codex-login' });
-});
-codexCancel.addEventListener('click', () => {
-	post({ kind: 'codex-login-cancel' });
-});
+// OAuth login buttons (Codex, Claude) share identical wiring; keyed by their
+// status message kind so the status handler can find the right elements.
+const oauthUis = {};
+function wireOAuth(statusKind, btnId, cancelId, statusId, loginKind, cancelKind) {
+	const btn = document.getElementById(btnId);
+	const cancel = document.getElementById(cancelId);
+	const status = document.getElementById(statusId);
+	if (!btn || !cancel || !status) return;
+	btn.addEventListener('click', () => {
+		btn.disabled = true;
+		cancel.classList.remove('hidden');
+		status.textContent = '시작 중…';
+		post({ kind: loginKind });
+	});
+	cancel.addEventListener('click', () => post({ kind: cancelKind }));
+	oauthUis[statusKind] = { btn, cancel, status };
+}
+wireOAuth('codex-status', 'codex-login-btn', 'codex-cancel-btn', 'codex-status', 'codex-login', 'codex-login-cancel');
+wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'anthropic-status', 'anthropic-login', 'anthropic-login-cancel');
 
 // Add auth (API key)
 document.getElementById('add-auth-btn').addEventListener('click', () => {
@@ -911,22 +918,24 @@ window.addEventListener('message', (ev) => {
 	if (msg.kind === 'state') render(msg.state);
 	else if (msg.kind === 'error') showToast(msg.message || 'Error', true);
 	else if (msg.kind === 'saved') showToast('저장됨: ' + (msg.files || []).join(', '));
-	else if (msg.kind === 'codex-status') {
+	else if (msg.kind === 'codex-status' || msg.kind === 'anthropic-status') {
+		const ui = oauthUis[msg.kind];
+		if (!ui) return;
 		const s = msg.state;
 		if (s === 'success') {
-			codexBtn.disabled = false;
-			codexCancel.classList.add('hidden');
-			codexStatus.textContent = '✓ ' + (msg.message || '완료');
-			codexStatus.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
-			setTimeout(() => { codexStatus.textContent = ''; codexStatus.style.color = ''; }, 4000);
+			ui.btn.disabled = false;
+			ui.cancel.classList.add('hidden');
+			ui.status.textContent = '✓ ' + (msg.message || '완료');
+			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
+			setTimeout(() => { ui.status.textContent = ''; ui.status.style.color = ''; }, 4000);
 		} else if (s === 'error') {
-			codexBtn.disabled = false;
-			codexCancel.classList.add('hidden');
-			codexStatus.textContent = '✗ ' + (msg.message || 'Error');
-			codexStatus.style.color = 'var(--vscode-errorForeground)';
+			ui.btn.disabled = false;
+			ui.cancel.classList.add('hidden');
+			ui.status.textContent = '✗ ' + (msg.message || 'Error');
+			ui.status.style.color = 'var(--vscode-errorForeground)';
 		} else {
-			codexStatus.style.color = '';
-			codexStatus.textContent = msg.message || '';
+			ui.status.style.color = '';
+			ui.status.textContent = msg.message || '';
 		}
 	}
 	else if (msg.kind === 'discovered-models') {
