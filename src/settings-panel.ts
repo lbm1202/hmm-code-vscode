@@ -317,20 +317,18 @@ export class SettingsPanel {
 					out.push("auth.json");
 				}
 				if (out.length > 0) {
-					// Pi caches AuthStorage in memory and ctx.reload() doesn't
-					// re-read auth.json — auth changes need a full process
-					// restart. For modes/models-only changes, /reload-runtime
-					// suffices (extension hooks re-run on session_start).
-					if (authChanged) {
-						vscode.commands.executeCommand("hmm-code.restartChat");
-					} else {
-						// Broadcast to ALL live backends (sidebar + every open
-						// editor panel) so they stay in sync.
-						ChatBackend.reloadAll();
-					}
+					// Any settings change → full process restart. Pi caches
+					// AuthStorage in memory and ctx.reload() doesn't re-read
+					// auth.json, and the soft /reload-runtime didn't reliably
+					// refresh the model list — so restart cleanly picks up
+					// auth/models/modes. The chat webview auto-resumes the
+					// persisted session, and restart re-pulls models (see
+					// ChatBackend.start), so dropdowns update without a window
+					// reload.
+					vscode.commands.executeCommand("hmm-code.restartChat");
 				}
 				SettingsPanel.refresh(panel);
-				panel.webview.postMessage({ kind: "saved", files: out, restarted: authChanged });
+				panel.webview.postMessage({ kind: "saved", files: out, restarted: out.length > 0 });
 				return;
 			}
 			case "discover-models": {

@@ -226,23 +226,15 @@ export class ChatBackend {
 	 *  up the new auth.json — not just the sidebar. */
 	private static _live = new Set<ChatBackend>();
 	static restartAll(): void {
-		for (const b of ChatBackend._live) b.restart();
-	}
-	/** Broadcast `/reload-runtime` to every live Pi process. Used by the
-	 *  settings panel after modes/models changes — extension hooks re-read
-	 *  modes.json on `ctx.reload()`, and our session_start(reason="reload")
-	 *  handler refreshes the modelRegistry so models.json edits show up.
-	 *  Keeps Pi processes alive (no in-flight session disruption), unlike
-	 *  `restartAll`. */
-	static reloadAll(): void {
+		let any = false;
 		for (const b of ChatBackend._live) {
-			b.prompt("/reload-runtime");
-			// Pi processes the slash asynchronously; reload is usually
-			// sub-second. Schedule a model re-pull to refresh the picker's
-			// cached availableModels (modes.json:modelAliases re-attached
-			// inside the REQUEST_MODELS handler).
-			b.scheduleModelRefresh(800);
+			b.restart();
+			any = true;
 		}
+		// No live chat view (only the settings panel is open): nothing restarted,
+		// so refresh the model cache via a one-shot fetch with the new auth.json
+		// — otherwise the settings dropdowns stay stale until a window reload.
+		if (!any) ChatBackend.requestModelsOnce();
 	}
 
 	private modelRefreshTimer: NodeJS.Timeout | undefined;
@@ -332,6 +324,12 @@ export class ChatBackend {
 			c.start({ piBin: launch.cmd, args: launch.args, env: launch.env, cwd });
 			this.client = c;
 			this.post({ kind: TO_WEBVIEW.READY });
+			// Host-side model re-pull once the new process is up. This is what
+			// refreshes the picker + the settings panel's cached model list after
+			// a restart (e.g. an OAuth login or auth removal added/removed a
+			// provider) — without relying on the webview to ask, so it works even
+			// when only the settings panel is open.
+			this.scheduleModelRefresh(1200);
 		} catch (err) {
 			this.post({ kind: TO_WEBVIEW.STDERR, text: `Failed to spawn pi: ${(err as Error).message}` });
 		}
