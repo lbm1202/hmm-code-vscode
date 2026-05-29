@@ -1,0 +1,35 @@
+# Auto-opens PRs when bundled Pi (or any other npm dep) ships a new version.
+# Merge the PR to pull the update into the lockfile, then tag + push to
+# trigger the release workflow which rebuilds the .vsix.
+#
+# Limited to `@earendil-works/*` and the runtime deps we actually ship — we
+# don't want noisy PRs for every devDep bump.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      include: scope
+    labels:
+      - dependencies
+    allow:
+      # Bundled Pi runtime — primary reason for this config. Auto-PR on
+      # every release so we can tag + ship a fresh .vsix promptly.
+      - dependency-name: "@earendil-works/*"
+      # Webview runtime deps that ship to users. Patch the security/perf
+      # baseline without hand-watching npm.
+      - dependency-name: "dompurify"
+      - dependency-name: "marked"
+      - dependency-name: "shiki"
+    groups:
+      # Keep Anthropic Earendil packages bumped together to avoid an
+      # in-between state where, say, pi-coding-agent and pi-ai disagree.
+      earendil:
+        patterns:
+          - "@earendil-works/*"

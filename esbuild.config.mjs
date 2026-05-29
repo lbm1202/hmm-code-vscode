@@ -4,11 +4,10 @@ import { cpSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// SSH form so private-repo clones work without a PAT. Requires the build
-// machine to have a GitHub SSH key. Override via HMM_CODE_PI_REPO env var
-// (e.g. set to https URL with embedded token for CI).
+// Public HTTPS — no auth required. Override via HMM_CODE_PI_REPO env var if
+// you maintain a fork or a private mirror.
 const HMM_CODE_PI_REPO =
-	process.env.HMM_CODE_PI_REPO ?? "git@github.com:lbm1202/hmm-code-pi.git";
+	process.env.HMM_CODE_PI_REPO ?? "https://github.com/lbm1202/hmm-code-pi.git";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const watch = process.argv.includes("--watch");

@@ -4,14 +4,7 @@ name: Release
 # Ubuntu runner, packages it as a .vsix, creates a GitHub Release, and
 # attaches the .vsix as a download.
 #
-# Setup (one-time):
-#   1. Create a fine-grained Personal Access Token at
-#      https://github.com/settings/personal-access-tokens with read-only
-#      access to the `lbm1202/hmm-code-pi` repo (Contents: Read).
-#   2. Add it as a repo secret named `HMM_CODE_PI_TOKEN`
-#      (Settings → Secrets and variables → Actions → New repository secret).
-#   3. Push a tag: `git tag v0.1.0 && git push --tags`.
-#      The workflow auto-runs and the .vsix appears on the Releases page.
+# Just push a tag: `git tag v0.1.0 && git push --tags`.
 
 on:
   push:
@@ -34,17 +27,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Clone hmm-code-pi (private, requires PAT)
-        env:
-          GH_PAT: ${{ secrets.HMM_CODE_PI_TOKEN }}
-        run: |
-          if [ -z "$GH_PAT" ]; then
-            echo "::error::HMM_CODE_PI_TOKEN secret not set. See workflow header for setup."
-            exit 1
-          fi
-          git clone --depth 1 \
-            "https://x-access-token:${GH_PAT}@github.com/lbm1202/hmm-code-pi.git" \
-            ../hmm-code-pi
+      - name: Clone hmm-code-pi (sibling — build requires it)
+        run: git clone --depth 1 https://github.com/lbm1202/hmm-code-pi.git ../hmm-code-pi
 
       - name: Install npm dependencies
         run: npm ci
@@ -66,7 +50,7 @@ jobs:
           fi
 
       - name: Package .vsix
-        run: npx --yes @vscode/vsce package --allow-missing-repository --skip-license
+        run: npx --yes @vscode/vsce package
 
       - name: Upload .vsix as workflow artifact (debug)
         uses: actions/upload-artifact@v4
