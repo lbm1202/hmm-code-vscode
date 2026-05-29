@@ -22,7 +22,10 @@ const PURIFY_CONFIG = {
 
 export function md(s: string): string {
 	try {
-		const raw = marked.parse(s) as string;
+		const raw = marked.parse(s);
+		// marked can return a Promise if async slips on; sanitizing a Promise
+		// would stringify to "[object Promise]". Fall back to plain escaping.
+		if (typeof raw !== "string") return escapeHtml(s);
 		return DOMPurify.sanitize(raw, PURIFY_CONFIG);
 	} catch {
 		return escapeHtml(s);
@@ -34,11 +37,15 @@ export function escapeHtml(s: string): string {
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
 }
 
+/** Escape a string for use inside a double-quoted attribute selector value,
+ *  e.g. `[data-tool-call-id="${cssEscape(id)}"]`. Escapes the backslash and
+ *  the closing quote so an id carrying either can't break out of the selector. */
 export function cssEscape(s: string): string {
-	return s.replace(/"/g, '\\"');
+	return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 export function safeStringify(v: unknown): string {
@@ -72,8 +79,13 @@ export function displayModel(v: string): string {
 /** Plan-handoff implementation prompt template (referencing the saved plan file). */
 export function buildPlanExecutionBody(path: string, targetMode: string): string {
 	const mode = (targetMode || "code").toUpperCase();
+	// Debug mode strips edit/write (bash only); don't tell it those tools exist.
+	const modeLine =
+		mode === "DEBUG"
+			? `You are now in DEBUG mode (handoff from plan). You have full bash/shell access for reproduction and investigation, but edit/write are disabled — diagnose per the plan, don't modify code.`
+			: `You are now in ${mode} mode (handoff from plan). You are no longer read-only — edit/write/bash are available.`;
 	return [
-		`You are now in ${mode} mode (handoff from plan). You are no longer read-only — edit/write/bash are available.`,
+		modeLine,
 		"",
 		`A plan was saved at ${path}. Read it first, then call todo_write with one item per plan step. Work through them one-by-one, marking in_progress before starting each and completed immediately after finishing.`,
 		"",

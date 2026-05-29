@@ -2,18 +2,11 @@
 // build the "recent sessions" list on the empty state.
 
 import { appendBubble, appendUserBubble, els, setEmptyVisibility } from "./dom";
-import { escapeHtml, md, safeStringify } from "./helpers";
+import { md } from "./helpers";
 import { showModal } from "./modals";
 import { FROM_WEBVIEW } from "./protocol";
 import { pendingUiRequests, post, ui } from "./state";
-import {
-	BUILT_IN_PRETTY,
-	INTERACTIVE_TOOLS,
-	renderEditOrWriteBody,
-	shouldShowArgsBlock,
-	summaryHtmlForTool,
-	updateToolResult,
-} from "./tools";
+import { buildToolCallBlock, updateToolResult } from "./tools";
 import { finalizeTurn } from "./turn-lifecycle";
 
 /** Clear all messages and re-render any pending UI requests. */
@@ -74,39 +67,10 @@ function renderAssistantHistory(m: any): void {
 				toolsEl.className = "msg-tools";
 				bubble.appendChild(toolsEl);
 			}
-			const name = String(tc.name ?? "?");
-			const block = document.createElement("details");
-			block.className = "tool-call";
-			if (INTERACTIVE_TOOLS.has(name)) block.classList.add("tool-call-interactive");
-			if (BUILT_IN_PRETTY.has(name)) block.classList.add("tool-call-builtin");
-			block.dataset.toolCallId = String(tc.id ?? Math.random());
-			block.dataset.toolName = name;
-			const summary = document.createElement("summary");
-			summary.innerHTML =
-				`<span class="tool-name">${escapeHtml(name)}</span>` +
-				summaryHtmlForTool(name, tc.arguments);
-			block.appendChild(summary);
-			if (
-				tc.arguments !== undefined &&
-				!INTERACTIVE_TOOLS.has(name) &&
-				!BUILT_IN_PRETTY.has(name) &&
-				shouldShowArgsBlock(tc.arguments)
-			) {
-				const pre = document.createElement("pre");
-				pre.className = "tool-input";
-				pre.textContent = safeStringify(tc.arguments);
-				block.appendChild(pre);
-			}
-			// edit/write/multi_edit diff body (same as live rendering)
-			const diffBody = renderEditOrWriteBody(name, tc.arguments);
-			if (diffBody) {
-				const wrap = document.createElement("div");
-				wrap.innerHTML = diffBody;
-				const inner = wrap.firstElementChild;
-				if (inner) block.appendChild(inner);
-				(block as HTMLDetailsElement).open = true;
-			}
-			toolsEl.appendChild(block);
+			// Shared builder (no spinner — history calls are already complete).
+			toolsEl.appendChild(
+				buildToolCallBlock(String(tc.name ?? "?"), String(tc.id ?? Math.random()), tc.arguments),
+			);
 		}
 	}
 

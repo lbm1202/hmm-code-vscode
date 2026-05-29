@@ -32,26 +32,31 @@ export const BUILT_IN_PRETTY = new Set([
  *  this many lines. User can click to expand. Keeps the chat scrollable. */
 const COLLAPSE_LINES_THRESHOLD = 10;
 
-export function addToolCall(toolName: string, toolCallId: string, args: unknown): void {
-	const b = ensureBubble();
-	if (!b.toolsEl) {
-		b.toolsEl = document.createElement("div");
-		b.toolsEl.className = "msg-tools";
-		b.bubble.appendChild(b.toolsEl);
-	}
+/** Build the `<details class="tool-call">` element used by BOTH live streaming
+ *  (addToolCall) and history replay (renderAssistantHistory in history.ts).
+ *  Keeping one builder stops the two from drifting (class tags, args-block
+ *  gating, diff-body extraction must stay identical). `spinner` adds the
+ *  running indicator — live only; history calls are already complete. */
+export function buildToolCallBlock(
+	toolName: string,
+	toolCallId: string,
+	args: unknown,
+	opts: { spinner?: boolean } = {},
+): HTMLDetailsElement {
 	const block = document.createElement("details");
 	block.className = "tool-call";
 	if (INTERACTIVE_TOOLS.has(toolName)) block.classList.add("tool-call-interactive");
 	if (BUILT_IN_PRETTY.has(toolName)) block.classList.add("tool-call-builtin");
 	block.dataset.toolCallId = toolCallId;
 	block.dataset.toolName = toolName;
+
 	const summary = document.createElement("summary");
-	const argHtml = summaryHtmlForTool(toolName, args);
 	summary.innerHTML =
 		`<span class="tool-name">${escapeHtml(toolName)}</span>` +
-		argHtml +
-		`<span class="tool-spinner" title="실행 중…">⏳</span>`;
+		summaryHtmlForTool(toolName, args) +
+		(opts.spinner ? `<span class="tool-spinner" title="실행 중…">⏳</span>` : "");
 	block.appendChild(summary);
+
 	// Args JSON block only when (a) not interactive (those use a card UI),
 	// (b) not a known built-in (those have a clean summary), and (c) >1 key
 	// worth showing. For typical { path } / { command } args the summary
@@ -67,19 +72,30 @@ export function addToolCall(toolName: string, toolCallId: string, args: unknown)
 		pre.textContent = safeStringify(args);
 		block.appendChild(pre);
 	}
+
 	// Edit/write/multi_edit: render a diff body up-front from args so the user
 	// sees the change before tool execution finishes. Auto-open so the diff
 	// is visible without an extra click.
 	const diffBody = renderEditOrWriteBody(toolName, args);
 	if (diffBody) {
-		const div = document.createElement("div");
-		div.innerHTML = diffBody;
+		const wrap = document.createElement("div");
+		wrap.innerHTML = diffBody;
 		// Move the actual element (first child) out of the wrapper.
-		const inner = div.firstElementChild;
+		const inner = wrap.firstElementChild;
 		if (inner) block.appendChild(inner);
-		(block as HTMLDetailsElement).open = true;
+		block.open = true;
 	}
-	b.toolsEl.appendChild(block);
+	return block;
+}
+
+export function addToolCall(toolName: string, toolCallId: string, args: unknown): void {
+	const b = ensureBubble();
+	if (!b.toolsEl) {
+		b.toolsEl = document.createElement("div");
+		b.toolsEl.className = "msg-tools";
+		b.bubble.appendChild(b.toolsEl);
+	}
+	b.toolsEl.appendChild(buildToolCallBlock(toolName, toolCallId, args, { spinner: true }));
 	pinStatusToEnd();
 }
 
@@ -660,6 +676,7 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 			new_session_pending: "새 세션 대기",
 			current_session: "현재 세션에서 실행",
 			current_session_deferred: "현재 세션에서 실행 (turn 종료 후)",
+			current_session_headless: "현재 세션에서 실행 (headless)",
 			revise: "수정 요청",
 			deferred: "사용자 보류",
 		};
