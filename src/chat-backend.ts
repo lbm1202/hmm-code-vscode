@@ -18,6 +18,7 @@ import {
 	type SessionEntry,
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
+import { buildCsp, makeNonce } from "./webview-html";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -202,6 +203,10 @@ export class ChatBackend {
 		const cwd =
 			vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME ?? undefined;
 		const client = new PiClient();
+		// PiClient extends EventEmitter — an unheard 'error' (spawn failure on
+		// the system-fallback path) would throw as an uncaughtException and
+		// crash the host. The rejected send() below surfaces the real failure.
+		client.on("error", () => {});
 		try {
 			const launch = ChatBackend.getLaunchConfig();
 			client.start({ piBin: launch.cmd, args: launch.args, env: launch.env, cwd });
@@ -241,6 +246,7 @@ export class ChatBackend {
 	}
 
 	private modelRefreshTimer: NodeJS.Timeout | undefined;
+	private restartTimer: NodeJS.Timeout | undefined;
 	private scheduleModelRefresh(delayMs: number): void {
 		if (this.modelRefreshTimer) clearTimeout(this.modelRefreshTimer);
 		this.modelRefreshTimer = setTimeout(async () => {
@@ -337,6 +343,11 @@ export class ChatBackend {
 			clearTimeout(this.modelRefreshTimer);
 			this.modelRefreshTimer = undefined;
 		}
+		if (this.restartTimer) {
+			clearTimeout(this.restartTimer);
+			this.restartTimer = undefined;
+		}
+		this.client?.removeAllListeners();
 		this.client?.stop();
 		this.client = undefined;
 		ChatBackend._live.delete(this);
@@ -350,14 +361,37 @@ export class ChatBackend {
 	 *  on the new ready event, so the user lands back on the same chat. */
 	restart(): void {
 		if (this.disposed) return;
-		this.client?.stop();
+		if (this.restartTimer) {
+			clearTimeout(this.restartTimer);
+			this.restartTimer = undefined;
+		}
+		const old = this.client;
 		this.client = undefined;
-		// Tiny delay so the previous process fully exits before we spawn
-		// the next one (avoids transient log noise from overlapping starts).
-		setTimeout(() => {
-			if (this.disposed) return;
+		if (!old) {
 			this.start(this.cwd);
-		}, 100);
+			return;
+		}
+		// Detach our listeners so late stderr/exit/event from the dying process
+		// can't post to the webview and race the fresh process's READY.
+		old.removeAllListeners();
+		let respawned = false;
+		const respawn = (): void => {
+			if (respawned || this.disposed) return;
+			respawned = true;
+			if (this.restartTimer) {
+				clearTimeout(this.restartTimer);
+				this.restartTimer = undefined;
+			}
+			this.start(this.cwd);
+		};
+		// Spawn the replacement only after the old process has actually exited
+		// so two pi processes never hold the same session JSONL at once. stop()
+		// escalates to SIGKILL, so 'exit' is guaranteed; the timer is a backstop
+		// in case it doesn't arrive.
+		old.once("exit", respawn);
+		old.stop();
+		this.restartTimer = setTimeout(respawn, 2500);
+		this.restartTimer.unref?.();
 	}
 
 	abort(): void {
@@ -651,13 +685,7 @@ export function renderChatHtml(
 	const styleUri = webview.asWebviewUri(
 		vscode.Uri.joinPath(extensionUri, "out", "webview", "styles.css"),
 	);
-	const csp = [
-		"default-src 'none'",
-		`script-src 'nonce-${nonce}'`,
-		`style-src ${webview.cspSource} 'unsafe-inline'`,
-		`font-src ${webview.cspSource}`,
-		`img-src ${webview.cspSource} data:`,
-	].join("; ");
+	const csp = buildCsp(webview, nonce, webview.cspSource);
 	// Inject version/publisher BEFORE the main script loads so dom.ts can
 	// read them when building the empty-state HTML. JSON.stringify escapes
 	// any quotes/control chars so it's safe inside a <script>.
@@ -677,11 +705,4 @@ export function renderChatHtml(
 	<script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
-}
-
-function makeNonce(): string {
-	let out = "";
-	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	for (let i = 0; i < 32; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
-	return out;
 }

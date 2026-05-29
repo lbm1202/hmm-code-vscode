@@ -64,21 +64,54 @@ export class PiClient extends EventEmitter {
 			}
 			this.pending.clear();
 		});
-		this.proc.on("error", (err) => this.emit("error", err));
+		this.proc.on("error", (err) => {
+			// Guard the emit: EventEmitter throws on an 'error' with no listener,
+			// which would crash the host. ChatBackend detaches its listeners
+			// during restart(), so a late process error must not be fatal.
+			if (this.listenerCount("error") > 0) this.emit("error", err);
+			else console.error("[pi-client] process error (no listener):", err);
+		});
+		// A write to a pi that has exited emits 'error' (EPIPE) on the stdin
+		// stream. Without this listener Node promotes it to an uncaughtException
+		// and crashes the extension host. Re-emit only if someone is listening
+		// (EventEmitter throws on an unhandled 'error'); a broken pipe to an
+		// already-dead pi is otherwise not actionable.
+		this.proc.stdin.on("error", (err) => {
+			if (this.listenerCount("error") > 0) this.emit("error", err);
+		});
 	}
 
 	stop(): void {
-		if (!this.proc) return;
-		try {
-			this.proc.stdin.end();
-			this.proc.kill();
-		} catch {}
+		const proc = this.proc;
+		if (!proc) return;
+		// Null immediately so new sends fail fast instead of writing to a pipe
+		// we're tearing down. The 'exit' handler above still runs to reject
+		// pending requests.
 		this.proc = null;
+		try {
+			proc.stdin.end();
+		} catch {}
+		try {
+			proc.kill(); // SIGTERM
+		} catch {}
+		// Escalate to SIGKILL if it doesn't exit promptly (hung in a syscall or
+		// ignoring SIGTERM) so we don't leak a zombie still holding the session
+		// JSONL file handle.
+		const killTimer = setTimeout(() => {
+			try {
+				proc.kill("SIGKILL");
+			} catch {}
+		}, 2000);
+		killTimer.unref?.();
+		proc.once("exit", () => clearTimeout(killTimer));
 	}
 
 	/** Send a command. Returns the matching response (success or error). */
 	send(cmd: RpcCommand, timeoutMs = 30_000): Promise<RpcResponse> {
-		if (!this.proc) throw new Error("PiClient not started");
+		// Reject (not throw) so every failure path is a rejected promise — a
+		// synchronous throw from an async-looking method surprises callers that
+		// only `.catch()`.
+		if (!this.proc) return Promise.reject(new Error("PiClient not started"));
 		const id = cmd.id ?? `c${this.nextId++}`;
 		const payload = { ...cmd, id };
 		const line = JSON.stringify(payload) + "\n";
@@ -100,16 +133,25 @@ export class PiClient extends EventEmitter {
 
 	/** Fire-and-forget command (no response correlated). */
 	sendNoReply(cmd: RpcCommand): void {
-		if (!this.proc) throw new Error("PiClient not started");
-		const line = JSON.stringify(cmd) + "\n";
-		this.proc.stdin.write(line);
+		this.writeLine(JSON.stringify(cmd) + "\n");
 	}
 
 	/** Reply to an extension_ui_request. */
 	sendUiResponse(res: RpcExtensionUiResponse): void {
-		if (!this.proc) throw new Error("PiClient not started");
-		const line = JSON.stringify(res) + "\n";
-		this.proc.stdin.write(line);
+		this.writeLine(JSON.stringify(res) + "\n");
+	}
+
+	/** Guarded fire-and-forget write. Silently no-ops when pi isn't running or
+	 *  the pipe is gone — these paths (abort, UI responses) have no caller to
+	 *  surface an error to, and an unguarded write on a dead pipe throws/EPIPEs. */
+	private writeLine(line: string): void {
+		const stdin = this.proc?.stdin;
+		if (!stdin || stdin.destroyed) return;
+		try {
+			stdin.write(line);
+		} catch {
+			/* broken pipe — pi already gone */
+		}
 	}
 
 	// ── Internals ────────────────────────────────────────────────────────────
