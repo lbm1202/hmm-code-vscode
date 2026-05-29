@@ -42,6 +42,9 @@ export const STATUS_KEYS = {
 	OVERRIDDEN: "overridden",
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
+	// Received from Pi's todo_write but todos render via the tool-call result,
+	// not this channel — mirrored here only to keep the contract complete.
+	TODOS: "todos",
 	AUTO_APPROVE: "auto-approve",
 } as const;
 

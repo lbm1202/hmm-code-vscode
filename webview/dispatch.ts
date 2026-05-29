@@ -43,6 +43,7 @@ export function wireDispatch(): void {
 		const msg = ev.data as ToWebview;
 		const handler = MESSAGE_HANDLERS[msg.kind];
 		if (handler) handler(msg as any);
+		else console.warn("[hmm-code] unhandled host→webview message kind:", msg?.kind);
 	});
 }
 
@@ -188,6 +189,10 @@ function handlePiEvent(ev: any): void {
 		case PI_EVENT.EXTENSION_ERROR:
 			appendSystem(`[ext error ${ev.extensionPath ?? "?"} @ ${ev.event ?? "?"}] ${ev.error ?? ""}`);
 			return;
+		default:
+			// Unknown Pi event type — surfaces protocol drift during dev instead
+			// of dropping silently. Harmless events (many) land here too.
+			if (t) console.debug("[hmm-code] unhandled pi event:", t);
 	}
 }
 
@@ -209,6 +214,8 @@ function handleHint(hint: any): void {
 		case "set_editor_text":
 			els().prompt.value = String(hint.text ?? "");
 			return;
+		default:
+			if (method) console.warn("[hmm-code] unhandled ui-hint method:", method);
 	}
 }
 
@@ -258,6 +265,12 @@ function handleSetStatus(key: string, value: string): void {
 			kind: FROM_WEBVIEW.COMMAND,
 			command: { type: "new_session", parentSession: runtime.currentSessionFile },
 		});
+	} else if (key === STATUS_KEYS.TODOS) {
+		// Received from Pi's todo_write, but todos render from the todo_write
+		// tool-call result (see tools.ts), not this status channel. Acknowledge
+		// so it doesn't trip the unknown-key warning below.
+	} else if (key) {
+		console.warn("[hmm-code] unhandled setStatus key:", key);
 	}
 }
 

@@ -48,6 +48,10 @@ export const STATUS_KEYS = {
 	OVERRIDDEN: "overridden",
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
+	// Pi emits this from todo_write. The webview currently renders todos from
+	// the todo_write tool-call result, not this setStatus channel — mirrored
+	// here only to keep the contract complete with Pi's constants.ts.
+	TODOS: "todos",
 	AUTO_APPROVE: "auto-approve",
 } as const;
 
