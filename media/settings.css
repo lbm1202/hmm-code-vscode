@@ -186,7 +186,7 @@ th {
 }
 .model-grid {
 	display: grid;
-	grid-template-columns: 40px 1fr 1fr 90px 40px;
+	grid-template-columns: 40px 1fr 1fr 70px 150px 40px;
 	gap: 8px;
 	margin-bottom: 4px;
 }
@@ -199,7 +199,7 @@ th {
 }
 .model-row-card {
 	display: grid;
-	grid-template-columns: 40px 1fr 1fr 90px 40px;
+	grid-template-columns: 40px 1fr 1fr 70px 150px 40px;
 	gap: 8px;
 	align-items: center;
 	margin: 4px 0;

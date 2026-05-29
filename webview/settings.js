@@ -440,6 +440,21 @@ function renderProviders() {
 	});
 }
 
+// thinkingFormat values Pi understands (pi-ai types.d.ts). Empty = auto-detect
+// from the provider/baseUrl. "qwen-chat-template" uses chat_template_kwargs.
+const THINKING_FORMATS = ['openai', 'openrouter', 'deepseek', 'together', 'zai', 'qwen', 'qwen-chat-template', 'string-thinking'];
+
+function thinkingFormatOptionsHtml(selected) {
+	const list = THINKING_FORMATS.slice();
+	// Preserve an on-disk value we don't recognize so save can't silently drop it.
+	if (selected && list.indexOf(selected) === -1) list.push(selected);
+	let html = '<option value=""' + (!selected ? ' selected' : '') + '>(auto)</option>';
+	for (const f of list) {
+		html += '<option value="' + esc(f) + '"' + (f === selected ? ' selected' : '') + '>' + esc(f) + '</option>';
+	}
+	return html;
+}
+
 function renderModelRows(container, provName, models) {
 	container.innerHTML = '';
 	if (models.length === 0) {
@@ -449,30 +464,46 @@ function renderModelRows(container, provName, models) {
 	// Header
 	const header = document.createElement('div');
 	header.className = 'model-grid';
-	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">이름</div><div class="label" style="text-align:center">추론</div><div></div>';
+	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">이름</div><div class="label" style="text-align:center">추론</div><div class="label">thinking 형식</div><div></div>';
 	container.appendChild(header);
 	models.forEach((m, idx) => {
 		const row = document.createElement('div');
 		row.className = 'model-row-card';
 		const reasoningChecked = m.reasoning ? 'checked' : '';
+		const tf = (m.compat && m.compat.thinkingFormat) || '';
 		row.innerHTML =
 			'<div class="row-num">' + (idx + 1) + '</div>' +
 			'<input type="text" placeholder="model-id" value="' + esc(m.id || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="id" />' +
 			'<input type="text" placeholder="(optional)" value="' + esc(m.name || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="name" />' +
 			'<label class="reasoning-cell" title="모델이 reasoning/thinking 출력을 지원하면 체크"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
+			'<select title="thinking 토글 전송 형식 — 비워두면 provider 기준 자동 감지" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat">' + thinkingFormatOptionsHtml(tf) + '</select>' +
 			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="제거">✕</button>';
 		container.appendChild(row);
 	});
-	container.querySelectorAll('input[data-mf]').forEach((el) => {
+	container.querySelectorAll('[data-mf]').forEach((el) => {
 		const isCheckbox = el.type === 'checkbox';
-		el.addEventListener(isCheckbox ? 'change' : 'input', () => {
+		const evt = isCheckbox || el.tagName === 'SELECT' ? 'change' : 'input';
+		el.addEventListener(evt, () => {
 			const p = el.getAttribute('data-mp');
 			const i = parseInt(el.getAttribute('data-mi'), 10);
 			const f = el.getAttribute('data-mf');
 			if (!p || isNaN(i) || !f) return;
 			const cfg = modelsDraft.providers[p];
 			if (!cfg?.models?.[i]) return;
-			cfg.models[i][f] = isCheckbox ? el.checked : el.value;
+			const model = cfg.models[i];
+			if (f === 'thinkingFormat') {
+				// Nested under compat. Empty → remove (back to auto-detect) and
+				// drop an emptied compat object so we don't write `compat: {}`.
+				const v = el.value;
+				if (v) {
+					model.compat = Object.assign({}, model.compat, { thinkingFormat: v });
+				} else if (model.compat) {
+					delete model.compat.thinkingFormat;
+					if (Object.keys(model.compat).length === 0) delete model.compat;
+				}
+			} else {
+				model[f] = isCheckbox ? el.checked : el.value;
+			}
 			// id change can rename a model — any mode pinned to the old id
 			// loses its target and needs fallback.
 			if (f === 'id') {
