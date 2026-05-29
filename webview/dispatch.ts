@@ -142,6 +142,14 @@ function handlePiEvent(ev: any): void {
 			return;
 		}
 		case PI_EVENT.MESSAGE_END: {
+			// A turn that errored (e.g. provider 400/401, rate/usage limit) comes
+			// back as an assistant message with stopReason "error" and empty
+			// content — which would otherwise render as a blank bubble (user sees
+			// nothing). Surface the provider's reason instead.
+			const m = ev.message;
+			if (m?.role === "assistant" && (m.stopReason === "error" || m.errorMessage)) {
+				appendSystem("⚠️ " + formatTurnError(m.errorMessage));
+			}
 			// Bubble is per-message. Status stays alive across messages so the
 			// "도구 실행 중" indicator remains visible during tool gaps.
 			finalizeBubble();
@@ -359,5 +367,26 @@ async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
 	while (!pred() && Date.now() - start < timeoutMs) {
 		await delay(50);
 	}
+}
+
+/** Turn the raw assistant errorMessage into a readable line. Pi stores things
+ *  like `400 {"type":"error","error":{"message":"…"}}` — pull out the human
+ *  message + status code when present, else show the (truncated) raw string. */
+function formatTurnError(raw: unknown): string {
+	if (typeof raw !== "string" || !raw.trim()) return "응답 생성 실패 (provider error).";
+	const braceAt = raw.indexOf("{");
+	if (braceAt >= 0) {
+		try {
+			const j = JSON.parse(raw.slice(braceAt));
+			const inner = j?.error?.message ?? j?.message;
+			if (typeof inner === "string" && inner) {
+				const status = raw.slice(0, braceAt).trim();
+				return (status ? status + " — " : "") + inner;
+			}
+		} catch {
+			/* not JSON — fall through */
+		}
+	}
+	return raw.length > 500 ? raw.slice(0, 500) + "…" : raw;
 }
 
