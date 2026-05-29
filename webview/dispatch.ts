@@ -101,8 +101,13 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	},
 	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages),
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
-	[TO_WEBVIEW.EXIT]: (msg) =>
-		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`),
+	[TO_WEBVIEW.EXIT]: (msg) => {
+		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`);
+		// A crash/exit mid-turn would otherwise strand the optimistic loading
+		// spinner — end the turn so the input is usable again.
+		runtime.turnInFlight = false;
+		finalizeTurn();
+	},
 };
 
 /** Pi lifecycle / streaming event handler. */

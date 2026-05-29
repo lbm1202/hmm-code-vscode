@@ -435,9 +435,24 @@ export class ChatBackend {
 		switch (raw.kind) {
 			case FROM_WEBVIEW.PROMPT:
 				try {
-					await client.send({ type: "prompt", message: raw.text });
+					const res = await client.send({ type: "prompt", message: raw.text });
+					// Pi acks the prompt after preflight succeeds; a FAILED preflight
+					// (no model / no auth) resolves with success:false and emits NO
+					// turn lifecycle events — so the webview's optimistic loading
+					// state would spin forever. Surface the reason and end the turn.
+					if (!res.success) {
+						this.post({
+							kind: TO_WEBVIEW.STDERR,
+							text: res.error
+								? `${res.error}\n\n(설정에서 provider 인증을 추가하세요 — Hmm-code 설정 패널)`
+								: "프롬프트 실행 실패 — 사용 가능한 모델이 없습니다. 설정에서 provider 인증을 추가하세요.",
+						});
+						this.post({ kind: TO_WEBVIEW.EVENT, event: { type: "turn_end" } });
+					}
 				} catch (err) {
 					this.post({ kind: TO_WEBVIEW.STDERR, text: `prompt failed: ${(err as Error).message}` });
+					// Timeout / transport failure also strands the spinner — clear it.
+					this.post({ kind: TO_WEBVIEW.EVENT, event: { type: "turn_end" } });
 				}
 				return;
 			case FROM_WEBVIEW.ABORT:
