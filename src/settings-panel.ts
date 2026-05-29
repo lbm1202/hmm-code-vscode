@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { ChatBackend } from "./chat-backend";
 import { codexOAuthLogin } from "./oauth-codex";
+import { fetchCodexUsage } from "./codex-usage";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
@@ -431,6 +432,18 @@ export class SettingsPanel {
 				}
 				return;
 			}
+			case "codex-usage": {
+				try {
+					const usage = await fetchCodexUsage();
+					panel.webview.postMessage({ kind: "codex-usage-result", usage });
+				} catch (err) {
+					panel.webview.postMessage({
+						kind: "codex-usage-result",
+						error: (err as Error).message,
+					});
+				}
+				return;
+			}
 			case "set-language": {
 				const value = String(msg.value ?? "auto");
 				const allowed = ["auto", "en", "ko"];
@@ -749,8 +762,10 @@ export class SettingsPanel {
 					<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
 					<button id="codex-login-btn">${t("settings.auth.codexLogin")}</button>
 					<button class="ghost hidden" id="codex-cancel-btn">${t("settings.cancel")}</button>
+					<button class="ghost hidden" id="codex-usage-btn">${t("settings.usage.check")}</button>
 					<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
 				</div>
+				<div id="codex-usage" class="codex-usage hidden"></div>
 				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
 					<span style="font-size: 11px; min-width: 88px;">Claude Pro/Max</span>
 					<button id="anthropic-login-btn">${t("settings.auth.claudeLogin")}</button>

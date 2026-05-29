@@ -180,5 +180,13 @@
   "settings.compact.reset": "기본값으로 복원",
   "settings.compact.defaultHint": "(기본 {n}%)",
   "settings.dirty.compact": "자동요약 임계값",
-  "settings.oauth.authed": "✓ 인증됨"
+  "settings.oauth.authed": "✓ 인증됨",
+  "settings.usage.check": "Codex 사용량 확인",
+  "settings.usage.checking": "사용량 확인 중…",
+  "settings.usage.5h": "5시간",
+  "settings.usage.weekly": "주간",
+  "settings.usage.resetsIn": "{t} 후 초기화",
+  "settings.usage.plan": "플랜: {plan}",
+  "settings.usage.limitReached": "한도 초과",
+  "settings.usage.failed": "사용량 확인 실패: {err}"
 }

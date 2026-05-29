@@ -949,11 +949,13 @@ const OAUTH_BTN_PROVIDERS = [
 	{ statusKind: 'anthropic-status', providerId: 'anthropic' },
 ];
 function updateOAuthButtons() {
+	let codexAuthed = false;
 	for (const { statusKind, providerId } of OAUTH_BTN_PROVIDERS) {
 		const ui = oauthUis[statusKind];
 		if (!ui) continue;
 		const cred = diskAuth()[providerId];
 		const authed = !!(cred && cred.type === 'oauth');
+		if (providerId === 'openai-codex') codexAuthed = authed;
 		const inFlight = !ui.cancel.classList.contains('hidden');
 		if (authed) {
 			ui.btn.disabled = true;
@@ -962,6 +964,17 @@ function updateOAuthButtons() {
 		} else if (!inFlight) {
 			ui.btn.disabled = false;
 		}
+	}
+	// Codex usage button + one-shot auto-fetch, gated on Codex being authed.
+	const usageBtn = document.getElementById('codex-usage-btn');
+	const usageOut = document.getElementById('codex-usage');
+	if (usageBtn) usageBtn.classList.toggle('hidden', !codexAuthed);
+	if (!codexAuthed) {
+		codexUsageFetched = false;
+		if (usageOut) { usageOut.classList.add('hidden'); usageOut.textContent = ''; }
+	} else if (!codexUsageFetched) {
+		codexUsageFetched = true;
+		requestCodexUsage();
 	}
 }
 
@@ -985,6 +998,50 @@ function wireOAuth(statusKind, btnId, cancelId, statusId, loginKind, cancelKind)
 }
 wireOAuth('codex-status', 'codex-login-btn', 'codex-cancel-btn', 'codex-status', 'codex-login', 'codex-login-cancel');
 wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'anthropic-status', 'anthropic-login', 'anthropic-login-cancel');
+
+// Codex usage (ChatGPT subscription limits). Read-only; the host hits the
+// usage endpoint with the stored OAuth token. Auto-fetched once per panel
+// load when Codex is authed; the button re-fetches.
+let codexUsageFetched = false;
+function requestCodexUsage() {
+	const out = document.getElementById('codex-usage');
+	if (out) { out.classList.remove('hidden'); out.textContent = t('settings.usage.checking'); }
+	post({ kind: 'codex-usage' });
+}
+(function wireCodexUsage() {
+	const btn = document.getElementById('codex-usage-btn');
+	if (btn) btn.addEventListener('click', requestCodexUsage);
+})();
+function fmtResetIn(resetAtSec) {
+	const secs = Math.max(0, Math.round(resetAtSec - Date.now() / 1000));
+	const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
+	const parts = d ? [d + 'd', h + 'h'] : h ? [h + 'h', m + 'm'] : [m + 'm'];
+	return t('settings.usage.resetsIn', { t: parts.join(' ') });
+}
+function windowLabel(win) {
+	if (win.windowSeconds === 18000) return t('settings.usage.5h');
+	if (win.windowSeconds === 604800) return t('settings.usage.weekly');
+	return Math.round(win.windowSeconds / 3600) + 'h';
+}
+function renderCodexUsage(msg) {
+	const out = document.getElementById('codex-usage');
+	if (!out) return;
+	out.classList.remove('hidden');
+	if (msg.error) {
+		out.textContent = t('settings.usage.failed', { err: msg.error });
+		return;
+	}
+	const u = msg.usage || {};
+	const wins = [u.primary, u.secondary].filter(Boolean);
+	const rows = wins.map((w) =>
+		'<div class="codex-usage-row"><span class="cu-label">' + esc(windowLabel(w)) + '</span>' +
+		'<span class="cu-bar"><span class="cu-bar-fill" style="width:' + Math.min(100, Math.max(0, w.usedPercent)) + '%"></span></span>' +
+		'<span class="cu-pct">' + esc(String(w.usedPercent)) + '%</span>' +
+		'<span class="cu-reset">' + esc(fmtResetIn(w.resetAt)) + '</span></div>'
+	).join('');
+	const head = t('settings.usage.plan', { plan: u.planType || '?' }) + (u.limitReached ? ' · ' + t('settings.usage.limitReached') : '');
+	out.innerHTML = '<div class="codex-usage-head">' + esc(head) + '</div>' + rows;
+}
 
 // Add auth (API key)
 document.getElementById('add-auth-btn').addEventListener('click', () => {
@@ -1055,6 +1112,7 @@ window.addEventListener('message', (ev) => {
 	if (msg.kind === 'state') render(msg.state);
 	else if (msg.kind === 'error') showToast(msg.message || 'Error', true);
 	else if (msg.kind === 'saved') showToast(t('settings.toast.saved', { files: (msg.files || []).join(', ') }));
+	else if (msg.kind === 'codex-usage-result') renderCodexUsage(msg);
 	else if (msg.kind === 'codex-status' || msg.kind === 'anthropic-status') {
 		const ui = oauthUis[msg.kind];
 		if (!ui) return;

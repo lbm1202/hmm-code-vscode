@@ -180,5 +180,13 @@
   "settings.compact.reset": "Reset to default",
   "settings.compact.defaultHint": "(default {n}%)",
   "settings.dirty.compact": "auto-summarize threshold",
-  "settings.oauth.authed": "✓ Authenticated"
+  "settings.oauth.authed": "✓ Authenticated",
+  "settings.usage.check": "Check Codex usage",
+  "settings.usage.checking": "Checking usage…",
+  "settings.usage.5h": "5-hour",
+  "settings.usage.weekly": "Weekly",
+  "settings.usage.resetsIn": "resets in {t}",
+  "settings.usage.plan": "Plan: {plan}",
+  "settings.usage.limitReached": "limit reached",
+  "settings.usage.failed": "Usage check failed: {err}"
 }

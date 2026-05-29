@@ -13,6 +13,8 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 - **Per-mode system-prompt editor** in the Modes tab. Defaults are read from the bundled Pi `config.ts`; saving the unchanged default writes no override.
 - **`hmm-code.autoApproveDefault`** — start new/resumed sessions with permission auto-approve ON.
 - **Configurable context auto-summarization threshold** (General tab) — writes `modes.json:autoCompactThreshold`; default is the bundled Pi `AUTO_COMPACT_THRESHOLD`.
+- **Codex usage readout** (Authentication tab) — shows the 5-hour and weekly ChatGPT-subscription limit usage (% used + reset time + plan), fetched read-only with the stored Codex OAuth token. Auto-loads when Codex is authenticated; refreshable.
+- OAuth login buttons (Codex / Claude) disable and show "✓ Authenticated" once that provider has an OAuth credential.
 - `LICENSE` (MIT), `CHANGELOG.md`, `RELEASING.md`.
 
 ### Changed
