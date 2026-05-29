@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { PiClient } from "./pi-client";
+import type { PiLaunchConfig } from "./pi-launcher";
 import {
 	FROM_WEBVIEW,
 	STATUS_KEYS,
@@ -153,6 +154,22 @@ export class ChatBackend {
 		ChatBackend._cacheObservers.add(fn);
 		return () => ChatBackend._cacheObservers.delete(fn);
 	}
+
+	/** Spawn config for Pi — set once at extension activation. Every
+	 *  ChatBackend instance (and the standalone settings fetch) spawns
+	 *  through this so the bundled-vs-system Pi decision is centralized. */
+	private static _launchConfig: PiLaunchConfig | undefined;
+	static setLaunchConfig(cfg: PiLaunchConfig): void {
+		ChatBackend._launchConfig = cfg;
+	}
+	static getLaunchConfig(): PiLaunchConfig {
+		if (!ChatBackend._launchConfig) {
+			throw new Error(
+				"ChatBackend.setLaunchConfig() not called — extension activation order bug.",
+			);
+		}
+		return ChatBackend._launchConfig;
+	}
 	private static setCache(models: ModelEntry[]): void {
 		ChatBackend._cachedModels = models;
 		for (const fn of ChatBackend._cacheObservers) {
@@ -187,7 +204,8 @@ export class ChatBackend {
 			vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME ?? undefined;
 		const client = new PiClient();
 		try {
-			client.start({ cwd });
+			const launch = ChatBackend.getLaunchConfig();
+			client.start({ piBin: launch.cmd, args: launch.args, env: launch.env, cwd });
 			const res = await client.send({ type: "get_available_models" }, 30_000);
 			if (!res.success) return;
 			const data = res.data as { models?: any[] };
@@ -305,7 +323,8 @@ export class ChatBackend {
 			}),
 		);
 		try {
-			c.start({ cwd });
+			const launch = ChatBackend.getLaunchConfig();
+			c.start({ piBin: launch.cmd, args: launch.args, env: launch.env, cwd });
 			this.client = c;
 			this.post({ kind: TO_WEBVIEW.READY });
 		} catch (err) {

@@ -81,6 +81,16 @@
           "name": "Chat"
         }
       ]
+    },
+    "configuration": {
+      "title": "Hmm-code",
+      "properties": {
+        "hmm-code.piBinary": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to an external `pi` binary. Leave blank to use the Pi runtime bundled with this extension (recommended). Set to a system path like `/opt/homebrew/bin/pi` when you want to drive the chat with a separately-installed Pi (e.g. to test a newer version)."
+        }
+      }
     }
   },
   "scripts": {
@@ -90,6 +100,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.77.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.24.0",
