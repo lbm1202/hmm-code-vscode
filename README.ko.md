@@ -14,7 +14,7 @@ plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 
 
 [English](README.md) · **한국어**
 
-[설치](#설치) · [기능](#기능) · [문서](#문서) · [Pi 확장](https://github.com/lbm1202/hmm-code-pi)
+[설치](#설치) · [무엇을-하는가](#무엇을-하는가) · [문서](#문서) · [Pi 확장](https://github.com/lbm1202/hmm-code-pi)
 
 </div>
 
@@ -58,26 +58,20 @@ code --install-extension hmm-code-0.1.0.vsix --force
 
 ---
 
-## 기능
+## 무엇을 하는가
 
-| | |
-|---|---|
-| 📦 **자체 완결형 `.vsix`** | Pi 런타임 + hmm-code-pi 확장을 함께 동봉. 한 번 설치하면 별도의 Pi 설정 불필요. |
-| 🪟 **사이드바 + 에디터 패널** | 사이드바 뷰 1개 + 에디터 탭 N개. 각 탭이 독립된 Pi 프로세스를 가짐. |
-| 🔁 **재로드 복원** | `WebviewPanelSerializer` + `lastSessionFile` 저장 — VS Code 재로드 시 마지막 세션으로 복귀. |
-| 🎨 **모드 피커** | `code`(흰색) · `plan`(파랑) · `debug`(보라) · `ask`(주황). Pi의 `setStatus`를 반영. |
-| 🤖 **모델 피커 + 별칭** | `modes.json:modelAliases` 의 별칭. 모드별 필터. |
-| 🃏 **인터랙티브 도구 카드** | `ask_user`, `todo_write`, `finalize_plan`, `request_mode_switch` 전용 UI. |
-| 📝 **edit / write diff** | LCS 기반 통합 diff + [Shiki](https://shiki.style/) 문법 강조 (25개 이상 언어). |
-| 🖱️ **파일 경로 Ctrl/Cmd-클릭** | 도구 호출의 파일 경로를 에디터에서 열기. |
-| 🔓 **자동 승인 토글** | 권한 `ask` 프롬프트를 세션 단위로 우회 (인라인 버튼). |
-| 🛡️ **권한 확인 모달** | Pi의 `ctx.ui.confirm`을 webview 모달로 — Pi 권한 시스템의 UI. |
-| ⚙️ **설정 패널** | 탭형 에디터 (기본 / 인증 / 모델 / 모드 / 프롬프트) — 언어, 자동 승인 기본값, 다이나믹 압축 + 임계값, 요약 모델, 편집 가능한 프롬프트(모드 + 자동제목 + 요약 포커스), API 키, OAuth 로그인, 커스텀 공급자. |
-| 🗜️ **다이나믹 압축** | 에이전트의 턴 도중에 끊지 않고 턴 경계에서 컨텍스트를 자동 요약 (토글 + 50–85% 임계값). 채팅 푸터에 수동 **Compact** 버튼. |
-| 🌐 **현지화 UI** | 영어(기본) + 한국어, `l10n/*.json` 기반. `hmm-code.language` = `auto`/`en`/`ko` (`auto`는 VS Code 표시 언어를 따름). |
-| 🗂️ **세션 피커** | 부모-자식 트리 + 이름변경 + 연쇄 삭제. 활성 세션 삭제 시 대체 세션 자동 생성. |
-| ✨ **자동 제목 생성** | 첫 메시지 쌍 → GPT-mini → 세션 제목 (동봉된 Pi 확장 경유). |
-| 🧼 **마크다운 살균** | 모든 렌더에 DOMPurify — `<script>`, `on*` 핸들러, `javascript:` URL, `<iframe>` 제거. |
+위젯이 아니라 워크플로우가 핵심인, 모드 기반의 규율 있는 코딩 에이전트:
+
+- **4개 명시적 모드** — `plan` · `code` · `debug` · `ask`. 각 모드가 독립된 모델 · thinking 레벨 · 도구 · 시스템 프롬프트를 가짐. 피커로 직접 전환하거나, 에이전트가 제안한 전환을 사용자가 승인.
+- **설계상 plan 우선** — 모든 코드 변경은 `plan → code`를 거침. `plan`/`debug`/`ask`는 edit·write 불가. 오직 `code`만 파일을 건드리며, 그것도 plan 핸드오프(`finalize_plan`) 이후에만.
+- **권한 게이팅** — 계층형 권한 시스템이 도구 호출마다 `allow` / `ask` / `deny`를 결정(모드 기본값 + `.piignore`)하고 확인 프롬프트로 표시. 빠르게 진행하고 싶을 땐 세션 단위 **자동 승인**.
+- **다이나믹 압축** — 에이전트의 턴 도중에 끊지 않고 턴 경계에서 컨텍스트를 자동 요약(토글 + 50–85% 임계값, 수동 **Compact** 버튼).
+
+모드 시스템, plan 핸드오프, 권한 레이어는 동봉된 [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) 확장에서 옵니다 — 이 repo는 그것의 네이티브 VS Code UI입니다.
+
+## 에디터에서
+
+인터랙티브 도구 카드 · 문법 강조 edit/write diff([Shiki](https://shiki.style/)) · 모드 + 모델 피커 · 권한 모달 · 부모-자식 세션 히스토리 · 탭형 설정 패널(인증 / 모델 / 모드 / 프롬프트) · 영어 + 한국어 UI · 자체 완결형 `.vsix`(별도 Pi 설치 불필요).
 
 > **Claude(Anthropic) 구독 인증:** 이런 서드파티 에이전트 도구에서 Claude Pro/Max 플랜을 쓰는 것은 **2026-06-15** 부터 Anthropic이 공식 지원합니다 — [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan) 참고. 그 전에는 Anthropic **API 키**(또는 다른 공급자)를 권장합니다. ChatGPT Plus/Pro(Codex) 구독 인증은 설정 패널의 OAuth 버튼으로 가능합니다.
 

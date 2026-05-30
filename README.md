@@ -14,7 +14,7 @@ plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection 
 
 **English** · [한국어](README.ko.md)
 
-[Install](#install) · [Features](#features) · [Docs](#docs) · [Pi extension](https://github.com/lbm1202/hmm-code-pi)
+[Install](#install) · [What it does](#what-it-does) · [Docs](#docs) · [Pi extension](https://github.com/lbm1202/hmm-code-pi)
 
 </div>
 
@@ -58,26 +58,20 @@ If the sibling isn't there, the build auto-clones `hmm-code-pi` into `node_modul
 
 ---
 
-## Features
+## What it does
 
-| | |
-|---|---|
-| 📦 **Self-contained `.vsix`** | Pi runtime + hmm-code-pi extension shipped together. One install, no separate Pi setup. |
-| 🪟 **Sidebar + editor panels** | One sidebar view + N editor tabs. Each tab owns an independent Pi process. |
-| 🔁 **Reload-survivable** | `WebviewPanelSerializer` + persisted `lastSessionFile` — VS Code reload returns to the last session. |
-| 🎨 **Mode picker** | `code` (white) · `plan` (blue) · `debug` (purple) · `ask` (orange). Mirrors Pi's `setStatus`. |
-| 🤖 **Model picker + aliases** | Aliases from `modes.json:modelAliases`. Per-mode filter. |
-| 🃏 **Interactive tool cards** | Custom UI for `ask_user`, `todo_write`, `finalize_plan`, `request_mode_switch`. |
-| 📝 **Edit / write diffs** | LCS-based unified diff with [Shiki](https://shiki.style/) syntax highlighting across 25+ languages. |
-| 🖱️ **Ctrl/Cmd-click on file paths** | Tool-call paths open in the editor area. |
-| 🔓 **Auto-approve toggle** | Session-scoped bypass for permission `ask` prompts (inline button). |
-| 🛡️ **Permission confirm modal** | Pi's `ctx.ui.confirm` surfaced as a webview modal — UI for the Pi permission system. |
-| ⚙️ **Settings panel** | Tabbed editor (General / Authentication / Models / Modes / Prompts) — language, auto-approve default, dynamic compaction + threshold, summary model, editable prompts (modes + auto-title + compaction focus), API keys, OAuth logins, custom providers. |
-| 🗜️ **Dynamic compaction** | Context auto-summarizes at the turn boundary instead of cutting the agent mid-turn (toggle + 50–85% threshold). Manual **Compact** button in the chat footer. |
-| 🌐 **Localized UI** | English (default) + Korean, via `l10n/*.json`. `hmm-code.language` = `auto`/`en`/`ko` (`auto` follows VS Code's display language). |
-| 🗂️ **Session picker** | Parent-child tree with rename + cascade delete. Active-session delete auto-spawns a replacement. |
-| ✨ **Auto-generated titles** | First message pair → GPT-mini → session title (via the bundled Pi extension). |
-| 🧼 **Sanitized markdown** | DOMPurify on every render — strips `<script>`, `on*` handlers, `javascript:` URLs, `<iframe>`. |
+A disciplined, mode-driven coding agent — the workflow, not the widgets:
+
+- **Four explicit modes** — `plan` · `code` · `debug` · `ask`, each with its own model, thinking level, tools, and system prompt. Switch from the picker, or let the agent propose a switch you confirm.
+- **Plan-first by design** — every code change goes `plan → code`. `plan`/`debug`/`ask` can't edit or write; only `code` touches your files, after a plan handoff (`finalize_plan`).
+- **Permission-gated** — a layered permission system decides `allow` / `ask` / `deny` per tool call (mode defaults + `.piignore`), surfaced as confirm prompts. Session-scoped **auto-approve** when you want to move fast.
+- **Dynamic compaction** — context auto-summarizes at the turn boundary instead of cutting the agent mid-turn (toggle + 50–85% threshold; manual **Compact** button).
+
+The mode system, plan handoff, and permission layer come from the bundled [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) extension — this repo is the native VS Code UI for it.
+
+## In the editor
+
+Interactive tool cards · syntax-highlighted edit/write diffs ([Shiki](https://shiki.style/)) · mode + model picker · permission modals · parent-child session history · tabbed settings panel (auth / models / modes / prompts) · English + Korean UI · self-contained `.vsix` (no separate Pi install).
 
 > **Claude (Anthropic) subscription auth:** using a Claude Pro/Max plan with third-party agent tools like this one is officially supported by Anthropic from **2026-06-15** onward — see [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan). Before that date, prefer an Anthropic **API key** (or another provider). ChatGPT Plus/Pro (Codex) subscription auth is available via the OAuth button in the settings panel.
 
