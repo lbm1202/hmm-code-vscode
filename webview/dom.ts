@@ -40,6 +40,7 @@ const APP_HTML = `
 		</div>
 	</div>
 	<div class="prompt-area">
+		<div class="slash-menu hidden" id="slash-menu"></div>
 		<textarea id="prompt-input" rows="3" placeholder="${t("chat.promptPlaceholder")}" autofocus></textarea>
 		<div class="prompt-footer">
 			<div class="picker-row">
@@ -65,6 +66,7 @@ export interface DomRefs {
 	empty: HTMLElement;
 	recentList: HTMLElement;
 	prompt: HTMLTextAreaElement;
+	slashMenu: HTMLElement;
 	send: HTMLElement;
 	modalRoot: HTMLElement;
 	popoverRoot: HTMLElement;
@@ -94,6 +96,7 @@ function mountDom(root: HTMLElement): DomRefs {
 		empty: document.getElementById("empty-state")!,
 		recentList: document.getElementById("recent-list")!,
 		prompt: document.getElementById("prompt-input") as HTMLTextAreaElement,
+		slashMenu: document.getElementById("slash-menu")!,
 		send: document.getElementById("send-btn")!,
 		modalRoot: document.getElementById("modal-root")!,
 		popoverRoot: document.getElementById("popover-root")!,

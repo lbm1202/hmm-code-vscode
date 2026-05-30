@@ -66,6 +66,7 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		// for the active model if state.model is missing those fields.
 		post({ kind: FROM_WEBVIEW.REQUEST_MODELS });
 		post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
+		post({ kind: FROM_WEBVIEW.REQUEST_COMMANDS });
 		post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
 		// Auto-resume: if VS Code restored this webview after a reload, the
 		// previous session file is in persisted state. Switch back to it so
@@ -111,6 +112,9 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		}
 	},
 	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages),
+	[TO_WEBVIEW.COMMANDS]: (msg) => {
+		runtime.slashCommands = msg.commands ?? [];
+	},
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
 	[TO_WEBVIEW.EXIT]: (msg) => {
 		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`);
@@ -172,6 +176,9 @@ function handlePiEvent(ev: any): void {
 			post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			post({ kind: FROM_WEBVIEW.REQUEST_MESSAGES });
+			// Backfill the slash-command list if the READY-time fetch hasn't
+			// landed yet (cold-session race) so the prompt autocomplete works.
+			if (!runtime.slashCommands.length) post({ kind: FROM_WEBVIEW.REQUEST_COMMANDS });
 			// hmm-code.autoApproveDefault: the user opted into auto-approve as a
 			// default, so (re)assert it ON whenever a session starts or loads
 			// (new session + boot-resume). SESSION_SWITCH is excluded to avoid

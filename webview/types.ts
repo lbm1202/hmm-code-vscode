@@ -4,6 +4,7 @@
 
 import type {
 	FROM_WEBVIEW,
+	SlashCommand,
 	TO_WEBVIEW,
 } from "./protocol";
 
@@ -41,6 +42,7 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.SESSIONS; sessions: SessionEntry[] }
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: any[] }
+	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -52,6 +54,7 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MODELS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MESSAGES }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_CONTEXT }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_COMMANDS }
 	| { kind: typeof FROM_WEBVIEW.LIST_SESSIONS }
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }

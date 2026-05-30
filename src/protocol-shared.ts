@@ -9,6 +9,16 @@
 // handleFromWebview switch. Constants give us autocomplete + grep-ability and,
 // now, a compile-time guarantee that both sides agree on the strings.
 
+/** A registered slash command surfaced to the prompt autocomplete. Mirrors the
+ *  shape Pi's `get_commands` RPC returns. `source: "extension"` commands run a
+ *  handler with no LLM turn (clean-dispatch, no chat echo); `skill`/`prompt`
+ *  expand into a message to the model. */
+export interface SlashCommand {
+	name: string;
+	description: string;
+	source: "extension" | "skill" | "prompt";
+}
+
 /** kind values on ToWebview (host → webview). */
 export const TO_WEBVIEW = {
 	READY: "ready",
@@ -19,6 +29,9 @@ export const TO_WEBVIEW = {
 	SESSIONS: "sessions",
 	MODELS: "models",
 	MESSAGES: "messages",
+	/** Registered slash commands (from Pi's get_commands RPC) for the prompt
+	 *  autocomplete + clean-dispatch path. */
+	COMMANDS: "commands",
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
@@ -33,6 +46,8 @@ export const FROM_WEBVIEW = {
 	REQUEST_MODELS: "request-models",
 	REQUEST_MESSAGES: "request-messages",
 	REQUEST_CONTEXT: "request-context",
+	/** Ask the host for the registered slash command list (get_commands RPC). */
+	REQUEST_COMMANDS: "request-commands",
 	LIST_SESSIONS: "list-sessions",
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",

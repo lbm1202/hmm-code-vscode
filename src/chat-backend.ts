@@ -10,6 +10,7 @@ import {
 	STATUS_KEYS,
 	SESSION_RESET_COMMANDS,
 	TO_WEBVIEW,
+	type SlashCommand,
 } from "./protocol";
 import {
 	collectCascade,
@@ -79,6 +80,7 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.SESSIONS; sessions: SessionEntry[] }
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: unknown[] }
+	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -90,6 +92,7 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MODELS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MESSAGES }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_CONTEXT }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_COMMANDS }
 	| { kind: typeof FROM_WEBVIEW.LIST_SESSIONS }
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
@@ -474,6 +477,18 @@ export class ChatBackend {
 					}
 				} catch (err) {
 					this.post({ kind: TO_WEBVIEW.STDERR, text: `get_state failed: ${(err as Error).message}` });
+				}
+				return;
+			case FROM_WEBVIEW.REQUEST_COMMANDS:
+				try {
+					const res = await client.send({ type: "get_commands" });
+					if (res.success) {
+						const data = res.data as { commands?: SlashCommand[] };
+						this.post({ kind: TO_WEBVIEW.COMMANDS, commands: data.commands ?? [] });
+					}
+				} catch (err) {
+					// Non-fatal — the prompt just won't have autocomplete this session.
+					console.error("[hmm-code:chat-backend] get_commands failed:", err);
 				}
 				return;
 			case FROM_WEBVIEW.LIST_SESSIONS:

@@ -7,8 +7,14 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- **Slash commands in the chat prompt.** Typing a registered command (`/mode`, `/reset`, `/compact`, …) now dispatches it cleanly — no stray user-message bubble and no stuck loading spinner — instead of being echoed and stranding the turn. A `/`-triggered autocomplete menu lists the available commands (fetched live from Pi via `get_commands`); click a suggestion to fill it in. Unknown slashes still go to the model as a normal message. (Keyboard navigation of the menu is not wired yet — mouse selection + Escape/click-outside to dismiss.)
+  - `/plan-execute` is hidden from the menu: it's the TUI engine behind finalize_plan's new-session handoff, not a chat command (in VS Code the finalize_plan dialog is the entry point). It still clean-dispatches if typed in full.
+  - The clean-dispatch path is race-proof: if the command list hasn't loaded yet on a cold session, a `/`-prefixed entry is still dispatched echo-free so it can't strand the spinner; the list is also re-fetched on session start when missing.
+
 ### Changed
 - Internal: shared model alias + allowlist helpers extracted to `src/model-utils.ts`, used by both the chat backend and the settings webview so the chat picker and the settings dropdowns apply the same allowlist predicate. Added a `node --test` suite (`npm test`) and excluded `test/` from the packaged `.vsix`.
+- CI: `.github/workflows/ci.yml` runs `tsc --noEmit` + `npm test` on every push and PR.
 
 ## [0.1.1-rc2] — 2026-05-30
 

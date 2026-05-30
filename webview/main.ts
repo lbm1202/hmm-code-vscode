@@ -7,6 +7,7 @@ import { updateModeColor, wirePickers } from "./pickers";
 import { wirePrompt } from "./prompt";
 import { FROM_WEBVIEW } from "./protocol";
 import { showSessionPicker } from "./session-picker";
+import { wireSlashMenu } from "./slash";
 import { post, ui } from "./state";
 
 const app = document.getElementById("app");
@@ -15,6 +16,7 @@ if (!app) throw new Error("#app not found");
 initDom(app);
 wirePickers();
 wirePrompt();
+wireSlashMenu();
 wireDispatch();
 updateModeColor();
 
