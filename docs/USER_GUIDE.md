@@ -141,12 +141,12 @@ Click the 🕘 button at the top → session tree modal.
 
 Footer ⚙ button or `Cmd+Shift+P` → "Hmm-code: Open Settings". Full reference: [SETTINGS.md](SETTINGS.md).
 
-Summary:
-- **Modes**: edit each mode's model / thinking.
-- **Other model settings**: auto-title model (background job).
-- **Model filter per provider**: allowlist that controls which models appear in the picker.
-- **Provider auth**: API keys, Codex OAuth login.
-- **Custom providers**: register self-hosted endpoints (vLLM / Ollama).
+Five tabs:
+- **General**: UI language, auto-title model, dynamic-compaction toggle + auto-summarization threshold (50–85%), and the summary (compaction) model.
+- **Authentication**: API keys, Codex / Claude OAuth logins, Codex usage readout.
+- **Models**: custom providers (self-hosted vLLM / Ollama) + the per-provider model filter (allowlist).
+- **Modes**: each mode's model / thinking level.
+- **Prompts**: the four mode system prompts, the auto-title prompt, and compaction focus.
 
 Saving triggers an auto-reload — every open chat tab picks up the new config.
 

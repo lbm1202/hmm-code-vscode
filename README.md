@@ -12,7 +12,9 @@ plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection 
 [![Release](https://img.shields.io/github/v/release/lbm1202/hmm-code-vscode?label=release)](https://github.com/lbm1202/hmm-code-vscode/releases)
 [![Pi-coding-agent](https://img.shields.io/badge/Pi-0.77.x-purple.svg)](https://github.com/badlogic/pi-mono)
 
-[Install](#install) · [Features](#features) · [Docs](#docs) · [Companion Pi extension](https://github.com/lbm1202/hmm-code-pi)
+**English** · [한국어](README.ko.md)
+
+[Install](#install) · [Features](#features) · [Docs](#docs) · [Pi extension](https://github.com/lbm1202/hmm-code-pi)
 
 </div>
 
@@ -70,7 +72,8 @@ If the sibling isn't there, the build auto-clones `hmm-code-pi` into `node_modul
 | 🖱️ **Ctrl/Cmd-click on file paths** | Tool-call paths open in the editor area. |
 | 🔓 **Auto-approve toggle** | Session-scoped bypass for permission `ask` prompts (inline button). |
 | 🛡️ **Permission confirm modal** | Pi's `ctx.ui.confirm` surfaced as a webview modal — UI for the Pi permission system. |
-| ⚙️ **Settings panel** | Tabbed editor (General / Authentication / Models / Modes) — language, auto-approve default, auto-compact threshold, per-mode prompts, API keys, OAuth logins, custom providers. |
+| ⚙️ **Settings panel** | Tabbed editor (General / Authentication / Models / Modes / Prompts) — language, auto-approve default, dynamic compaction + threshold, summary model, editable prompts (modes + auto-title + compaction focus), API keys, OAuth logins, custom providers. |
+| 🗜️ **Dynamic compaction** | Context auto-summarizes at the turn boundary instead of cutting the agent mid-turn (toggle + 50–85% threshold). Manual **Compact** button in the chat footer. |
 | 🌐 **Localized UI** | English (default) + Korean, via `l10n/*.json`. `hmm-code.language` = `auto`/`en`/`ko` (`auto` follows VS Code's display language). |
 | 🗂️ **Session picker** | Parent-child tree with rename + cascade delete. Active-session delete auto-spawns a replacement. |
 | ✨ **Auto-generated titles** | First message pair → GPT-mini → session title (via the bundled Pi extension). |
@@ -141,7 +144,6 @@ Inside the prompt textarea, `Tab` / `Shift+Tab` cycle modes (the webview handles
 |---|---|
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | UI walkthrough of every feature |
 | [docs/SETTINGS.md](docs/SETTINGS.md) | Settings panel reference |
-| [docs/ANALYSIS.md](docs/ANALYSIS.md) | File-by-file architecture deep-dive |
 | [RELEASING.md](RELEASING.md) | How to cut a release (maintainers) |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 

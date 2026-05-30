@@ -8,9 +8,13 @@ Saving triggers an auto-reload — auth changes respawn every Pi process (`resta
 
 ---
 
-## 1. Modes
+The panel has **five tabs**: General · Authentication · Models · Modes · Prompts. The sections below group the controls by tab.
 
-Edit the model + thinking level for each of the four modes (plan / code / debug / ask).
+---
+
+## Modes tab
+
+Edit the model + thinking level for each of the four modes (plan / code / debug / ask). The per-mode **system prompts** live in the **Prompts** tab.
 
 | Mode  | Provider ▾ | Model ▾ | Thinking ▾ |
 |-------|-----------|---------|------------|
@@ -35,7 +39,10 @@ Edit the model + thinking level for each of the four modes (plan / code / debug 
 
 ---
 
-## 2. Other model settings
+## General tab
+
+### UI language
+`hmm-code.language` (`auto` / `en` / `ko`) — `auto` follows VS Code's display language. Changing it prompts a window reload. Also exposed as a native VS Code setting.
 
 ### Auto-title model
 The model used to generate session titles in the background (`auto-title.ts`).
@@ -43,11 +50,25 @@ The model used to generate session titles in the background (`auto-title.ts`).
 - **Empty**: falls back through the GPT-mini candidate list → code mode's model → the currently active model.
 - **Set**: that model is used unconditionally (saved as `modes.json:autoTitle.{provider,id}`).
 
-> "Which model does Pi use for context compaction?" — always **the currently active model**. That's Pi's internal behavior and isn't configurable here.
+### Context auto-summarization
+When usage reaches the **threshold** (slider, 50–85%; default 75%, stored as `modes.json:autoCompactThreshold`), the conversation is summarized (compacted) to free room.
+
+- **Dynamic compaction** (toggle, on by default — `modes.json:dynamicCompaction`): compaction waits for the agent's multi-step turn to finish (the turn boundary) instead of cutting it mid-loop; it only force-compacts mid-turn if usage climbs 15% past the threshold. Off = legacy behavior (compact the moment the threshold is crossed, even mid-turn).
+- **Summary (compaction) model** (`modes.json:compactModel`): the model that writes the compaction summary. **Empty = the active session model.** Set a dedicated (cheaper/faster) model to offload summarization off your chat model.
 
 ---
 
-## 3. Per-provider model filter
+## Prompts tab
+
+Every editable prompt in one place. Empty = built-in default for each.
+
+- **Mode system prompts** — the per-mode `systemPromptAddendum` (plan / code / debug / ask), appended to the base system prompt. Saving text identical to the default writes no override. (`modes.json:modes.<mode>.systemPromptAddendum`)
+- **Auto-title prompt** — replaces the built-in title prompt; the language line (from `hmm-code.language`) is always appended regardless. (`modes.json:autoTitlePrompt`)
+- **Compaction focus** — extra instructions appended to Pi's summary prompt as `Additional focus: …` (Pi's base summary prompt can't be replaced). Empty = none. (`modes.json:compactInstructions`)
+
+---
+
+## Models tab — per-provider model filter
 
 Allowlists which models appear in the chat model picker.
 
@@ -81,7 +102,7 @@ Storage: `modelAllowlist` field in `~/.pi/agent/modes.json`. Missing key = no fi
 
 ---
 
-## 4. Provider auth (`auth.json`)
+## Authentication tab — provider auth (`auth.json`)
 
 UI for Pi's `AuthStorage` (`~/.pi/agent/auth.json`).
 
@@ -90,10 +111,13 @@ UI for Pi's `AuthStorage` (`~/.pi/agent/auth.json`).
 - Click "Add" — staged immediately in the in-memory draft, persisted on Save.
 - Inline — no modal pops up.
 
-### OAuth login (openai-codex)
-- "Codex login" button → starts the browser OAuth flow (callback on `127.0.0.1:1455`).
-- On success, the status panel updates and every Pi process restarts (refreshes the in-memory `auth.json` cache).
+### OAuth login (Codex / Claude)
+- "Codex login" / "Claude login" buttons → start the browser OAuth flow.
+- On success every Pi process restarts (refreshes the in-memory `auth.json` cache); the login button is hidden and a green **✓ Authenticated** badge shows. Removing the credential restores the button.
 - Cancelable mid-flow (abort button).
+
+### Codex usage
+When Codex is authenticated, a read-only readout shows the 5-hour and weekly ChatGPT-subscription limit usage (% used + reset time + plan). Auto-loads on this tab; refreshable. Fetched with the stored OAuth token — nothing is written.
 
 ### Removal
 - The ✕ button on each row.
@@ -104,7 +128,7 @@ UI for Pi's `AuthStorage` (`~/.pi/agent/auth.json`).
 
 ---
 
-## 5. Custom providers (`models.json`)
+## Models tab — custom providers (`models.json`)
 
 Register vLLM / Ollama / self-hosted OpenAI-compatible endpoints.
 
@@ -140,7 +164,7 @@ Storage: `~/.pi/agent/models.json`.
 
 ---
 
-## 6. Save behavior in detail
+## Save behavior in detail
 
 The Save button (fixed bottom-right bar) appears only when something is dirty.
 
@@ -150,7 +174,7 @@ Save (3 modes · auto-title model · model filter)  [Save]
 
 Internal flow:
 1. `models.json` first (aliases derived from custom models feed into `modes.json:modelAliases`).
-2. Collect those aliases and write `modes.json` — mode configs + autoTitle + modelAllowlist all at once.
+2. Collect those aliases and write `modes.json` — mode configs (incl. system prompts) + autoTitle + autoTitlePrompt + modelAllowlist + autoCompactThreshold + dynamicCompaction + compactModel + compactInstructions, all at once.
 3. Apply the `auth.json` delta (adds + removes).
 4. Route:
    - **Auth changed** → `restartChat` (`ChatBackend.restartAll`) — respawn every Pi process.
@@ -161,7 +185,7 @@ A toast confirms the save and lists the touched files (`modes.json`, `models.jso
 
 ---
 
-## 7. Cache / sync
+## Cache / sync
 
 - **Model cache**: `ChatBackend._cachedModels` (static field) — shared across every chat tab + settings panel; populated whenever any backend fetches.
 - **Settings observer**: when the cache updates, the settings panel auto-refreshes its dropdowns. The settings panel can open before any chat has run.
@@ -169,7 +193,7 @@ A toast confirms the save and lists the touched files (`modes.json`, `models.jso
 
 ---
 
-## 8. Troubleshooting
+## Troubleshooting
 
 ### Save didn't take effect in chat
 - Modes/models-only changes go through `/reload-runtime` — Pi stays alive and re-reads config files.

@@ -7,6 +7,10 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.1-rc2] — 2026-05-30
+
+Pre-release (release candidate). Stable remains 0.1.0.
+
 ### Fixed
 - Settings panel OAuth state now stays correct: the "✓ Authenticated" badge no longer disappears a few seconds after a successful login (a stale success-message timeout was wiping it), the login button is hidden while authenticated (disconnect from the auth table), and removing a Codex/Claude credential clears the badge and restores the button immediately instead of only after save + reload.
 
@@ -18,6 +22,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 ### Changed
 - Auto-compact watchdog raised to 10 min (bundled Pi) so a slow-but-working compaction on a reasoning model isn't prematurely re-armed.
 - Session titles are generated in the `hmm-code.language` locale (passed to Pi as `HMM_CODE_LANG`), and auto-title no longer fires on a turn that's also compacting (avoids a duplicate request to the session model).
+- Internal: the settings-panel webview script was converted from plain JS to TypeScript and split into modules (`settings-state` / `settings-disk` / `settings-pickers` / `settings-codex` + core); the host↔webview protocol constants are single-sourced (`src/protocol-shared.ts`); and the whole extension now type-checks with zero errors (the old `webview/tools.ts` implicit-any filter is gone).
 
 ## [0.1.1-rc1] — 2026-05-29
 
@@ -73,5 +78,7 @@ First public release.
 - Auto-resume race: switch_session now guarded so the in-flight target session can't be overwritten by an interim STATE for Pi's temp session.
 - Plan handoff race: mode-switch wait is now condition-based (`waitFor(ui.mode === target, 2000)`) instead of a fixed 200ms.
 
-[Unreleased]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1-rc2...HEAD
+[0.1.1-rc2]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1-rc1...v0.1.1-rc2
+[0.1.1-rc1]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.0...v0.1.1-rc1
 [0.1.0]: https://github.com/lbm1202/hmm-code-vscode/releases/tag/v0.1.0
