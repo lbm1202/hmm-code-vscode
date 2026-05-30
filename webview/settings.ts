@@ -4,105 +4,14 @@ import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS
 import {
 	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
 } from "./settings-disk";
+import { requestCodexUsage, renderCodexUsage } from "./settings-codex";
+import { buildProviderIndex, providerOptionsHtml, modelOptionsHtml, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
 
 
 // Build a {provider: [id, ...]} index from live availableModels (cached from
 // Pi's get_available_models). Used to constrain the mode dropdowns to real
 // choices. Fallback: if Pi hasn't responded yet, both selects show only the
 // current draft value so the user isn't blocked.
-function buildProviderIndex(applyAllowlist = true) {
-	// Map<provider, Array<{id, alias?}>>. Alias comes from modes.json:modelAliases
-	// and is attached to availableModels by the host. Dropdowns display alias
-	// when present so the user sees "Hmm" instead of "Qwen3.6-35B-A3B-MLX-VL-oQ5".
-	//
-	// applyAllowlist=true (default): respect the user's allowlist filter so
-	// the mode/autoTitle dropdowns mirror what the chat picker shows. A mode
-	// that's already configured to a now-hidden model keeps its selection —
-	// modelOptionsHtml re-injects the currentValue if it's missing.
-	// applyAllowlist=false: used by the allowlist UI itself, which must list
-	// every model so the user can toggle them.
-	const map = new Map();
-	const list = (S.diskState && S.diskState.availableModels) || [];
-	for (const m of list) {
-		if (!m.provider || !m.id) continue;
-		if (!map.has(m.provider)) map.set(m.provider, []);
-		map.get(m.provider).push({ id: m.id, alias: m.alias });
-	}
-	if (applyAllowlist) {
-		for (const [prov, entries] of map.entries()) {
-			const allowed = Array.isArray(S.allowlistDraft[prov])
-				? new Set(S.allowlistDraft[prov])
-				: null;
-			if (allowed) map.set(prov, entries.filter((e: any) => allowed.has(e.id)));
-		}
-	}
-	for (const arr of map.values())
-		arr.sort((a: any, b: any) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
-	return map;
-}
-
-function providerOptionsHtml(currentValue: any, providerIndex: any) {
-	const opts = [...providerIndex.keys()].sort();
-	// Ensure the current draft value is selectable even if Pi doesn't know
-	// about it yet (e.g. user typed a provider name that hasn't been
-	// registered or the get_available_models response hasn't arrived).
-	if (currentValue && !providerIndex.has(currentValue)) opts.unshift(currentValue);
-	const parts = ['<option value="">(default)</option>'];
-	for (const p of opts) {
-		const sel = p === currentValue ? ' selected' : '';
-		parts.push('<option value="' + esc(p) + '"' + sel + '>' + esc(p) + '</option>');
-	}
-	return parts.join('');
-}
-
-function modelOptionsHtml(currentValue: any, provider: any, providerIndex: any) {
-	const entries = (provider && providerIndex.get(provider)) || [];
-	const present = entries.slice();
-	if (currentValue && !present.some((e: any) => e.id === currentValue)) {
-		present.unshift({ id: currentValue });
-	}
-	const parts = ['<option value="">(default)</option>'];
-	for (const e of present) {
-		const sel = e.id === currentValue ? ' selected' : '';
-		// Label: alias if available, else id. Title attribute always shows raw
-		// id so hovering disambiguates aliases that map to similar names.
-		const label = e.alias || e.id;
-		const title = e.alias ? e.alias + ' (' + e.id + ')' : e.id;
-		parts.push('<option value="' + esc(e.id) + '" title="' + esc(title) + '"' + sel + '>' + esc(label) + '</option>');
-	}
-	return parts.join('');
-}
-
-const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
-
-function findAvailableModel(provider: any, id: any) {
-	const list = (S.diskState && S.diskState.availableModels) || [];
-	return list.find((m: any) => m.provider === provider && m.id === id) || null;
-}
-
-// Thinking <option>s for a mode, mirroring the chat picker: non-reasoning →
-// (default)+off; binary qwen/zai → (default)+off+on; leveled → (default)+off+
-// mapped levels. `selected` is the mode's stored thinkingLevel ('' = default).
-function modeThinkingOptionsHtml(provider: any, id: any, selected: any) {
-	const sel = selected || '';
-	const opt = (val: any, label: any, on: any) => '<option value="' + esc(val) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>';
-	let html = opt('', '(default)', sel === '');
-	const model = findAvailableModel(provider, id);
-	if (!model || !model.reasoning) return html + opt('off', 'off', sel === 'off');
-	const map = model.thinkingLevelMap || {};
-	if (model.thinkingFormat && BINARY_THINKING_FORMATS.includes(model.thinkingFormat)) {
-		const onLevel = THINKING_LEVELS.find((l) => l && l !== 'off' && map[l] != null) || 'medium';
-		return html + opt('off', 'off', sel === 'off') + opt(onLevel, 'on', sel !== '' && sel !== 'off');
-	}
-	for (const lvl of THINKING_LEVELS) {
-		if (lvl === '') continue;
-		const mapped = map[lvl];
-		if (mapped === null) continue;
-		if (lvl === 'xhigh' && mapped === undefined) continue;
-		html += opt(lvl, lvl, sel === lvl);
-	}
-	return html;
-}
 
 function renderModes() {
 	const root = el('mode-cards');
@@ -442,18 +351,6 @@ function renderProviders() {
 
 // thinkingFormat values Pi understands (pi-ai types.d.ts). Empty = auto-detect
 // from the provider/baseUrl. "qwen-chat-template" uses chat_template_kwargs.
-const THINKING_FORMATS = ['openai', 'openrouter', 'deepseek', 'together', 'zai', 'qwen', 'qwen-chat-template', 'string-thinking'];
-
-function thinkingFormatOptionsHtml(selected: any) {
-	const list = THINKING_FORMATS.slice();
-	// Preserve an on-disk value we don't recognize so save can't silently drop it.
-	if (selected && list.indexOf(selected) === -1) list.push(selected);
-	let html = '<option value=""' + (!selected ? ' selected' : '') + '>(auto)</option>';
-	for (const f of list) {
-		html += '<option value="' + esc(f) + '"' + (f === selected ? ' selected' : '') + '>' + esc(f) + '</option>';
-	}
-	return html;
-}
 
 function renderModelRows(container: any, provName: any, models: any) {
 	container.innerHTML = '';
@@ -950,49 +847,6 @@ function wireOAuth(statusKind: any, btnId: any, cancelId: any, statusId: any, lo
 }
 wireOAuth('codex-status', 'codex-login-btn', 'codex-cancel-btn', 'codex-status', 'codex-login', 'codex-login-cancel');
 wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'anthropic-status', 'anthropic-login', 'anthropic-login-cancel');
-
-// Codex usage (ChatGPT subscription limits). Read-only; the host hits the
-// usage endpoint with the stored OAuth token. Auto-fetched once per panel
-// load when Codex is authed; the button re-fetches.
-function requestCodexUsage() {
-	const out = el('codex-usage');
-	if (out) { out.classList.remove('hidden'); out.textContent = t('settings.usage.checking'); }
-	post({ kind: 'codex-usage' });
-}
-(function wireCodexUsage() {
-	const btn = el('codex-usage-btn');
-	if (btn) btn.addEventListener('click', requestCodexUsage);
-})();
-function fmtResetIn(resetAtSec: any) {
-	const secs = Math.max(0, Math.round(resetAtSec - Date.now() / 1000));
-	const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
-	const parts = d ? [d + 'd', h + 'h'] : h ? [h + 'h', m + 'm'] : [m + 'm'];
-	return t('settings.usage.resetsIn', { t: parts.join(' ') });
-}
-function windowLabel(win: any) {
-	if (win.windowSeconds === 18000) return t('settings.usage.5h');
-	if (win.windowSeconds === 604800) return t('settings.usage.weekly');
-	return Math.round(win.windowSeconds / 3600) + 'h';
-}
-function renderCodexUsage(msg: any) {
-	const out = el('codex-usage');
-	if (!out) return;
-	out.classList.remove('hidden');
-	if (msg.error) {
-		out.textContent = t('settings.usage.failed', { err: msg.error });
-		return;
-	}
-	const u = msg.usage || {};
-	const wins = [u.primary, u.secondary].filter(Boolean);
-	const rows = wins.map((w) =>
-		'<div class="codex-usage-row"><span class="cu-label">' + esc(windowLabel(w)) + '</span>' +
-		'<span class="cu-bar"><span class="cu-bar-fill" style="width:' + Math.min(100, Math.max(0, w.usedPercent)) + '%"></span></span>' +
-		'<span class="cu-pct">' + esc(String(w.usedPercent)) + '%</span>' +
-		'<span class="cu-reset">' + esc(fmtResetIn(w.resetAt)) + '</span></div>'
-	).join('');
-	const head = t('settings.usage.plan', { plan: u.planType || '?' }) + (u.limitReached ? ' · ' + t('settings.usage.limitReached') : '');
-	out.innerHTML = '<div class="codex-usage-head">' + esc(head) + '</div>' + rows;
-}
 
 // Add auth (API key)
 el('add-auth-btn').addEventListener('click', () => {

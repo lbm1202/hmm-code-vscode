@@ -9,9 +9,9 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
 export const vscode = acquireVsCodeApi();
 export const post = (msg: unknown): void => vscode.postMessage(msg);
-export const I18N: Record<string, string> = (window as any).__HMM_I18N || {};
+const i18n: Record<string, string> = (window as any).__HMM_I18N || {};
 export function t(key: string, params?: Record<string, unknown>): string {
-	let str = I18N[key] != null ? I18N[key] : key;
+	let str = i18n[key] != null ? i18n[key] : key;
 	if (params) str = str.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : '{' + k + '}'));
 	return str;
 }
