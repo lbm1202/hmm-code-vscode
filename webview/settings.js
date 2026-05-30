@@ -25,6 +25,9 @@ let modelsDraft = { providers: {} };
 // = no filter for that provider. Sent to host as modelAllowlist on save.
 let allowlistDraft = {};
 let compactDraft = '';  // auto-compact threshold (effective value shown in the input)
+let dynamicCompactionDraft = true;  // dynamic compaction toggle (default on)
+let autoTitlePromptDraft = '';  // auto-title system-prompt override ('' = built-in default)
+let compactInstructionsDraft = '';  // compaction additional-focus ('' = none)
 
 function showToast(text, isError) {
 	const t = document.getElementById('toast');
@@ -128,6 +131,35 @@ function compactDirty() {
 	const draftOverride = (!Number.isFinite(n) || n === def) ? null : n;
 	return draftOverride !== diskCompactOverride();
 }
+function diskDynamicCompaction() {
+	return (diskState && typeof diskState.dynamicCompaction === 'boolean') ? diskState.dynamicCompaction : true;
+}
+function dynamicCompactionDirty() {
+	return dynamicCompactionDraft !== diskDynamicCompaction();
+}
+function diskAutoTitlePrompt() {
+	const v = diskState && diskState.modes && diskState.modes.autoTitlePrompt;
+	return typeof v === 'string' ? v : '';
+}
+function defaultAutoTitle() {
+	return (diskState && typeof diskState.defaultAutoTitlePrompt === 'string') ? diskState.defaultAutoTitlePrompt : '';
+}
+// The auto-title editor is pre-filled with the built-in default; an override is
+// only stored when the text differs from it (mirrors the per-mode prompts).
+function autoTitleOverrideFromDraft() {
+	const d = autoTitlePromptDraft.trim();
+	return (d === '' || d === defaultAutoTitle().trim()) ? '' : autoTitlePromptDraft;
+}
+function diskCompactInstructions() {
+	const v = diskState && diskState.modes && diskState.modes.compactInstructions;
+	return typeof v === 'string' ? v : '';
+}
+function autoTitlePromptDirty() {
+	return autoTitleOverrideFromDraft().trim() !== diskAutoTitlePrompt().trim();
+}
+function compactInstructionsDirty() {
+	return compactInstructionsDraft.trim() !== diskCompactInstructions().trim();
+}
 
 function isDirty() {
 	if (!diskState) return false;
@@ -138,6 +170,9 @@ function isDirty() {
 	if (modelsDirty()) return true;
 	if (allowlistDirty()) return true;
 	if (compactDirty()) return true;
+	if (dynamicCompactionDirty()) return true;
+	if (autoTitlePromptDirty()) return true;
+	if (compactInstructionsDirty()) return true;
 	return false;
 }
 
@@ -266,20 +301,11 @@ function renderModes() {
 		const card = document.createElement('div');
 		card.className = 'mode-card' + (modeDirty(name) ? ' dirty' : '');
 		card.dataset.mode = name;
-		const overridden = (draft.prompt || '') !== defaultPrompt(name) && (draft.prompt || '').trim() !== '';
 		card.innerHTML =
 			'<div class="mode-name ' + name + '">' + name + '</div>' +
 			'<select data-mode="' + name + '" data-field="provider">' + providerOptionsHtml(draft.provider, providerIndex) + '</select>' +
 			'<select data-mode="' + name + '" data-field="id">' + modelOptionsHtml(draft.id, draft.provider, providerIndex) + '</select>' +
-			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>' +
-			'<details class="mode-prompt"' + (overridden ? ' open' : '') + '>' +
-				'<summary>' + esc(t('settings.modes.promptSummary')) + (overridden ? ' <span class="mode-prompt-badge">' + esc(t('settings.modes.promptCustom')) + '</span>' : '') + '</summary>' +
-				'<div class="mode-prompt-head">' +
-					'<span class="field-hint">' + esc(t('settings.modes.promptHint')) + '</span>' +
-					'<button class="ghost" data-prompt-reset="' + esc(name) + '">' + esc(t('settings.modes.resetDefault')) + '</button>' +
-				'</div>' +
-				'<textarea class="mode-prompt-ta" rows="10" spellcheck="false" data-mode="' + esc(name) + '" data-field="prompt">' + esc(draft.prompt || '') + '</textarea>' +
-			'</details>';
+			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>';
 		root.appendChild(card);
 		// thinking <select> uses `selected` attributes (model-aware), so no
 		// post-hoc .value assignment.
@@ -304,27 +330,79 @@ function renderModes() {
 			updateSaveBar();
 		});
 	});
-	// Per-mode systemPromptAddendum textarea (live, no re-render so focus stays).
-	root.querySelectorAll('textarea[data-field="prompt"]').forEach((el) => {
-		el.addEventListener('input', () => {
-			const name = el.getAttribute('data-mode');
-			if (!name || !modesDraft[name]) return;
-			modesDraft[name].prompt = el.value;
-			const card = el.closest('.mode-card');
-			if (card) card.classList.toggle('dirty', modeDirty(name));
-			updateSaveBar();
+}
+
+// Prompts tab: all four mode system prompts + the auto-title prompt + the
+// compaction additional-focus. Mode prompts share modesDraft with the Modes
+// tab, so dirty tracking (modeDirty) is unchanged.
+function renderPrompts() {
+	const root = document.getElementById('prompt-modes');
+	if (root) {
+		root.innerHTML = '';
+		for (const name of MODE_NAMES) {
+			const draft = modesDraft[name] || { prompt: '' };
+			const overridden = (draft.prompt || '') !== defaultPrompt(name) && (draft.prompt || '').trim() !== '';
+			const block = document.createElement('div');
+			block.className = 'prompt-block' + (modeDirty(name) ? ' dirty' : '');
+			block.innerHTML =
+				'<div class="mode-prompt-head">' +
+					'<span class="mode-name ' + name + '">' + name + '</span>' +
+					(overridden ? '<span class="mode-prompt-badge">' + esc(t('settings.modes.promptCustom')) + '</span>' : '') +
+					'<span class="spacer"></span>' +
+					'<button class="ghost" data-prompt-reset="' + esc(name) + '">' + esc(t('settings.modes.resetDefault')) + '</button>' +
+				'</div>' +
+				'<textarea class="mode-prompt-ta" rows="10" spellcheck="false" data-mode="' + esc(name) + '" data-field="prompt">' + esc(draft.prompt || '') + '</textarea>';
+			root.appendChild(block);
+		}
+		root.querySelectorAll('textarea[data-field="prompt"]').forEach((el) => {
+			el.addEventListener('input', () => {
+				const name = el.getAttribute('data-mode');
+				if (!name || !modesDraft[name]) return;
+				modesDraft[name].prompt = el.value;
+				const block = el.closest('.prompt-block');
+				if (block) block.classList.toggle('dirty', modeDirty(name));
+				updateSaveBar();
+			});
 		});
-	});
-	// "Reset to default" — restore the built-in prompt for this mode.
-	root.querySelectorAll('button[data-prompt-reset]').forEach((btn) => {
-		btn.addEventListener('click', () => {
-			const name = btn.getAttribute('data-prompt-reset');
-			if (!name || !modesDraft[name]) return;
-			modesDraft[name].prompt = defaultPrompt(name);
-			renderModes();
-			updateSaveBar();
+		root.querySelectorAll('button[data-prompt-reset]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const name = btn.getAttribute('data-prompt-reset');
+				if (!name || !modesDraft[name]) return;
+				modesDraft[name].prompt = defaultPrompt(name);
+				renderPrompts();
+				updateSaveBar();
+			});
 		});
-	});
+	}
+	const toggleBadge = (id, on) => {
+		const b = document.getElementById(id);
+		if (b) b.classList.toggle('hidden', !on);
+	};
+	const titleTa = document.getElementById('autotitle-prompt-ta');
+	if (titleTa) {
+		titleTa.value = autoTitlePromptDraft;
+		toggleBadge('autotitle-badge', autoTitleOverrideFromDraft().trim() !== '');
+		titleTa.oninput = () => {
+			autoTitlePromptDraft = titleTa.value;
+			toggleBadge('autotitle-badge', autoTitleOverrideFromDraft().trim() !== '');
+			updateSaveBar();
+		};
+		// "Reset to default" restores the built-in prompt text (= clears override).
+		const reset = document.getElementById('autotitle-prompt-reset');
+		if (reset) reset.onclick = () => { autoTitlePromptDraft = defaultAutoTitle(); titleTa.value = autoTitlePromptDraft; toggleBadge('autotitle-badge', false); updateSaveBar(); };
+	}
+	const compactTa = document.getElementById('compact-instructions-ta');
+	if (compactTa) {
+		compactTa.value = compactInstructionsDraft;
+		toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
+		compactTa.oninput = () => {
+			compactInstructionsDraft = compactTa.value;
+			toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
+			updateSaveBar();
+		};
+		const reset = document.getElementById('compact-instructions-reset');
+		if (reset) reset.onclick = () => { compactInstructionsDraft = ''; compactTa.value = ''; toggleBadge('compact-badge', false); updateSaveBar(); };
+	}
 }
 
 function renderAuth() {
@@ -943,14 +1021,22 @@ function renderAllowlist() {
 }
 
 function renderCompact() {
+	const toggle = document.getElementById('dynamic-compaction');
+	if (toggle) {
+		toggle.checked = dynamicCompactionDraft;
+		toggle.onchange = () => { dynamicCompactionDraft = toggle.checked; updateSaveBar(); };
+	}
 	const input = document.getElementById('compact-threshold');
 	if (!input) return;
 	input.value = compactDraft;
+	const valueLabel = document.getElementById('compact-value');
+	const showValue = () => { if (valueLabel) valueLabel.textContent = input.value + '%'; };
+	showValue();
 	const hint = document.getElementById('compact-default-hint');
 	if (hint) hint.textContent = t('settings.compact.defaultHint', { n: defaultCompact() });
-	input.oninput = () => { compactDraft = input.value; updateSaveBar(); };
+	input.oninput = () => { compactDraft = input.value; showValue(); updateSaveBar(); };
 	const reset = document.getElementById('compact-reset');
-	if (reset) reset.onclick = () => { compactDraft = String(defaultCompact()); input.value = compactDraft; updateSaveBar(); };
+	if (reset) reset.onclick = () => { compactDraft = String(defaultCompact()); input.value = compactDraft; showValue(); updateSaveBar(); };
 }
 
 function render(s) {
@@ -967,8 +1053,12 @@ function render(s) {
 	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
 	allowlistDraft = JSON.parse(JSON.stringify(diskAllowlist()));
 	compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
+	dynamicCompactionDraft = diskDynamicCompaction();
+	autoTitlePromptDraft = diskAutoTitlePrompt() || defaultAutoTitle();
+	compactInstructionsDraft = diskCompactInstructions();
 
 	renderModes();
+	renderPrompts();
 	renderAutoTitle();
 	renderCompactModel();
 	renderAllowlist();
@@ -1141,6 +1231,9 @@ document.getElementById('save-btn').addEventListener('click', () => {
 		authRemoves: Array.from(authRemovesDraft),
 		models: modelsDraft,
 		autoCompactThreshold: (() => { const n = parseInt(compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
+		dynamicCompaction: dynamicCompactionDraft,
+		autoTitlePrompt: autoTitleOverrideFromDraft(),
+		compactInstructions: compactInstructionsDraft,
 	};
 	post(payload);
 	showToast(t('settings.toast.saving'));

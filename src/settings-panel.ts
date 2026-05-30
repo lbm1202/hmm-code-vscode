@@ -194,6 +194,11 @@ export class SettingsPanel {
 					? modes.autoCompactThreshold
 					: null,
 			defaultCompactThreshold: SettingsPanel.defaultCompactThreshold(),
+			defaultAutoTitlePrompt: SettingsPanel.defaultAutoTitlePrompt(),
+			dynamicCompaction:
+				modes && typeof modes === "object" && typeof modes.dynamicCompaction === "boolean"
+					? modes.dynamicCompaction
+					: true,
 		};
 	}
 
@@ -240,6 +245,21 @@ export class SettingsPanel {
 			/* bundle missing */
 		}
 		return 75;
+	}
+
+	/** Parse the built-in DEFAULT_AUTO_TITLE_PROMPT (single-line literal) out of
+	 *  the bundled constants.ts so the panel pre-fills the auto-title editor with
+	 *  the real default — no mirrored copy that could drift. */
+	private static defaultAutoTitlePrompt(): string {
+		try {
+			const p = join(SettingsPanel._extPath, "out", "vendor", "hmm-code-pi", "constants.ts");
+			const src = readFileSync(p, "utf-8");
+			const m = src.match(/DEFAULT_AUTO_TITLE_PROMPT\s*=\s*"((?:[^"\\]|\\.)*)"/);
+			if (m) return JSON.parse(`"${m[1]}"`) as string;
+		} catch {
+			/* bundle missing — panel falls back to empty (placeholder shows) */
+		}
+		return "";
 	}
 
 	private static readJsonSafe(path: string): any {
@@ -366,6 +386,9 @@ export class SettingsPanel {
 						msg.modelAllowlist,
 						msg.autoCompactThreshold,
 						msg.compactModel,
+						msg.dynamicCompaction,
+						msg.autoTitlePrompt,
+						msg.compactInstructions,
 					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
@@ -497,8 +520,29 @@ export class SettingsPanel {
 		modelAllowlist?: Record<string, string[]> | null,
 		autoCompactThreshold?: number | null,
 		compactModel?: { provider?: string; id?: string } | null,
+		dynamicCompaction?: boolean,
+		autoTitlePrompt?: string | null,
+		compactInstructions?: string | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
+		// Dynamic compaction (default on). Store only when explicitly off so
+		// modes.json stays clean when at the default.
+		if (dynamicCompaction !== undefined) {
+			if (dynamicCompaction === false) raw.dynamicCompaction = false;
+			else delete raw.dynamicCompaction;
+		}
+		// Auto-title system-prompt override + compaction additional-focus.
+		// Empty/whitespace → delete the field so the built-in default applies.
+		if (autoTitlePrompt !== undefined) {
+			const v = (autoTitlePrompt ?? "").trim();
+			if (v) raw.autoTitlePrompt = v;
+			else delete raw.autoTitlePrompt;
+		}
+		if (compactInstructions !== undefined) {
+			const v = (compactInstructions ?? "").trim();
+			if (v) raw.compactInstructions = v;
+			else delete raw.compactInstructions;
+		}
 		// Compaction (summary) model override. Both blank → delete the field so
 		// Pi falls back to the active session model.
 		if (compactModel !== undefined) {
@@ -512,9 +556,9 @@ export class SettingsPanel {
 		if (autoCompactThreshold !== undefined) {
 			const def = SettingsPanel.defaultCompactThreshold();
 			const n = Number(autoCompactThreshold);
-			// Clamp to the same [40, 95] range Pi enforces on load, so the stored
+			// Clamp to the same [50, 85] range Pi enforces on load, so the stored
 			// value always equals the one Pi actually uses (no panel/runtime drift).
-			const clamped = Number.isFinite(n) ? Math.min(95, Math.max(40, Math.round(n))) : NaN;
+			const clamped = Number.isFinite(n) ? Math.min(85, Math.max(50, Math.round(n))) : NaN;
 			if (autoCompactThreshold !== null && Number.isFinite(clamped) && clamped !== def) {
 				raw.autoCompactThreshold = clamped;
 			} else {
@@ -703,6 +747,7 @@ export class SettingsPanel {
 		<button class="tab-btn" data-tab="auth">${t("settings.tab.auth")}</button>
 		<button class="tab-btn" data-tab="models">${t("settings.tab.models")}</button>
 		<button class="tab-btn" data-tab="modes">${t("settings.tab.modes")}</button>
+		<button class="tab-btn" data-tab="prompts">${t("settings.tab.prompts")}</button>
 	</nav>
 
 	<section class="tab-panel" data-tab="general">
@@ -729,9 +774,17 @@ export class SettingsPanel {
 		<div class="section">
 			<h2>${t("settings.compact.heading")}</h2>
 			<div class="desc">${t("settings.compact.desc")}</div>
-			<div class="row">
-				<input type="number" id="compact-threshold" min="40" max="95" step="1" style="max-width: 96px;" />
-				<span class="field-hint">%</span>
+			<label class="toggle-row" for="dynamic-compaction">
+				<span class="switch">
+					<input type="checkbox" id="dynamic-compaction" />
+					<span class="switch-track"><span class="switch-thumb"></span></span>
+				</span>
+				<span>${t("settings.compact.dynamic")}</span>
+			</label>
+			<div class="desc field-hint" style="margin-top: 4px;">${t("settings.compact.dynamicDesc")}</div>
+			<div class="row" style="margin-top: 12px;">
+				<input type="range" id="compact-threshold" min="50" max="85" step="1" class="slider" />
+				<span class="field-hint slider-value" id="compact-value">75%</span>
 				<span class="field-hint" id="compact-default-hint"></span>
 				<button class="ghost" id="compact-reset">${t("settings.compact.reset")}</button>
 			</div>
@@ -812,6 +865,40 @@ export class SettingsPanel {
 			<h2>${t("settings.modes.heading")}</h2>
 			<div class="desc">${t("settings.modes.desc")}</div>
 			<div id="mode-cards"></div>
+		</div>
+	</section>
+
+	<section class="tab-panel" data-tab="prompts">
+		<div class="section">
+			<h2>${t("settings.prompts.modesHeading")}</h2>
+			<div class="desc">${t("settings.prompts.modesDesc")}</div>
+			<div id="prompt-modes"></div>
+		</div>
+		<div class="section">
+			<h2>${t("settings.prompts.autoTitleHeading")}</h2>
+			<div class="desc">${t("settings.prompts.autoTitleDesc")}</div>
+			<div class="prompt-block">
+				<div class="mode-prompt-head">
+					<span class="mode-name">${t("settings.prompts.autoTitleName")}</span>
+					<span class="mode-prompt-badge hidden" id="autotitle-badge">${t("settings.modes.promptCustom")}</span>
+					<span class="spacer"></span>
+					<button class="ghost" id="autotitle-prompt-reset">${t("settings.modes.resetDefault")}</button>
+				</div>
+				<textarea id="autotitle-prompt-ta" class="mode-prompt-ta" rows="10" spellcheck="false" placeholder="${t("settings.prompts.autoTitlePlaceholder")}"></textarea>
+			</div>
+		</div>
+		<div class="section">
+			<h2>${t("settings.prompts.compactHeading")}</h2>
+			<div class="desc">${t("settings.prompts.compactDesc")}</div>
+			<div class="prompt-block">
+				<div class="mode-prompt-head">
+					<span class="mode-name">${t("settings.prompts.compactName")}</span>
+					<span class="mode-prompt-badge hidden" id="compact-badge">${t("settings.modes.promptCustom")}</span>
+					<span class="spacer"></span>
+					<button class="ghost" id="compact-instructions-reset">${t("settings.prompts.clear")}</button>
+				</div>
+				<textarea id="compact-instructions-ta" class="mode-prompt-ta" rows="10" spellcheck="false" placeholder="${t("settings.prompts.compactPlaceholder")}"></textarea>
+			</div>
 		</div>
 	</section>
 
