@@ -287,6 +287,10 @@ function handleSetStatus(key: string, value: string): void {
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
 		e.ctxPill.textContent = `ctx ${value}`;
+		// Compact button only appears once there's enough context to be worth
+		// compacting (≥20% usage) — below that it's noise.
+		const pct = parseFloat(value);
+		e.btnCompact.classList.toggle("hidden", !(Number.isFinite(pct) && pct >= 20));
 	} else if (key === STATUS_KEYS.PLAN_HANDOFF) {
 		// value format: "<planPath>|<targetMode>"
 		const sep = value.lastIndexOf("|");

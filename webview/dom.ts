@@ -48,7 +48,7 @@ const APP_HTML = `
 				<button class="picker" id="picker-thinking"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
 				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺ ${t("chat.resetLabel")}</button>
 				<button class="picker autoapprove off" id="btn-autoapprove" title="${t("chat.autoApproveTitle")}">🔒 Auto</button>
-				<button class="picker" id="btn-compact" title="${t("chat.compactTitle")}">🗜 ${t("chat.compactLabel")}</button>
+				<button class="picker hidden" id="btn-compact" title="${t("chat.compactTitle")}">🗜 ${t("chat.compactLabel")}</button>
 			</div>
 			<div class="footer-right">
 				<span class="ctx-pill" id="ctx-pill">ctx —</span>
