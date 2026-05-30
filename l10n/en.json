@@ -190,5 +190,9 @@
   "settings.usage.limitReached": "limit reached",
   "settings.usage.failed": "Usage check failed: {err}",
   "chat.compactLabel": "Compact",
-  "chat.compactTitle": "Compact the context now"
+  "chat.compactTitle": "Compact the context now",
+  "settings.compactModel.desc": "Model used to summarize the context during compaction. <strong>Leave empty to use the active session model</strong>. Set a dedicated (e.g. cheaper/faster) model to offload summarization off your chat model.",
+  "settings.compactModel.label": "Summary model",
+  "settings.dirty.compactModel": "summary model",
+  "settings.fallback.compactModelLabel": "Summary model"
 }

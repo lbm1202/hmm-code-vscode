@@ -17,6 +17,7 @@ const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '<
 let diskState = null;
 let modesDraft = {};
 let autoTitleDraft = { provider: '', id: '' };
+let compactModelDraft = { provider: '', id: '' };  // compaction (summary) model override
 let authAddsDraft = {};           // provider id -> key (new ones to add)
 let authRemovesDraft = new Set(); // provider ids to remove
 let modelsDraft = { providers: {} };
@@ -85,6 +86,17 @@ function autoTitleDirty() {
 	const d = diskAutoTitle();
 	return d.provider !== autoTitleDraft.provider || d.id !== autoTitleDraft.id;
 }
+function diskCompactModel() {
+	const a = diskState && diskState.modes && diskState.modes.compactModel;
+	return {
+		provider: (a && a.provider) || '',
+		id: (a && a.id) || '',
+	};
+}
+function compactModelDirty() {
+	const d = diskCompactModel();
+	return d.provider !== compactModelDraft.provider || d.id !== compactModelDraft.id;
+}
 
 function diskAllowlist() {
 	const a = diskState && diskState.modelAllowlist;
@@ -121,6 +133,7 @@ function isDirty() {
 	if (!diskState) return false;
 	for (const n of MODE_NAMES) if (modeDirty(n)) return true;
 	if (autoTitleDirty()) return true;
+	if (compactModelDirty()) return true;
 	if (authDirty()) return true;
 	if (modelsDirty()) return true;
 	if (allowlistDirty()) return true;
@@ -138,6 +151,7 @@ function updateSaveBar() {
 	const parts = [];
 	if (modeD) parts.push(t('settings.dirty.modes', { n: modeD }));
 	if (autoTitleDirty()) parts.push(t('settings.dirty.autoTitle'));
+	if (compactModelDirty()) parts.push(t('settings.dirty.compactModel'));
 	if (authD) parts.push(t('settings.dirty.auth', { n: authD }));
 	if (modelsDirty()) parts.push(t('settings.dirty.providers'));
 	if (allowlistDirty()) parts.push(t('settings.dirty.filter'));
@@ -774,6 +788,7 @@ function autoFallbackModes() {
 	};
 	for (const m of MODE_NAMES) fixOne(t('settings.fallback.modeLabel', { mode: m }), modesDraft[m] || { provider: '', id: '' });
 	fixOne(t('settings.fallback.autoTitleLabel'), autoTitleDraft);
+	fixOne(t('settings.fallback.compactModelLabel'), compactModelDraft);
 	if (replacements.length) {
 		showToast(t('settings.fallback.toast', { n: replacements.length, first: replacements[0] })
 			+ (replacements.length > 1 ? t('settings.fallback.more', { n: replacements.length - 1 }) : ''));
@@ -799,6 +814,28 @@ function renderAutoTitle() {
 	idSel.onchange = () => {
 		autoTitleDraft.id = idSel.value;
 		card.classList.toggle('dirty', autoTitleDirty());
+		updateSaveBar();
+	};
+}
+
+function renderCompactModel() {
+	const card = document.getElementById('compactmodel-card');
+	if (!card) return;
+	card.classList.toggle('dirty', compactModelDirty());
+	const providerIndex = buildProviderIndex();
+	const provSel = document.getElementById('compactmodel-provider');
+	const idSel = document.getElementById('compactmodel-id');
+	provSel.innerHTML = providerOptionsHtml(compactModelDraft.provider, providerIndex);
+	idSel.innerHTML = modelOptionsHtml(compactModelDraft.id, compactModelDraft.provider, providerIndex);
+	provSel.onchange = () => {
+		compactModelDraft.provider = provSel.value;
+		compactModelDraft.id = '';
+		renderCompactModel();
+		updateSaveBar();
+	};
+	idSel.onchange = () => {
+		compactModelDraft.id = idSel.value;
+		card.classList.toggle('dirty', compactModelDirty());
 		updateSaveBar();
 	};
 }
@@ -924,6 +961,7 @@ function render(s) {
 		modesDraft[n] = { provider: d.provider, id: d.id, thinking: d.thinking, prompt: d.promptOverride || defaultPrompt(n) };
 	}
 	autoTitleDraft = diskAutoTitle();
+	compactModelDraft = diskCompactModel();
 	authAddsDraft = {};
 	authRemovesDraft = new Set();
 	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
@@ -932,6 +970,7 @@ function render(s) {
 
 	renderModes();
 	renderAutoTitle();
+	renderCompactModel();
 	renderAllowlist();
 	renderAuth();
 	renderProviders();
@@ -1096,6 +1135,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
 		modes: true,
 		modeConfigs: modesDraft,
 		autoTitle: autoTitleDraft,
+		compactModel: compactModelDraft,
 		modelAllowlist: allowlistDraft,
 		authAdds: authAddsDraft,
 		authRemoves: Array.from(authRemovesDraft),

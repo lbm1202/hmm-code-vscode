@@ -365,6 +365,7 @@ export class SettingsPanel {
 						msg.autoTitle,
 						msg.modelAllowlist,
 						msg.autoCompactThreshold,
+						msg.compactModel,
 					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
@@ -495,8 +496,17 @@ export class SettingsPanel {
 		autoTitle?: { provider?: string; id?: string } | null,
 		modelAllowlist?: Record<string, string[]> | null,
 		autoCompactThreshold?: number | null,
+		compactModel?: { provider?: string; id?: string } | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
+		// Compaction (summary) model override. Both blank → delete the field so
+		// Pi falls back to the active session model.
+		if (compactModel !== undefined) {
+			const p = (compactModel?.provider ?? "").trim();
+			const i = (compactModel?.id ?? "").trim();
+			if (p && i) raw.compactModel = { provider: p, id: i };
+			else delete raw.compactModel;
+		}
 		// Auto-compact threshold: store only when it differs from the built-in
 		// default; otherwise drop the field so modes.json stays clean.
 		if (autoCompactThreshold !== undefined) {
@@ -724,6 +734,12 @@ export class SettingsPanel {
 				<span class="field-hint">%</span>
 				<span class="field-hint" id="compact-default-hint"></span>
 				<button class="ghost" id="compact-reset">${t("settings.compact.reset")}</button>
+			</div>
+			<div class="desc" style="margin-top: 14px;">${t("settings.compactModel.desc")}</div>
+			<div class="mode-card autotitle-card" id="compactmodel-card">
+				<div class="mode-name" style="color: var(--vscode-foreground);">${t("settings.compactModel.label")}</div>
+				<select id="compactmodel-provider"></select>
+				<select id="compactmodel-id"></select>
 			</div>
 		</div>
 	</section>
