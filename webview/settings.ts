@@ -1,210 +1,10 @@
-// Settings-panel webview script. Extracted from the inline template strings
-// that used to live in src/settings-panel.ts, loaded as a bundled asset via
-// <script src>. TypeScript (bundled by esbuild to out/webview/settings.js).
-//
-// DOM access is intentionally loosely typed: el()/q()/qa() return `any` so the
-// (very DOM-heavy) panel code stays terse. TS still fully checks module state +
-// function references — which is what makes the file safe to refactor/split.
-declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
+// Settings panel entry. Foundation (state, DOM helpers, constants) lives in
+// settings-state.ts; disk readers + dirty checks in settings-disk.ts.
+import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS, API_TYPES, API_TYPE_HTML, S } from "./settings-state";
+import {
+	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
+} from "./settings-disk";
 
-const vscode = acquireVsCodeApi();
-const post = (msg: unknown): void => vscode.postMessage(msg);
-const I18N: Record<string, string> = (window as any).__HMM_I18N || {};
-function t(key: string, params?: Record<string, unknown>): string {
-	let str = I18N[key] != null ? I18N[key] : key;
-	if (params) str = str.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : '{' + k + '}'));
-	return str;
-}
-
-// Permissive DOM accessors — identical runtime to the native calls; `any`
-// return keeps DOM-touching code terse without weakening state/ref checks.
-const el = (id: string): any => document.getElementById(id);
-const q = (root: any, sel: string): any => root.querySelector(sel);
-const qa = (root: any, sel: string): any[] => Array.from(root.querySelectorAll(sel));
-
-const MODE_NAMES = ["plan", "code", "debug", "ask"];
-const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
-const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
-const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '</option>').join('');
-let diskState: any = null;
-let modesDraft: any = {};
-let autoTitleDraft: { provider: string; id: string } = { provider: '', id: '' };
-let compactModelDraft: { provider: string; id: string } = { provider: '', id: '' };  // compaction (summary) model override
-let authAddsDraft: Record<string, string> = {};  // provider id -> key (new ones to add)
-let authRemovesDraft = new Set<string>();         // provider ids to remove
-let modelsDraft: any = { providers: {} };
-// Per-provider model id allowlist draft. Empty obj or empty list per provider
-// = no filter for that provider. Sent to host as modelAllowlist on save.
-let allowlistDraft: Record<string, string[]> = {};
-let compactDraft = '';  // auto-compact threshold (effective value shown in the input)
-let dynamicCompactionDraft = true;  // dynamic compaction toggle (default on)
-let autoTitlePromptDraft = '';  // auto-title system-prompt override ('' = built-in default)
-let compactInstructionsDraft = '';  // compaction additional-focus ('' = none)
-
-function showToast(text: any, isError?: any) {
-	const t = el('toast');
-	t.textContent = text;
-	t.classList.toggle('error', !!isError);
-	t.classList.remove('hidden');
-	setTimeout(() => t.classList.add('hidden'), 2500);
-}
-function esc(s: any) {
-	return String(s)
-		.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
-
-function diskMode(name: any) {
-	const cfg = (diskState && diskState.modes && diskState.modes.modes && diskState.modes.modes[name]) || {};
-	const m = cfg.model;
-	const isObj = m && typeof m === 'object';
-	return {
-		provider: isObj ? (m.provider || '') : '',
-		id: isObj ? (m.id || '') : '',
-		thinking: cfg.thinkingLevel || '',
-		promptOverride: cfg.systemPromptAddendum || '',
-	};
-}
-function defaultPrompt(name: any) {
-	return (diskState && diskState.defaultPrompts && diskState.defaultPrompts[name]) || '';
-}
-function diskAuth() { return (diskState && diskState.auth) || {}; }
-function diskModels() {
-	const m = diskState && diskState.models;
-	return (m && typeof m === 'object' && m.providers) ? m : { providers: {} };
-}
-
-function modeDirty(name: any) {
-	const d = diskMode(name);
-	const draft = modesDraft[name] || { provider: '', id: '', thinking: '', prompt: '' };
-	const def = defaultPrompt(name);
-	// Treat "prompt identical to default" as no override.
-	const draftOverride = (draft.prompt || '') === def ? '' : (draft.prompt || '');
-	return d.provider !== draft.provider || d.id !== draft.id || d.thinking !== draft.thinking
-		|| draftOverride !== d.promptOverride;
-}
-function authDirty() {
-	return Object.keys(authAddsDraft).length > 0 || authRemovesDraft.size > 0;
-}
-function modelsDirty() {
-	return JSON.stringify(modelsDraft) !== JSON.stringify(diskModels());
-}
-
-function diskAutoTitle() {
-	const a = diskState && diskState.modes && diskState.modes.autoTitle;
-	return {
-		provider: (a && a.provider) || '',
-		id: (a && a.id) || '',
-	};
-}
-function autoTitleDirty() {
-	const d = diskAutoTitle();
-	return d.provider !== autoTitleDraft.provider || d.id !== autoTitleDraft.id;
-}
-function diskCompactModel() {
-	const a = diskState && diskState.modes && diskState.modes.compactModel;
-	return {
-		provider: (a && a.provider) || '',
-		id: (a && a.id) || '',
-	};
-}
-function compactModelDirty() {
-	const d = diskCompactModel();
-	return d.provider !== compactModelDraft.provider || d.id !== compactModelDraft.id;
-}
-
-function diskAllowlist() {
-	const a = diskState && diskState.modelAllowlist;
-	return (a && typeof a === 'object') ? a : {};
-}
-function allowlistDirty() {
-	// Preserve empty arrays — they mean "explicitly hide all from this provider",
-	// distinct from a missing key which means "no filter".
-	const norm = (obj: any) => {
-		const out: Record<string, any> = {};
-		for (const [k, v] of Object.entries(obj || {})) {
-			if (Array.isArray(v)) out[k] = v.slice().sort();
-		}
-		return out;
-	};
-	return JSON.stringify(norm(allowlistDraft)) !== JSON.stringify(norm(diskAllowlist()));
-}
-
-function diskCompactOverride() {
-	return (diskState && typeof diskState.autoCompactThreshold === 'number') ? diskState.autoCompactThreshold : null;
-}
-function defaultCompact() {
-	return (diskState && typeof diskState.defaultCompactThreshold === 'number') ? diskState.defaultCompactThreshold : 75;
-}
-function compactDirty() {
-	// Treat "equal to default" as no override.
-	const def = defaultCompact();
-	const n = parseInt(compactDraft, 10);
-	const draftOverride = (!Number.isFinite(n) || n === def) ? null : n;
-	return draftOverride !== diskCompactOverride();
-}
-function diskDynamicCompaction() {
-	return (diskState && typeof diskState.dynamicCompaction === 'boolean') ? diskState.dynamicCompaction : true;
-}
-function dynamicCompactionDirty() {
-	return dynamicCompactionDraft !== diskDynamicCompaction();
-}
-function diskAutoTitlePrompt() {
-	const v = diskState && diskState.modes && diskState.modes.autoTitlePrompt;
-	return typeof v === 'string' ? v : '';
-}
-function defaultAutoTitle() {
-	return (diskState && typeof diskState.defaultAutoTitlePrompt === 'string') ? diskState.defaultAutoTitlePrompt : '';
-}
-// The auto-title editor is pre-filled with the built-in default; an override is
-// only stored when the text differs from it (mirrors the per-mode prompts).
-function autoTitleOverrideFromDraft() {
-	const d = autoTitlePromptDraft.trim();
-	return (d === '' || d === defaultAutoTitle().trim()) ? '' : autoTitlePromptDraft;
-}
-function diskCompactInstructions() {
-	const v = diskState && diskState.modes && diskState.modes.compactInstructions;
-	return typeof v === 'string' ? v : '';
-}
-function autoTitlePromptDirty() {
-	return autoTitleOverrideFromDraft().trim() !== diskAutoTitlePrompt().trim();
-}
-function compactInstructionsDirty() {
-	return compactInstructionsDraft.trim() !== diskCompactInstructions().trim();
-}
-
-function isDirty() {
-	if (!diskState) return false;
-	for (const n of MODE_NAMES) if (modeDirty(n)) return true;
-	if (autoTitleDirty()) return true;
-	if (compactModelDirty()) return true;
-	if (authDirty()) return true;
-	if (modelsDirty()) return true;
-	if (allowlistDirty()) return true;
-	if (compactDirty()) return true;
-	if (dynamicCompactionDirty()) return true;
-	if (autoTitlePromptDirty()) return true;
-	if (compactInstructionsDirty()) return true;
-	return false;
-}
-
-function updateSaveBar() {
-	const dirty = isDirty();
-	el('save-bar').classList.toggle('hidden', !dirty);
-	if (!dirty) return;
-	let modeD = 0, authD = 0;
-	for (const n of MODE_NAMES) if (modeDirty(n)) modeD++;
-	authD = Object.keys(authAddsDraft).length + authRemovesDraft.size;
-	const parts = [];
-	if (modeD) parts.push(t('settings.dirty.modes', { n: modeD }));
-	if (autoTitleDirty()) parts.push(t('settings.dirty.autoTitle'));
-	if (compactModelDirty()) parts.push(t('settings.dirty.compactModel'));
-	if (authD) parts.push(t('settings.dirty.auth', { n: authD }));
-	if (modelsDirty()) parts.push(t('settings.dirty.providers'));
-	if (allowlistDirty()) parts.push(t('settings.dirty.filter'));
-	if (compactDirty()) parts.push(t('settings.dirty.compact'));
-	el('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
-}
 
 // Build a {provider: [id, ...]} index from live availableModels (cached from
 // Pi's get_available_models). Used to constrain the mode dropdowns to real
@@ -222,7 +22,7 @@ function buildProviderIndex(applyAllowlist = true) {
 	// applyAllowlist=false: used by the allowlist UI itself, which must list
 	// every model so the user can toggle them.
 	const map = new Map();
-	const list = (diskState && diskState.availableModels) || [];
+	const list = (S.diskState && S.diskState.availableModels) || [];
 	for (const m of list) {
 		if (!m.provider || !m.id) continue;
 		if (!map.has(m.provider)) map.set(m.provider, []);
@@ -230,8 +30,8 @@ function buildProviderIndex(applyAllowlist = true) {
 	}
 	if (applyAllowlist) {
 		for (const [prov, entries] of map.entries()) {
-			const allowed = Array.isArray(allowlistDraft[prov])
-				? new Set(allowlistDraft[prov])
+			const allowed = Array.isArray(S.allowlistDraft[prov])
+				? new Set(S.allowlistDraft[prov])
 				: null;
 			if (allowed) map.set(prov, entries.filter((e: any) => allowed.has(e.id)));
 		}
@@ -276,7 +76,7 @@ function modelOptionsHtml(currentValue: any, provider: any, providerIndex: any) 
 const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
 
 function findAvailableModel(provider: any, id: any) {
-	const list = (diskState && diskState.availableModels) || [];
+	const list = (S.diskState && S.diskState.availableModels) || [];
 	return list.find((m: any) => m.provider === provider && m.id === id) || null;
 }
 
@@ -309,7 +109,7 @@ function renderModes() {
 	root.innerHTML = '';
 	const providerIndex = buildProviderIndex();
 	for (const name of MODE_NAMES) {
-		const draft = modesDraft[name];
+		const draft = S.modesDraft[name];
 		const card = document.createElement('div');
 		card.className = 'mode-card' + (modeDirty(name) ? ' dirty' : '');
 		card.dataset.mode = name;
@@ -326,12 +126,12 @@ function renderModes() {
 		el.addEventListener('change', () => {
 			const name = el.getAttribute('data-mode');
 			const field = el.getAttribute('data-field');
-			if (!name || !field || !modesDraft[name]) return;
-			modesDraft[name][field] = el.value;
+			if (!name || !field || !S.modesDraft[name]) return;
+			S.modesDraft[name][field] = el.value;
 			// Changing provider invalidates the model selection; changing the
 			// model changes which thinking options apply — re-render either way.
 			if (field === 'provider') {
-				modesDraft[name].id = '';
+				S.modesDraft[name].id = '';
 				renderModes();
 			} else if (field === 'id') {
 				renderModes();
@@ -345,14 +145,14 @@ function renderModes() {
 }
 
 // Prompts tab: all four mode system prompts + the auto-title prompt + the
-// compaction additional-focus. Mode prompts share modesDraft with the Modes
+// compaction additional-focus. Mode prompts share S.modesDraft with the Modes
 // tab, so dirty tracking (modeDirty) is unchanged.
 function renderPrompts() {
 	const root = el('prompt-modes');
 	if (root) {
 		root.innerHTML = '';
 		for (const name of MODE_NAMES) {
-			const draft = modesDraft[name] || { prompt: '' };
+			const draft = S.modesDraft[name] || { prompt: '' };
 			const overridden = (draft.prompt || '') !== defaultPrompt(name) && (draft.prompt || '').trim() !== '';
 			const block = document.createElement('div');
 			block.className = 'prompt-block' + (modeDirty(name) ? ' dirty' : '');
@@ -369,8 +169,8 @@ function renderPrompts() {
 		qa(root, 'textarea[data-field="prompt"]').forEach((el: any) => {
 			el.addEventListener('input', () => {
 				const name = el.getAttribute('data-mode');
-				if (!name || !modesDraft[name]) return;
-				modesDraft[name].prompt = el.value;
+				if (!name || !S.modesDraft[name]) return;
+				S.modesDraft[name].prompt = el.value;
 				const block = el.closest('.prompt-block');
 				if (block) block.classList.toggle('dirty', modeDirty(name));
 				updateSaveBar();
@@ -379,8 +179,8 @@ function renderPrompts() {
 		qa(root, 'button[data-prompt-reset]').forEach((btn: any) => {
 			btn.addEventListener('click', () => {
 				const name = btn.getAttribute('data-prompt-reset');
-				if (!name || !modesDraft[name]) return;
-				modesDraft[name].prompt = defaultPrompt(name);
+				if (!name || !S.modesDraft[name]) return;
+				S.modesDraft[name].prompt = defaultPrompt(name);
 				renderPrompts();
 				updateSaveBar();
 			});
@@ -392,28 +192,28 @@ function renderPrompts() {
 	};
 	const titleTa = el('autotitle-prompt-ta');
 	if (titleTa) {
-		titleTa.value = autoTitlePromptDraft;
+		titleTa.value = S.autoTitlePromptDraft;
 		toggleBadge('autotitle-badge', autoTitleOverrideFromDraft().trim() !== '');
 		titleTa.oninput = () => {
-			autoTitlePromptDraft = titleTa.value;
+			S.autoTitlePromptDraft = titleTa.value;
 			toggleBadge('autotitle-badge', autoTitleOverrideFromDraft().trim() !== '');
 			updateSaveBar();
 		};
 		// "Reset to default" restores the built-in prompt text (= clears override).
 		const reset = el('autotitle-prompt-reset');
-		if (reset) reset.onclick = () => { autoTitlePromptDraft = defaultAutoTitle(); titleTa.value = autoTitlePromptDraft; toggleBadge('autotitle-badge', false); updateSaveBar(); };
+		if (reset) reset.onclick = () => { S.autoTitlePromptDraft = defaultAutoTitle(); titleTa.value = S.autoTitlePromptDraft; toggleBadge('autotitle-badge', false); updateSaveBar(); };
 	}
 	const compactTa = el('compact-instructions-ta');
 	if (compactTa) {
-		compactTa.value = compactInstructionsDraft;
-		toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
+		compactTa.value = S.compactInstructionsDraft;
+		toggleBadge('compact-badge', S.compactInstructionsDraft.trim() !== '');
 		compactTa.oninput = () => {
-			compactInstructionsDraft = compactTa.value;
-			toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
+			S.compactInstructionsDraft = compactTa.value;
+			toggleBadge('compact-badge', S.compactInstructionsDraft.trim() !== '');
 			updateSaveBar();
 		};
 		const reset = el('compact-instructions-reset');
-		if (reset) reset.onclick = () => { compactInstructionsDraft = ''; compactTa.value = ''; toggleBadge('compact-badge', false); updateSaveBar(); };
+		if (reset) reset.onclick = () => { S.compactInstructionsDraft = ''; compactTa.value = ''; toggleBadge('compact-badge', false); updateSaveBar(); };
 	}
 }
 
@@ -424,15 +224,15 @@ function renderAuth() {
 	// Combined view: existing (minus pending removes) + pending adds
 	const entries = [];
 	for (const [id, info] of Object.entries(onDisk) as [string, any][]) {
-		if (authRemovesDraft.has(id)) continue;
+		if (S.authRemovesDraft.has(id)) continue;
 		entries.push({ id, type: info.type, pending: false });
 	}
-	for (const id of Object.keys(authAddsDraft)) {
+	for (const id of Object.keys(S.authAddsDraft)) {
 		entries.push({ id, type: 'api_key', pending: true });
 	}
 	// Also show removed entries grayed (so user can undo)
 	const removedEntries = [];
-	for (const id of authRemovesDraft) {
+	for (const id of S.authRemovesDraft) {
 		removedEntries.push({ id, type: (onDisk[id] && onDisk[id].type) || '?' });
 	}
 
@@ -462,8 +262,8 @@ function renderAuth() {
 		btn.addEventListener('click', () => {
 			const id = btn.getAttribute('data-del-auth');
 			if (!id) return;
-			if (authAddsDraft[id]) delete authAddsDraft[id];
-			else authRemovesDraft.add(id);
+			if (S.authAddsDraft[id]) delete S.authAddsDraft[id];
+			else S.authRemovesDraft.add(id);
 			renderAuth();
 			updateOAuthButtons();
 			updateSaveBar();
@@ -473,7 +273,7 @@ function renderAuth() {
 		btn.addEventListener('click', () => {
 			const id = btn.getAttribute('data-undo-auth');
 			if (!id) return;
-			authRemovesDraft.delete(id);
+			S.authRemovesDraft.delete(id);
 			renderAuth();
 			updateOAuthButtons();
 			updateSaveBar();
@@ -490,14 +290,14 @@ const discoveryState: Record<string, any> = {};  // providerName -> { ids: [], f
 function provDirty(name: any) {
 	const onDisk = diskModels();
 	const a = (onDisk.providers && onDisk.providers[name]) || null;
-	const b = (modelsDraft.providers && modelsDraft.providers[name]) || null;
+	const b = (S.modelsDraft.providers && S.modelsDraft.providers[name]) || null;
 	return JSON.stringify(a) !== JSON.stringify(b);
 }
 
 function renderProviders() {
 	const root = el('providers-list');
 	root.innerHTML = '';
-	const providers = (modelsDraft && modelsDraft.providers) || {};
+	const providers = (S.modelsDraft && S.modelsDraft.providers) || {};
 	const entries = Object.entries(providers) as [string, any][];
 	if (entries.length === 0) {
 		root.innerHTML = '<div class="note">' + esc(t('settings.providers.empty')) + '</div>';
@@ -556,7 +356,7 @@ function renderProviders() {
 			const provName = card?.dataset.prov;
 			const field = el.getAttribute('data-field');
 			if (!provName || !field) return;
-			const cfg = modelsDraft.providers[provName];
+			const cfg = S.modelsDraft.providers[provName];
 			if (!cfg) return;
 			if (field === '__name') {
 				// Apply rename on blur (deferred); keep editing in place for now
@@ -574,13 +374,13 @@ function renderProviders() {
 			const oldName = card?.dataset.prov;
 			const newName = el.value.trim();
 			if (!oldName || !newName || oldName === newName) return;
-			if (modelsDraft.providers[newName]) {
+			if (S.modelsDraft.providers[newName]) {
 				showToast(t('settings.providers.idExists'), true);
 				el.value = oldName;
 				return;
 			}
-			modelsDraft.providers[newName] = modelsDraft.providers[oldName];
-			delete modelsDraft.providers[oldName];
+			S.modelsDraft.providers[newName] = S.modelsDraft.providers[oldName];
+			delete S.modelsDraft.providers[oldName];
 			if (discoveryState[oldName]) {
 				discoveryState[newName] = discoveryState[oldName];
 				delete discoveryState[oldName];
@@ -594,7 +394,7 @@ function renderProviders() {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
 			if (!n) return;
-			delete modelsDraft.providers[n];
+			delete S.modelsDraft.providers[n];
 			delete discoveryState[n];
 			// Whole provider gone → every mode pinned to it needs fallback.
 			autoFallbackModes();
@@ -609,7 +409,7 @@ function renderProviders() {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
 			if (!n) return;
-			const cfg = modelsDraft.providers[n];
+			const cfg = S.modelsDraft.providers[n];
 			if (!cfg) return;
 			if (!cfg.models) cfg.models = [];
 			cfg.models.push({ id: '', name: '', contextWindow: '', maxTokens: '', reasoning: false });
@@ -622,7 +422,7 @@ function renderProviders() {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
 			if (!n) return;
-			const cfg = modelsDraft.providers[n];
+			const cfg = S.modelsDraft.providers[n];
 			if (!cfg?.baseUrl) {
 				showToast(t('settings.providers.baseUrlFirst'), true);
 				return;
@@ -690,7 +490,7 @@ function renderModelRows(container: any, provName: any, models: any) {
 			const i = parseInt(el.getAttribute('data-mi'), 10);
 			const f = el.getAttribute('data-mf');
 			if (!p || isNaN(i) || !f) return;
-			const cfg = modelsDraft.providers[p];
+			const cfg = S.modelsDraft.providers[p];
 			if (!cfg?.models?.[i]) return;
 			const model = cfg.models[i];
 			if (f === 'thinkingFormat') {
@@ -730,7 +530,7 @@ function renderModelRows(container: any, provName: any, models: any) {
 			const p = btn.getAttribute('data-del-model');
 			const i = parseInt(btn.getAttribute('data-mi'), 10);
 			if (!p || isNaN(i)) return;
-			const cfg = modelsDraft.providers[p];
+			const cfg = S.modelsDraft.providers[p];
 			if (cfg?.models) {
 				cfg.models.splice(i, 1);
 				// Delete may have removed a model that modes/autoTitle reference.
@@ -763,7 +563,7 @@ function renderDiscoveryFor(container: any, provName: any) {
 		return;
 	}
 	const filtered = st.ids.filter((id: any) => !st.filter || id.toLowerCase().includes(st.filter.toLowerCase()));
-	const cfg = modelsDraft.providers[provName];
+	const cfg = S.modelsDraft.providers[provName];
 	const existing = new Set(((cfg && cfg.models) || []).map((m: any) => m.id));
 
 	const picker = document.createElement('div');
@@ -878,9 +678,9 @@ function autoFallbackModes() {
 			}
 		}
 	};
-	for (const m of MODE_NAMES) fixOne(t('settings.fallback.modeLabel', { mode: m }), modesDraft[m] || { provider: '', id: '' });
-	fixOne(t('settings.fallback.autoTitleLabel'), autoTitleDraft);
-	fixOne(t('settings.fallback.compactModelLabel'), compactModelDraft);
+	for (const m of MODE_NAMES) fixOne(t('settings.fallback.modeLabel', { mode: m }), S.modesDraft[m] || { provider: '', id: '' });
+	fixOne(t('settings.fallback.autoTitleLabel'), S.autoTitleDraft);
+	fixOne(t('settings.fallback.compactModelLabel'), S.compactModelDraft);
 	if (replacements.length) {
 		showToast(t('settings.fallback.toast', { n: replacements.length, first: replacements[0] })
 			+ (replacements.length > 1 ? t('settings.fallback.more', { n: replacements.length - 1 }) : ''));
@@ -895,16 +695,16 @@ function renderAutoTitle() {
 	const providerIndex = buildProviderIndex();
 	const provSel = el('autotitle-provider');
 	const idSel = el('autotitle-id');
-	provSel.innerHTML = providerOptionsHtml(autoTitleDraft.provider, providerIndex);
-	idSel.innerHTML = modelOptionsHtml(autoTitleDraft.id, autoTitleDraft.provider, providerIndex);
+	provSel.innerHTML = providerOptionsHtml(S.autoTitleDraft.provider, providerIndex);
+	idSel.innerHTML = modelOptionsHtml(S.autoTitleDraft.id, S.autoTitleDraft.provider, providerIndex);
 	provSel.onchange = () => {
-		autoTitleDraft.provider = provSel.value;
-		autoTitleDraft.id = '';
+		S.autoTitleDraft.provider = provSel.value;
+		S.autoTitleDraft.id = '';
 		renderAutoTitle();
 		updateSaveBar();
 	};
 	idSel.onchange = () => {
-		autoTitleDraft.id = idSel.value;
+		S.autoTitleDraft.id = idSel.value;
 		card.classList.toggle('dirty', autoTitleDirty());
 		updateSaveBar();
 	};
@@ -917,16 +717,16 @@ function renderCompactModel() {
 	const providerIndex = buildProviderIndex();
 	const provSel = el('compactmodel-provider');
 	const idSel = el('compactmodel-id');
-	provSel.innerHTML = providerOptionsHtml(compactModelDraft.provider, providerIndex);
-	idSel.innerHTML = modelOptionsHtml(compactModelDraft.id, compactModelDraft.provider, providerIndex);
+	provSel.innerHTML = providerOptionsHtml(S.compactModelDraft.provider, providerIndex);
+	idSel.innerHTML = modelOptionsHtml(S.compactModelDraft.id, S.compactModelDraft.provider, providerIndex);
 	provSel.onchange = () => {
-		compactModelDraft.provider = provSel.value;
-		compactModelDraft.id = '';
+		S.compactModelDraft.provider = provSel.value;
+		S.compactModelDraft.id = '';
 		renderCompactModel();
 		updateSaveBar();
 	};
 	idSel.onchange = () => {
-		compactModelDraft.id = idSel.value;
+		S.compactModelDraft.id = idSel.value;
 		card.classList.toggle('dirty', compactModelDirty());
 		updateSaveBar();
 	};
@@ -946,7 +746,7 @@ function renderAllowlist() {
 	}
 	for (const prov of providers) {
 		const entries = providerIndex.get(prov) || [];
-		const allowed = Array.isArray(allowlistDraft[prov]) ? new Set(allowlistDraft[prov]) : null;
+		const allowed = Array.isArray(S.allowlistDraft[prov]) ? new Set(S.allowlistDraft[prov]) : null;
 		// allowed === null → all visible (no filter for this provider)
 		// allowed === Set → only those ids visible
 		const card = document.createElement('div');
@@ -986,14 +786,14 @@ function renderAllowlist() {
 			if (!prov || !id) return;
 			const entries = providerIndex.get(prov) || [];
 			// Start from the current effective set (all visible if no filter).
-			const current = Array.isArray(allowlistDraft[prov])
-				? new Set(allowlistDraft[prov])
+			const current = Array.isArray(S.allowlistDraft[prov])
+				? new Set(S.allowlistDraft[prov])
 				: new Set(entries.map((e: any) => e.id));
 			if (el.checked) current.add(id);
 			else current.delete(id);
 			// If user re-checked everything, drop the key entirely (= no filter).
-			if (current.size === entries.length) delete allowlistDraft[prov];
-			else allowlistDraft[prov] = [...current] as string[];
+			if (current.size === entries.length) delete S.allowlistDraft[prov];
+			else S.allowlistDraft[prov] = [...current] as string[];
 			// Auto-fallback any mode (or autoTitle) whose model just dropped
 			// out of the visible set. Toast surfaces the replacement so the
 			// user notices before they save.
@@ -1007,7 +807,7 @@ function renderAllowlist() {
 	qa(root, 'button[data-allow-all]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-all');
-			if (prov) delete allowlistDraft[prov];
+			if (prov) delete S.allowlistDraft[prov];
 			// Auto-fallback any mode (or autoTitle) whose model just dropped
 			// out of the visible set. Toast surfaces the replacement so the
 			// user notices before they save.
@@ -1021,7 +821,7 @@ function renderAllowlist() {
 	qa(root, 'button[data-allow-none]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-none');
-			if (prov) allowlistDraft[prov] = [];
+			if (prov) S.allowlistDraft[prov] = [];
 			// Auto-fallback any mode (or autoTitle) whose model just dropped
 			// out of the visible set. Toast surfaces the replacement so the
 			// user notices before they save.
@@ -1037,39 +837,39 @@ function renderAllowlist() {
 function renderCompact() {
 	const toggle = el('dynamic-compaction');
 	if (toggle) {
-		toggle.checked = dynamicCompactionDraft;
-		toggle.onchange = () => { dynamicCompactionDraft = toggle.checked; updateSaveBar(); };
+		toggle.checked = S.dynamicCompactionDraft;
+		toggle.onchange = () => { S.dynamicCompactionDraft = toggle.checked; updateSaveBar(); };
 	}
 	const input = el('compact-threshold');
 	if (!input) return;
-	input.value = compactDraft;
+	input.value = S.compactDraft;
 	const valueLabel = el('compact-value');
 	const showValue = () => { if (valueLabel) valueLabel.textContent = input.value + '%'; };
 	showValue();
 	const hint = el('compact-default-hint');
 	if (hint) hint.textContent = t('settings.compact.defaultHint', { n: defaultCompact() });
-	input.oninput = () => { compactDraft = input.value; showValue(); updateSaveBar(); };
+	input.oninput = () => { S.compactDraft = input.value; showValue(); updateSaveBar(); };
 	const reset = el('compact-reset');
-	if (reset) reset.onclick = () => { compactDraft = String(defaultCompact()); input.value = compactDraft; showValue(); updateSaveBar(); };
+	if (reset) reset.onclick = () => { S.compactDraft = String(defaultCompact()); input.value = S.compactDraft; showValue(); updateSaveBar(); };
 }
 
 function render(s: any) {
-	diskState = s;
-	modesDraft = {};
+	S.diskState = s;
+	S.modesDraft = {};
 	for (const n of MODE_NAMES) {
 		const d = diskMode(n);
-		modesDraft[n] = { provider: d.provider, id: d.id, thinking: d.thinking, prompt: d.promptOverride || defaultPrompt(n) };
+		S.modesDraft[n] = { provider: d.provider, id: d.id, thinking: d.thinking, prompt: d.promptOverride || defaultPrompt(n) };
 	}
-	autoTitleDraft = diskAutoTitle();
-	compactModelDraft = diskCompactModel();
-	authAddsDraft = {};
-	authRemovesDraft = new Set();
-	modelsDraft = JSON.parse(JSON.stringify(diskModels()));
-	allowlistDraft = JSON.parse(JSON.stringify(diskAllowlist()));
-	compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
-	dynamicCompactionDraft = diskDynamicCompaction();
-	autoTitlePromptDraft = diskAutoTitlePrompt() || defaultAutoTitle();
-	compactInstructionsDraft = diskCompactInstructions();
+	S.autoTitleDraft = diskAutoTitle();
+	S.compactModelDraft = diskCompactModel();
+	S.authAddsDraft = {};
+	S.authRemovesDraft = new Set();
+	S.modelsDraft = JSON.parse(JSON.stringify(diskModels()));
+	S.allowlistDraft = JSON.parse(JSON.stringify(diskAllowlist()));
+	S.compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
+	S.dynamicCompactionDraft = diskDynamicCompaction();
+	S.autoTitlePromptDraft = diskAutoTitlePrompt() || defaultAutoTitle();
+	S.compactInstructionsDraft = diskCompactInstructions();
 
 	renderModes();
 	renderPrompts();
@@ -1097,10 +897,10 @@ function updateOAuthButtons() {
 		const ui = oauthUis[statusKind];
 		if (!ui) continue;
 		// Effective auth = on disk AND not staged for removal, so disconnecting
-		// (which only stages into authRemovesDraft until save) flips the badge
+		// (which only stages into S.authRemovesDraft until save) flips the badge
 		// immediately instead of waiting for save + reload.
 		const cred = diskAuth()[providerId];
-		const authed = !!(cred && cred.type === 'oauth') && !authRemovesDraft.has(providerId);
+		const authed = !!(cred && cred.type === 'oauth') && !S.authRemovesDraft.has(providerId);
 		if (providerId === 'openai-codex') codexAuthed = authed;
 		const inFlight = !ui.cancel.classList.contains('hidden');
 		if (authed) {
@@ -1122,10 +922,10 @@ function updateOAuthButtons() {
 	const usageOut = el('codex-usage');
 	if (usageBtn) usageBtn.classList.toggle('hidden', !codexAuthed);
 	if (!codexAuthed) {
-		codexUsageFetched = false;
+		S.codexUsageFetched = false;
 		if (usageOut) { usageOut.classList.add('hidden'); usageOut.textContent = ''; }
-	} else if (!codexUsageFetched) {
-		codexUsageFetched = true;
+	} else if (!S.codexUsageFetched) {
+		S.codexUsageFetched = true;
 		requestCodexUsage();
 	}
 }
@@ -1154,7 +954,6 @@ wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'an
 // Codex usage (ChatGPT subscription limits). Read-only; the host hits the
 // usage endpoint with the stored OAuth token. Auto-fetched once per panel
 // load when Codex is authed; the button re-fetches.
-let codexUsageFetched = false;
 function requestCodexUsage() {
 	const out = el('codex-usage');
 	if (out) { out.classList.remove('hidden'); out.textContent = t('settings.usage.checking'); }
@@ -1200,7 +999,7 @@ el('add-auth-btn').addEventListener('click', () => {
 	const id = el('new-auth-id').value.trim();
 	const key = el('new-auth-key').value;
 	if (!id || !key) { showToast(t('settings.auth.needBoth'), true); return; }
-	authAddsDraft[id] = key;
+	S.authAddsDraft[id] = key;
 	el('new-auth-id').value = '';
 	el('new-auth-key').value = '';
 	renderAuth();
@@ -1213,11 +1012,11 @@ el('add-provider-btn').addEventListener('click', () => {
 	let base = 'new-provider';
 	let name = base;
 	let n = 1;
-	while (modelsDraft.providers[name]) {
+	while (S.modelsDraft.providers[name]) {
 		n++;
 		name = base + '-' + n;
 	}
-	modelsDraft.providers[name] = { baseUrl: '', api: 'openai-completions', apiKey: '', models: [] };
+	S.modelsDraft.providers[name] = { baseUrl: '', api: 'openai-completions', apiKey: '', models: [] };
 	renderProviders();
 	updateSaveBar();
 	// Focus the new card's name input
@@ -1236,8 +1035,8 @@ el('add-provider-btn').addEventListener('click', () => {
 
 // Cancel
 el('cancel-btn').addEventListener('click', () => {
-	if (!diskState) return;
-	render(diskState);
+	if (!S.diskState) return;
+	render(S.diskState);
 	showToast(t('settings.toast.reverted'));
 });
 
@@ -1246,17 +1045,17 @@ el('save-btn').addEventListener('click', () => {
 	const payload = {
 		kind: 'save',
 		modes: true,
-		modeConfigs: modesDraft,
-		autoTitle: autoTitleDraft,
-		compactModel: compactModelDraft,
-		modelAllowlist: allowlistDraft,
-		authAdds: authAddsDraft,
-		authRemoves: Array.from(authRemovesDraft),
-		models: modelsDraft,
-		autoCompactThreshold: (() => { const n = parseInt(compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
-		dynamicCompaction: dynamicCompactionDraft,
+		modeConfigs: S.modesDraft,
+		autoTitle: S.autoTitleDraft,
+		compactModel: S.compactModelDraft,
+		modelAllowlist: S.allowlistDraft,
+		authAdds: S.authAddsDraft,
+		authRemoves: Array.from(S.authRemovesDraft),
+		models: S.modelsDraft,
+		autoCompactThreshold: (() => { const n = parseInt(S.compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
+		dynamicCompaction: S.dynamicCompactionDraft,
 		autoTitlePrompt: autoTitleOverrideFromDraft(),
-		compactInstructions: compactInstructionsDraft,
+		compactInstructions: S.compactInstructionsDraft,
 	};
 	post(payload);
 	showToast(t('settings.toast.saving'));
@@ -1319,3 +1118,4 @@ wireTabs();
 const langSel = el('lang-select');
 if (langSel) langSel.addEventListener('change', () => post({ kind: 'set-language', value: langSel.value }));
 post({ kind: 'refresh' });
+
