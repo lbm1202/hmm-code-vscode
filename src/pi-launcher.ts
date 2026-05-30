@@ -12,6 +12,7 @@
 
 import { existsSync } from "node:fs";
 import * as vscode from "vscode";
+import { resolveLocale } from "./i18n";
 
 export interface PiLaunchConfig {
 	/** Executable to spawn. */
@@ -28,11 +29,15 @@ export function getPiLaunchConfig(ctx: vscode.ExtensionContext): PiLaunchConfig 
 	const bundledCli = ctx.asAbsolutePath("out/vendor/pi/dist/cli.js");
 	const bundledHmmCodePi = ctx.asAbsolutePath("out/vendor/hmm-code-pi/index.ts");
 
+	// Pass the resolved UI locale so the bundled hmm-code-pi (auto-title) can
+	// generate session titles in the user's hmm-code.language.
+	const lang = resolveLocale();
+
 	if (existsSync(bundledCli) && existsSync(bundledHmmCodePi)) {
 		return {
 			cmd: process.execPath,
 			args: [bundledCli, "--no-extensions", "-e", bundledHmmCodePi],
-			env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+			env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", HMM_CODE_LANG: lang },
 			source: "bundled",
 		};
 	}
@@ -51,7 +56,7 @@ export function getPiLaunchConfig(ctx: vscode.ExtensionContext): PiLaunchConfig 
 	return {
 		cmd: "pi",
 		args: [],
-		env: { ...process.env },
+		env: { ...process.env, HMM_CODE_LANG: lang },
 		source: "system",
 	};
 }

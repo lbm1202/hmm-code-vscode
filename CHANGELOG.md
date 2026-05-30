@@ -12,6 +12,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ### Changed
 - Auto-compact watchdog raised to 10 min (bundled Pi) so a slow-but-working compaction on a reasoning model isn't prematurely re-armed.
+- Session titles are generated in the `hmm-code.language` locale (passed to Pi as `HMM_CODE_LANG`), and auto-title no longer fires on a turn that's also compacting (avoids a duplicate request to the session model).
 
 ## [0.1.1-rc1] — 2026-05-29
 
