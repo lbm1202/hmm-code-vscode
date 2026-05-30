@@ -188,5 +188,7 @@
   "settings.usage.resetsIn": "{t} 후 초기화",
   "settings.usage.plan": "플랜: {plan}",
   "settings.usage.limitReached": "한도 초과",
-  "settings.usage.failed": "사용량 확인 실패: {err}"
+  "settings.usage.failed": "사용량 확인 실패: {err}",
+  "chat.compactLabel": "압축",
+  "chat.compactTitle": "지금 컨텍스트 압축"
 }

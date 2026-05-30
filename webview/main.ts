@@ -48,6 +48,12 @@ e.btnAutoApprove.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve" });
 });
 
+// Manual compaction — dispatches /compact (handled by hmm-code-pi's command,
+// which calls ctx.compact + notifies). Same path as the TUI slash.
+e.btnCompact.addEventListener("click", () => {
+	post({ kind: FROM_WEBVIEW.SLASH, text: "/compact" });
+});
+
 setEmptyVisibility();
 
 // Ctrl/Cmd-click on a `.file-link` (rendered by tool summaries + edit-diff

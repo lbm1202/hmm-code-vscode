@@ -7,6 +7,12 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- Manual **Compact** button in the chat prompt footer — dispatches `/compact` to compact the session context on demand (same path as the Pi TUI `/compact`).
+
+### Changed
+- Auto-compact watchdog raised to 10 min (bundled Pi) so a slow-but-working compaction on a reasoning model isn't prematurely re-armed.
+
 ## [0.1.1-rc1] — 2026-05-29
 
 Pre-release (release candidate). Stable remains 0.1.0.

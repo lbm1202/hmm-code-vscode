@@ -188,5 +188,7 @@
   "settings.usage.resetsIn": "resets in {t}",
   "settings.usage.plan": "Plan: {plan}",
   "settings.usage.limitReached": "limit reached",
-  "settings.usage.failed": "Usage check failed: {err}"
+  "settings.usage.failed": "Usage check failed: {err}",
+  "chat.compactLabel": "Compact",
+  "chat.compactTitle": "Compact the context now"
 }
