@@ -1,4 +1,5 @@
 import { S, esc, t, MODE_NAMES, THINKING_LEVELS } from "./settings-state";
+import { isModelAllowed } from "../src/model-utils";
 
 export function buildProviderIndex(applyAllowlist = true) {
 	// Map<provider, Array<{id, alias?}>>. Alias comes from modes.json:modelAliases
@@ -20,10 +21,9 @@ export function buildProviderIndex(applyAllowlist = true) {
 	}
 	if (applyAllowlist) {
 		for (const [prov, entries] of map.entries()) {
-			const allowed = Array.isArray(S.allowlistDraft[prov])
-				? new Set(S.allowlistDraft[prov])
-				: null;
-			if (allowed) map.set(prov, entries.filter((e: any) => allowed.has(e.id)));
+			// Same predicate the chat picker uses (src/model-utils) but against the
+			// live draft allowlist so the dropdowns reflect unsaved edits.
+			map.set(prov, entries.filter((e: any) => isModelAllowed(S.allowlistDraft, prov, e.id)));
 		}
 	}
 	for (const arr of map.values())

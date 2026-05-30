@@ -211,7 +211,7 @@ function vendorBundle() {
 
 	cpSync(hmmSrc, hmmDst, {
 		recursive: true,
-		filter: (src) => !/(\.git\/|node_modules\/|\.map$)/.test(src),
+		filter: (src) => !/(\.git\/|node_modules\/|\.map$|\/tests?\/|\.test\.[jt]s$)/.test(src),
 	});
 
 	const piSize = (dirSize(piDst) / 1024 / 1024).toFixed(1);

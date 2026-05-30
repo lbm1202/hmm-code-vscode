@@ -2,6 +2,7 @@
 .vscode-test/**
 src/**
 webview/**
+test/**
 out/**/*.map
 node_modules/**
 .gitignore
@@ -14,3 +15,4 @@ package-lock.json
 hmm-code-*.vsix
 *.md
 !README.md
+!README.ko.md

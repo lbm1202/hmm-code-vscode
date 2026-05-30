@@ -20,6 +20,7 @@ import {
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
+import { applyAllowlist, findAlias } from "./model-utils";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -43,33 +44,6 @@ function readModelMaps(): {
 	} catch {
 		return { aliases: {}, allowlist: {} };
 	}
-}
-
-/** Find the alias for (provider,id). Tries "provider/id" first, then bare id. */
-function findAlias(
-	aliases: Record<string, string>,
-	provider: string | undefined,
-	id: string,
-): string | undefined {
-	if (provider) {
-		const fq = `${provider}/${id}`;
-		if (aliases[fq]) return aliases[fq];
-	}
-	return aliases[id];
-}
-
-/** Apply per-provider allowlist. Semantics:
- *   - provider key missing → no filter (all models visible)
- *   - provider key = [...]  → only those ids visible
- *   - provider key = []     → 0 visible (explicit hide-all) */
-function applyAllowlist(models: ModelEntry[], allowlist: Record<string, string[]>): ModelEntry[] {
-	const hasFilters = Object.keys(allowlist).length > 0;
-	if (!hasFilters) return models;
-	return models.filter((m) => {
-		const allowed = allowlist[m.provider];
-		if (!allowed) return true;
-		return allowed.includes(m.id);
-	});
 }
 
 /** Attach aliases to a raw Pi model list — used for the static cache that
