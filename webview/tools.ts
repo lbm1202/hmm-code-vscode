@@ -148,11 +148,11 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 function renderFinalizePlanPreview(args: any): string {
 	const summary = String(args?.summary ?? "").trim();
 	const body = String(args?.body ?? "").trim();
-	const steps = Array.isArray(args?.steps) ? args.steps.map((s: any) => String(s ?? "")) : [];
-	const validation = Array.isArray(args?.validation)
+	const steps: string[] = Array.isArray(args?.steps) ? args.steps.map((s: any) => String(s ?? "")) : [];
+	const validation: string[] = Array.isArray(args?.validation)
 		? args.validation.map((s: any) => String(s ?? ""))
 		: [];
-	const docs = Array.isArray(args?.docs) ? args.docs.map((s: any) => String(s ?? "")) : [];
+	const docs: string[] = Array.isArray(args?.docs) ? args.docs.map((s: any) => String(s ?? "")) : [];
 	const target = String(args?.target_mode ?? "code");
 
 	if (!summary && !body && steps.length === 0 && validation.length === 0 && docs.length === 0) {
