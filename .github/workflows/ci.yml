@@ -1,0 +1,31 @@
+name: CI
+
+# Runs on every push to main and on pull requests: type-checks the whole
+# extension and runs the unit test suite. The full .vsix build/package is
+# exercised separately by release.yml on tag pushes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Type check
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Run tests
+        run: npm test
