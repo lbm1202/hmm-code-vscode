@@ -38,8 +38,13 @@ export function showModal(req: any): void {
 			runtime.pendingQuestionCount = Math.max(0, runtime.pendingQuestionCount - 1);
 		}
 		post({ kind: FROM_WEBVIEW.UI_RESPONSE, response: res });
-		// User answered → likely a new turn begins; reset the in-bubble status row.
-		ensureTurn();
+		// Mid-turn ask_user/request_mode_switch: refresh the status row so it
+		// reappears promptly while the AI resumes. But a slash command's picker
+		// (e.g. bare `/mode`, `/mode-set`) also arrives as a ui-request with NO
+		// turn running — conjuring a status row there strands "응답 대기 중"
+		// forever, since no turn_end follows to clear it. Only refresh when a
+		// turn is actually in flight.
+		if (runtime.turnInFlight) ensureTurn();
 	};
 	const cancel = () => {
 		// Cancel = dismiss the question AND abort the current turn so the AI
