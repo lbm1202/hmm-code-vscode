@@ -8,7 +8,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 ## [Unreleased]
 
 ### Fixed
-- Settings panel: removing a Codex/Claude OAuth credential now clears the "✓ Authenticated" badge and re-enables the login button immediately (it was staged but the badge only refreshed after save + reload).
+- Settings panel OAuth state now stays correct: the "✓ Authenticated" badge no longer disappears a few seconds after a successful login (a stale success-message timeout was wiping it), the login button is hidden while authenticated (disconnect from the auth table), and removing a Codex/Claude credential clears the badge and restores the button immediately instead of only after save + reload.
 
 ### Added
 - **Prompts tab** in the settings panel. Consolidates all editable prompts in one place: the four mode system prompts (moved out of the Modes tab, which now holds model + thinking only), the **auto-title prompt** (full override of the built-in title prompt), and **compaction focus** (extra instructions appended to Pi's summary prompt — its base prompt can't be replaced). Empty = built-in default for each.

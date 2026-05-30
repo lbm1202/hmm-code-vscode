@@ -1104,10 +1104,13 @@ function updateOAuthButtons() {
 		if (providerId === 'openai-codex') codexAuthed = authed;
 		const inFlight = !ui.cancel.classList.contains('hidden');
 		if (authed) {
-			ui.btn.disabled = true;
+			// Hide the login button entirely (disconnect happens from the auth
+			// table) and show the persistent "✓ Authenticated" badge.
+			ui.btn.classList.add('hidden');
 			ui.status.textContent = t('settings.oauth.authed');
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
 		} else if (!inFlight) {
+			ui.btn.classList.remove('hidden');
 			ui.btn.disabled = false;
 			// Clear the "✓ authed" badge so a staged disconnect reflects at once.
 			ui.status.textContent = '';
@@ -1271,11 +1274,14 @@ window.addEventListener('message', (ev) => {
 		if (!ui) return;
 		const s = msg.state;
 		if (s === 'success') {
-			ui.btn.disabled = false;
 			ui.cancel.classList.add('hidden');
 			ui.status.textContent = '✓ ' + (msg.message || t('settings.done'));
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
-			setTimeout(() => { ui.status.textContent = ''; ui.status.style.color = ''; }, 4000);
+			// Settle into the persistent authed state instead of clearing — the
+			// host's post-login state refresh makes diskAuth authed, so this
+			// restores the "✓ Authenticated" badge (and keeps the button hidden)
+			// rather than wiping it.
+			setTimeout(() => updateOAuthButtons(), 4000);
 		} else if (s === 'error') {
 			ui.btn.disabled = false;
 			ui.cancel.classList.add('hidden');
