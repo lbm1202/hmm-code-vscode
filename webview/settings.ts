@@ -465,6 +465,7 @@ function renderAuth() {
 			if (authAddsDraft[id]) delete authAddsDraft[id];
 			else authRemovesDraft.add(id);
 			renderAuth();
+			updateOAuthButtons();
 			updateSaveBar();
 		});
 	});
@@ -474,6 +475,7 @@ function renderAuth() {
 			if (!id) return;
 			authRemovesDraft.delete(id);
 			renderAuth();
+			updateOAuthButtons();
 			updateSaveBar();
 		});
 	});
@@ -1094,8 +1096,11 @@ function updateOAuthButtons() {
 	for (const { statusKind, providerId } of OAUTH_BTN_PROVIDERS) {
 		const ui = oauthUis[statusKind];
 		if (!ui) continue;
+		// Effective auth = on disk AND not staged for removal, so disconnecting
+		// (which only stages into authRemovesDraft until save) flips the badge
+		// immediately instead of waiting for save + reload.
 		const cred = diskAuth()[providerId];
-		const authed = !!(cred && cred.type === 'oauth');
+		const authed = !!(cred && cred.type === 'oauth') && !authRemovesDraft.has(providerId);
 		if (providerId === 'openai-codex') codexAuthed = authed;
 		const inFlight = !ui.cancel.classList.contains('hidden');
 		if (authed) {
@@ -1104,6 +1109,9 @@ function updateOAuthButtons() {
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
 		} else if (!inFlight) {
 			ui.btn.disabled = false;
+			// Clear the "✓ authed" badge so a staged disconnect reflects at once.
+			ui.status.textContent = '';
+			ui.status.style.color = '';
 		}
 	}
 	// Codex usage button + one-shot auto-fetch, gated on Codex being authed.

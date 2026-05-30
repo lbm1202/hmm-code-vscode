@@ -7,6 +7,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Fixed
+- Settings panel: removing a Codex/Claude OAuth credential now clears the "✓ Authenticated" badge and re-enables the login button immediately (it was staged but the badge only refreshed after save + reload).
+
 ### Added
 - **Prompts tab** in the settings panel. Consolidates all editable prompts in one place: the four mode system prompts (moved out of the Modes tab, which now holds model + thinking only), the **auto-title prompt** (full override of the built-in title prompt), and **compaction focus** (extra instructions appended to Pi's summary prompt — its base prompt can't be replaced). Empty = built-in default for each.
 - **Dynamic compaction** toggle (General tab, on by default). When on, context compaction no longer interrupts the agent mid-turn — it summarizes at the turn boundary once usage passes the threshold, force-compacting only if usage climbs 15% past it. Turn it off for the legacy compact-on-threshold behavior. The threshold range is now 50–85% (the 15% grace band needs headroom under 100).
