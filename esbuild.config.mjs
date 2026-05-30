@@ -50,7 +50,7 @@ const webviewCssConfig = {
 // Settings-panel webview script. Plain JS (extracted from settings-panel.ts),
 // loaded via <script src> with a CSP nonce — same delivery as the chat main.js.
 const settingsConfig = {
-	entryPoints: ["webview/settings.js"],
+	entryPoints: ["webview/settings.ts"],
 	bundle: true,
 	outfile: "out/webview/settings.js",
 	platform: "browser",

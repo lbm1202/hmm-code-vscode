@@ -1,48 +1,60 @@
-// Settings-panel webview script. Extracted verbatim from the SETTINGS_JS_*
-// template strings that used to live inline in src/settings-panel.ts, and
-// loaded as a bundled asset via <script src>. Plain JS (not type-checked) —
-// unchanged from when it was an injected string.
+// Settings-panel webview script. Extracted from the inline template strings
+// that used to live in src/settings-panel.ts, loaded as a bundled asset via
+// <script src>. TypeScript (bundled by esbuild to out/webview/settings.js).
+//
+// DOM access is intentionally loosely typed: el()/q()/qa() return `any` so the
+// (very DOM-heavy) panel code stays terse. TS still fully checks module state +
+// function references — which is what makes the file safe to refactor/split.
+declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
+
 const vscode = acquireVsCodeApi();
-const post = (msg) => vscode.postMessage(msg);
-const I18N = (window.__HMM_I18N) || {};
-function t(key, params) {
+const post = (msg: unknown): void => vscode.postMessage(msg);
+const I18N: Record<string, string> = (window as any).__HMM_I18N || {};
+function t(key: string, params?: Record<string, unknown>): string {
 	let str = I18N[key] != null ? I18N[key] : key;
 	if (params) str = str.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : '{' + k + '}'));
 	return str;
 }
+
+// Permissive DOM accessors — identical runtime to the native calls; `any`
+// return keeps DOM-touching code terse without weakening state/ref checks.
+const el = (id: string): any => document.getElementById(id);
+const q = (root: any, sel: string): any => root.querySelector(sel);
+const qa = (root: any, sel: string): any[] => Array.from(root.querySelectorAll(sel));
+
 const MODE_NAMES = ["plan", "code", "debug", "ask"];
 const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
 const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
 const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '</option>').join('');
-let diskState = null;
-let modesDraft = {};
-let autoTitleDraft = { provider: '', id: '' };
-let compactModelDraft = { provider: '', id: '' };  // compaction (summary) model override
-let authAddsDraft = {};           // provider id -> key (new ones to add)
-let authRemovesDraft = new Set(); // provider ids to remove
-let modelsDraft = { providers: {} };
+let diskState: any = null;
+let modesDraft: any = {};
+let autoTitleDraft: { provider: string; id: string } = { provider: '', id: '' };
+let compactModelDraft: { provider: string; id: string } = { provider: '', id: '' };  // compaction (summary) model override
+let authAddsDraft: Record<string, string> = {};  // provider id -> key (new ones to add)
+let authRemovesDraft = new Set<string>();         // provider ids to remove
+let modelsDraft: any = { providers: {} };
 // Per-provider model id allowlist draft. Empty obj or empty list per provider
 // = no filter for that provider. Sent to host as modelAllowlist on save.
-let allowlistDraft = {};
+let allowlistDraft: Record<string, string[]> = {};
 let compactDraft = '';  // auto-compact threshold (effective value shown in the input)
 let dynamicCompactionDraft = true;  // dynamic compaction toggle (default on)
 let autoTitlePromptDraft = '';  // auto-title system-prompt override ('' = built-in default)
 let compactInstructionsDraft = '';  // compaction additional-focus ('' = none)
 
-function showToast(text, isError) {
-	const t = document.getElementById('toast');
+function showToast(text: any, isError?: any) {
+	const t = el('toast');
 	t.textContent = text;
 	t.classList.toggle('error', !!isError);
 	t.classList.remove('hidden');
 	setTimeout(() => t.classList.add('hidden'), 2500);
 }
-function esc(s) {
+function esc(s: any) {
 	return String(s)
 		.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;');
 }
 
-function diskMode(name) {
+function diskMode(name: any) {
 	const cfg = (diskState && diskState.modes && diskState.modes.modes && diskState.modes.modes[name]) || {};
 	const m = cfg.model;
 	const isObj = m && typeof m === 'object';
@@ -53,7 +65,7 @@ function diskMode(name) {
 		promptOverride: cfg.systemPromptAddendum || '',
 	};
 }
-function defaultPrompt(name) {
+function defaultPrompt(name: any) {
 	return (diskState && diskState.defaultPrompts && diskState.defaultPrompts[name]) || '';
 }
 function diskAuth() { return (diskState && diskState.auth) || {}; }
@@ -62,7 +74,7 @@ function diskModels() {
 	return (m && typeof m === 'object' && m.providers) ? m : { providers: {} };
 }
 
-function modeDirty(name) {
+function modeDirty(name: any) {
 	const d = diskMode(name);
 	const draft = modesDraft[name] || { provider: '', id: '', thinking: '', prompt: '' };
 	const def = defaultPrompt(name);
@@ -108,8 +120,8 @@ function diskAllowlist() {
 function allowlistDirty() {
 	// Preserve empty arrays — they mean "explicitly hide all from this provider",
 	// distinct from a missing key which means "no filter".
-	const norm = (obj) => {
-		const out = {};
+	const norm = (obj: any) => {
+		const out: Record<string, any> = {};
 		for (const [k, v] of Object.entries(obj || {})) {
 			if (Array.isArray(v)) out[k] = v.slice().sort();
 		}
@@ -178,7 +190,7 @@ function isDirty() {
 
 function updateSaveBar() {
 	const dirty = isDirty();
-	document.getElementById('save-bar').classList.toggle('hidden', !dirty);
+	el('save-bar').classList.toggle('hidden', !dirty);
 	if (!dirty) return;
 	let modeD = 0, authD = 0;
 	for (const n of MODE_NAMES) if (modeDirty(n)) modeD++;
@@ -191,7 +203,7 @@ function updateSaveBar() {
 	if (modelsDirty()) parts.push(t('settings.dirty.providers'));
 	if (allowlistDirty()) parts.push(t('settings.dirty.filter'));
 	if (compactDirty()) parts.push(t('settings.dirty.compact'));
-	document.getElementById('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
+	el('dirty-detail').textContent = parts.length ? ' (' + parts.join(' · ') + ')' : '';
 }
 
 // Build a {provider: [id, ...]} index from live availableModels (cached from
@@ -221,15 +233,15 @@ function buildProviderIndex(applyAllowlist = true) {
 			const allowed = Array.isArray(allowlistDraft[prov])
 				? new Set(allowlistDraft[prov])
 				: null;
-			if (allowed) map.set(prov, entries.filter((e) => allowed.has(e.id)));
+			if (allowed) map.set(prov, entries.filter((e: any) => allowed.has(e.id)));
 		}
 	}
 	for (const arr of map.values())
-		arr.sort((a, b) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
+		arr.sort((a: any, b: any) => (a.alias ?? a.id).localeCompare(b.alias ?? b.id));
 	return map;
 }
 
-function providerOptionsHtml(currentValue, providerIndex) {
+function providerOptionsHtml(currentValue: any, providerIndex: any) {
 	const opts = [...providerIndex.keys()].sort();
 	// Ensure the current draft value is selectable even if Pi doesn't know
 	// about it yet (e.g. user typed a provider name that hasn't been
@@ -243,10 +255,10 @@ function providerOptionsHtml(currentValue, providerIndex) {
 	return parts.join('');
 }
 
-function modelOptionsHtml(currentValue, provider, providerIndex) {
+function modelOptionsHtml(currentValue: any, provider: any, providerIndex: any) {
 	const entries = (provider && providerIndex.get(provider)) || [];
 	const present = entries.slice();
-	if (currentValue && !present.some((e) => e.id === currentValue)) {
+	if (currentValue && !present.some((e: any) => e.id === currentValue)) {
 		present.unshift({ id: currentValue });
 	}
 	const parts = ['<option value="">(default)</option>'];
@@ -263,17 +275,17 @@ function modelOptionsHtml(currentValue, provider, providerIndex) {
 
 const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
 
-function findAvailableModel(provider, id) {
+function findAvailableModel(provider: any, id: any) {
 	const list = (diskState && diskState.availableModels) || [];
-	return list.find((m) => m.provider === provider && m.id === id) || null;
+	return list.find((m: any) => m.provider === provider && m.id === id) || null;
 }
 
 // Thinking <option>s for a mode, mirroring the chat picker: non-reasoning →
 // (default)+off; binary qwen/zai → (default)+off+on; leveled → (default)+off+
 // mapped levels. `selected` is the mode's stored thinkingLevel ('' = default).
-function modeThinkingOptionsHtml(provider, id, selected) {
+function modeThinkingOptionsHtml(provider: any, id: any, selected: any) {
 	const sel = selected || '';
-	const opt = (val, label, on) => '<option value="' + esc(val) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>';
+	const opt = (val: any, label: any, on: any) => '<option value="' + esc(val) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>';
 	let html = opt('', '(default)', sel === '');
 	const model = findAvailableModel(provider, id);
 	if (!model || !model.reasoning) return html + opt('off', 'off', sel === 'off');
@@ -293,7 +305,7 @@ function modeThinkingOptionsHtml(provider, id, selected) {
 }
 
 function renderModes() {
-	const root = document.getElementById('mode-cards');
+	const root = el('mode-cards');
 	root.innerHTML = '';
 	const providerIndex = buildProviderIndex();
 	for (const name of MODE_NAMES) {
@@ -310,7 +322,7 @@ function renderModes() {
 		// thinking <select> uses `selected` attributes (model-aware), so no
 		// post-hoc .value assignment.
 	}
-	root.querySelectorAll('select').forEach((el) => {
+	qa(root, 'select').forEach((el: any) => {
 		el.addEventListener('change', () => {
 			const name = el.getAttribute('data-mode');
 			const field = el.getAttribute('data-field');
@@ -336,7 +348,7 @@ function renderModes() {
 // compaction additional-focus. Mode prompts share modesDraft with the Modes
 // tab, so dirty tracking (modeDirty) is unchanged.
 function renderPrompts() {
-	const root = document.getElementById('prompt-modes');
+	const root = el('prompt-modes');
 	if (root) {
 		root.innerHTML = '';
 		for (const name of MODE_NAMES) {
@@ -354,7 +366,7 @@ function renderPrompts() {
 				'<textarea class="mode-prompt-ta" rows="10" spellcheck="false" data-mode="' + esc(name) + '" data-field="prompt">' + esc(draft.prompt || '') + '</textarea>';
 			root.appendChild(block);
 		}
-		root.querySelectorAll('textarea[data-field="prompt"]').forEach((el) => {
+		qa(root, 'textarea[data-field="prompt"]').forEach((el: any) => {
 			el.addEventListener('input', () => {
 				const name = el.getAttribute('data-mode');
 				if (!name || !modesDraft[name]) return;
@@ -364,7 +376,7 @@ function renderPrompts() {
 				updateSaveBar();
 			});
 		});
-		root.querySelectorAll('button[data-prompt-reset]').forEach((btn) => {
+		qa(root, 'button[data-prompt-reset]').forEach((btn: any) => {
 			btn.addEventListener('click', () => {
 				const name = btn.getAttribute('data-prompt-reset');
 				if (!name || !modesDraft[name]) return;
@@ -374,11 +386,11 @@ function renderPrompts() {
 			});
 		});
 	}
-	const toggleBadge = (id, on) => {
-		const b = document.getElementById(id);
+	const toggleBadge = (id: any, on: any) => {
+		const b = el(id);
 		if (b) b.classList.toggle('hidden', !on);
 	};
-	const titleTa = document.getElementById('autotitle-prompt-ta');
+	const titleTa = el('autotitle-prompt-ta');
 	if (titleTa) {
 		titleTa.value = autoTitlePromptDraft;
 		toggleBadge('autotitle-badge', autoTitleOverrideFromDraft().trim() !== '');
@@ -388,10 +400,10 @@ function renderPrompts() {
 			updateSaveBar();
 		};
 		// "Reset to default" restores the built-in prompt text (= clears override).
-		const reset = document.getElementById('autotitle-prompt-reset');
+		const reset = el('autotitle-prompt-reset');
 		if (reset) reset.onclick = () => { autoTitlePromptDraft = defaultAutoTitle(); titleTa.value = autoTitlePromptDraft; toggleBadge('autotitle-badge', false); updateSaveBar(); };
 	}
-	const compactTa = document.getElementById('compact-instructions-ta');
+	const compactTa = el('compact-instructions-ta');
 	if (compactTa) {
 		compactTa.value = compactInstructionsDraft;
 		toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
@@ -400,18 +412,18 @@ function renderPrompts() {
 			toggleBadge('compact-badge', compactInstructionsDraft.trim() !== '');
 			updateSaveBar();
 		};
-		const reset = document.getElementById('compact-instructions-reset');
+		const reset = el('compact-instructions-reset');
 		if (reset) reset.onclick = () => { compactInstructionsDraft = ''; compactTa.value = ''; toggleBadge('compact-badge', false); updateSaveBar(); };
 	}
 }
 
 function renderAuth() {
-	const body = document.getElementById('auth-body');
+	const body = el('auth-body');
 	body.innerHTML = '';
 	const onDisk = diskAuth();
 	// Combined view: existing (minus pending removes) + pending adds
 	const entries = [];
-	for (const [id, info] of Object.entries(onDisk)) {
+	for (const [id, info] of Object.entries(onDisk) as [string, any][]) {
 		if (authRemovesDraft.has(id)) continue;
 		entries.push({ id, type: info.type, pending: false });
 	}
@@ -446,7 +458,7 @@ function renderAuth() {
 			'<td><button class="ghost" data-undo-auth="' + esc(e.id) + '">↶</button></td>';
 		body.appendChild(tr);
 	}
-	body.querySelectorAll('button[data-del-auth]').forEach((btn) => {
+	qa(body, 'button[data-del-auth]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const id = btn.getAttribute('data-del-auth');
 			if (!id) return;
@@ -456,7 +468,7 @@ function renderAuth() {
 			updateSaveBar();
 		});
 	});
-	body.querySelectorAll('button[data-undo-auth]').forEach((btn) => {
+	qa(body, 'button[data-undo-auth]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const id = btn.getAttribute('data-undo-auth');
 			if (!id) return;
@@ -471,9 +483,9 @@ function renderAuth() {
 // provider id / display name / base URL / API key + model list + discovery.
 // The "discovery" feature queries baseUrl/models (OpenAI-compatible) and shows
 // a checkbox picker for bulk-add.
-const discoveryState = {};  // providerName -> { ids: [], filter: '', selected: Set, loading: false, error: '' }
+const discoveryState: Record<string, any> = {};  // providerName -> { ids: [], filter: '', selected: Set, loading: false, error: '' }
 
-function provDirty(name) {
+function provDirty(name: any) {
 	const onDisk = diskModels();
 	const a = (onDisk.providers && onDisk.providers[name]) || null;
 	const b = (modelsDraft.providers && modelsDraft.providers[name]) || null;
@@ -481,10 +493,10 @@ function provDirty(name) {
 }
 
 function renderProviders() {
-	const root = document.getElementById('providers-list');
+	const root = el('providers-list');
 	root.innerHTML = '';
 	const providers = (modelsDraft && modelsDraft.providers) || {};
-	const entries = Object.entries(providers);
+	const entries = Object.entries(providers) as [string, any][];
 	if (entries.length === 0) {
 		root.innerHTML = '<div class="note">' + esc(t('settings.providers.empty')) + '</div>';
 		return;
@@ -530,13 +542,13 @@ function renderProviders() {
 			'<button class="ghost" data-add-model style="margin-top: 8px;">' + esc(t('settings.providers.addManual')) + '</button>' +
 			'<div data-disc-area></div>';
 		root.appendChild(card);
-		card.querySelector('select[data-field="api"]').value = cfg.api || '';
-		renderModelRows(card.querySelector('[data-models-area]'), name, cfg.models || []);
-		renderDiscoveryFor(card.querySelector('[data-disc-area]'), name);
+		q(card, 'select[data-field="api"]').value = cfg.api || '';
+		renderModelRows(q(card, '[data-models-area]'), name, cfg.models || []);
+		renderDiscoveryFor(q(card, '[data-disc-area]'), name);
 	}
 
 	// Wire field inputs
-	root.querySelectorAll('input[data-field], select[data-field]').forEach((el) => {
+	qa(root, 'input[data-field], select[data-field]').forEach((el: any) => {
 		el.addEventListener('input', () => {
 			const card = el.closest('.provider-card');
 			const provName = card?.dataset.prov;
@@ -554,7 +566,7 @@ function renderProviders() {
 		});
 	});
 	// Rename on blur to preserve focus while typing
-	root.querySelectorAll('input[data-field="__name"]').forEach((el) => {
+	qa(root, 'input[data-field="__name"]').forEach((el: any) => {
 		el.addEventListener('blur', () => {
 			const card = el.closest('.provider-card');
 			const oldName = card?.dataset.prov;
@@ -575,7 +587,7 @@ function renderProviders() {
 			updateSaveBar();
 		});
 	});
-	root.querySelectorAll('button[data-del-prov]').forEach((btn) => {
+	qa(root, 'button[data-del-prov]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
@@ -590,7 +602,7 @@ function renderProviders() {
 			updateSaveBar();
 		});
 	});
-	root.querySelectorAll('button[data-add-model]').forEach((btn) => {
+	qa(root, 'button[data-add-model]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
@@ -603,7 +615,7 @@ function renderProviders() {
 			updateSaveBar();
 		});
 	});
-	root.querySelectorAll('button[data-discover]').forEach((btn) => {
+	qa(root, 'button[data-discover]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const card = btn.closest('.provider-card');
 			const n = card?.dataset.prov;
@@ -630,7 +642,7 @@ function renderProviders() {
 // from the provider/baseUrl. "qwen-chat-template" uses chat_template_kwargs.
 const THINKING_FORMATS = ['openai', 'openrouter', 'deepseek', 'together', 'zai', 'qwen', 'qwen-chat-template', 'string-thinking'];
 
-function thinkingFormatOptionsHtml(selected) {
+function thinkingFormatOptionsHtml(selected: any) {
 	const list = THINKING_FORMATS.slice();
 	// Preserve an on-disk value we don't recognize so save can't silently drop it.
 	if (selected && list.indexOf(selected) === -1) list.push(selected);
@@ -641,7 +653,7 @@ function thinkingFormatOptionsHtml(selected) {
 	return html;
 }
 
-function renderModelRows(container, provName, models) {
+function renderModelRows(container: any, provName: any, models: any) {
 	container.innerHTML = '';
 	if (models.length === 0) {
 		container.innerHTML = '<div style="font-size: 11px; color: var(--vscode-descriptionForeground); padding: 6px 0;">' + esc(t('settings.models.empty')) + '</div>';
@@ -652,7 +664,7 @@ function renderModelRows(container, provName, models) {
 	header.className = 'model-grid';
 	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">' + esc(t('settings.models.colName')) + '</div><div class="label" style="text-align:center">' + esc(t('settings.models.colReasoning')) + '</div><div class="label">' + esc(t('settings.models.colThinkingFormat')) + '</div><div></div>';
 	container.appendChild(header);
-	models.forEach((m, idx) => {
+	models.forEach((m: any, idx: any) => {
 		const row = document.createElement('div');
 		row.className = 'model-row-card';
 		const reasoningChecked = m.reasoning ? 'checked' : '';
@@ -668,7 +680,7 @@ function renderModelRows(container, provName, models) {
 			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="' + esc(t('settings.providers.remove')) + '">✕</button>';
 		container.appendChild(row);
 	});
-	container.querySelectorAll('[data-mf]').forEach((el) => {
+	qa(container, '[data-mf]').forEach((el: any) => {
 		const isCheckbox = el.type === 'checkbox';
 		const evt = isCheckbox || el.tagName === 'SELECT' ? 'change' : 'input';
 		el.addEventListener(evt, () => {
@@ -696,7 +708,7 @@ function renderModelRows(container, provName, models) {
 			// shown (it's meaningless for non-reasoning models).
 			if (f === 'reasoning') {
 				const row = el.closest('.model-row-card');
-				const sel = row && row.querySelector('select[data-mf="thinkingFormat"]');
+				const sel = row && q(row, 'select[data-mf="thinkingFormat"]');
 				if (sel) sel.style.display = el.checked ? '' : 'none';
 			}
 			// id change can rename a model — any mode pinned to the old id
@@ -711,7 +723,7 @@ function renderModelRows(container, provName, models) {
 			if (card) card.classList.toggle('dirty', provDirty(p));
 		});
 	});
-	container.querySelectorAll('button[data-del-model]').forEach((btn) => {
+	qa(container, 'button[data-del-model]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const p = btn.getAttribute('data-del-model');
 			const i = parseInt(btn.getAttribute('data-mi'), 10);
@@ -730,7 +742,7 @@ function renderModelRows(container, provName, models) {
 	});
 }
 
-function renderDiscoveryFor(container, provName) {
+function renderDiscoveryFor(container: any, provName: any) {
 	const st = discoveryState[provName];
 	container.innerHTML = '';
 	if (!st) return;
@@ -742,15 +754,15 @@ function renderDiscoveryFor(container, provName) {
 		container.innerHTML =
 			'<div class="disc-picker"><div class="disc-empty" style="color: var(--vscode-errorForeground)">' + esc(t('settings.disc.failed')) + esc(st.error) + '</div>' +
 			'<div class="disc-footer"><button class="ghost" data-disc-close>' + esc(t('settings.close')) + '</button></div></div>';
-		container.querySelector('button[data-disc-close]').addEventListener('click', () => {
+		q(container, 'button[data-disc-close]').addEventListener('click', () => {
 			delete discoveryState[provName];
 			renderProviders();
 		});
 		return;
 	}
-	const filtered = st.ids.filter((id) => !st.filter || id.toLowerCase().includes(st.filter.toLowerCase()));
+	const filtered = st.ids.filter((id: any) => !st.filter || id.toLowerCase().includes(st.filter.toLowerCase()));
 	const cfg = modelsDraft.providers[provName];
-	const existing = new Set(((cfg && cfg.models) || []).map((m) => m.id));
+	const existing = new Set(((cfg && cfg.models) || []).map((m: any) => m.id));
 
 	const picker = document.createElement('div');
 	picker.className = 'disc-picker';
@@ -769,7 +781,7 @@ function renderDiscoveryFor(container, provName) {
 			'<button class="ghost" data-disc-close>' + esc(t('settings.cancel')) + '</button>' +
 		'</div>';
 	container.appendChild(picker);
-	const list = picker.querySelector('.disc-list');
+	const list = q(picker, '.disc-list');
 	if (filtered.length === 0) {
 		list.innerHTML = '<div class="disc-empty">' + esc(t('settings.disc.noResults')) + '</div>';
 	} else {
@@ -782,43 +794,43 @@ function renderDiscoveryFor(container, provName) {
 				'<span>' + esc(id) + (isExisting ? ' <small style="color: var(--vscode-descriptionForeground)">' + esc(t('settings.disc.alreadyAdded')) + '</small>' : '') + '</span>';
 			list.appendChild(item);
 		}
-		list.querySelectorAll('input[data-disc-id]').forEach((cb) => {
+		qa(list, 'input[data-disc-id]').forEach((cb) => {
 			cb.addEventListener('change', () => {
 				const id = cb.getAttribute('data-disc-id');
 				if (cb.checked) st.selected.add(id);
 				else st.selected.delete(id);
-				picker.querySelector('button[data-disc-add]').textContent = t('settings.disc.add', { n: st.selected.size });
+				q(picker, 'button[data-disc-add]').textContent = t('settings.disc.add', { n: st.selected.size });
 			});
 		});
 	}
-	picker.querySelector('.disc-search').addEventListener('input', (ev) => {
+	q(picker, '.disc-search').addEventListener('input', (ev: any) => {
 		st.filter = ev.target.value;
 		renderProviders();
 		// Re-focus the search input after re-render
 		setTimeout(() => {
-			const newCard = document.querySelector('.provider-card[data-prov="' + CSS.escape(provName) + '"] .disc-search');
+			const newCard = q(document, '.provider-card[data-prov="' + CSS.escape(provName) + '"] .disc-search');
 			if (newCard) {
 				newCard.focus();
 				newCard.setSelectionRange(st.filter.length, st.filter.length);
 			}
 		}, 0);
 	});
-	picker.querySelector('button[data-disc-all]').addEventListener('click', () => {
+	q(picker, 'button[data-disc-all]').addEventListener('click', () => {
 		for (const id of filtered) if (!existing.has(id)) st.selected.add(id);
 		renderProviders();
 	});
-	picker.querySelector('button[data-disc-none]').addEventListener('click', () => {
+	q(picker, 'button[data-disc-none]').addEventListener('click', () => {
 		st.selected.clear();
 		renderProviders();
 	});
-	picker.querySelector('button[data-disc-close]').addEventListener('click', () => {
+	q(picker, 'button[data-disc-close]').addEventListener('click', () => {
 		delete discoveryState[provName];
 		renderProviders();
 	});
-	picker.querySelector('button[data-disc-add]').addEventListener('click', () => {
+	q(picker, 'button[data-disc-add]').addEventListener('click', () => {
 		if (!cfg) return;
 		if (!cfg.models) cfg.models = [];
-		const existingIds = new Set(cfg.models.map((m) => m.id));
+		const existingIds = new Set(cfg.models.map((m: any) => m.id));
 		for (const id of st.selected) {
 			if (!existingIds.has(id)) cfg.models.push({ id, name: '', contextWindow: '', maxTokens: '', reasoning: false });
 		}
@@ -842,11 +854,11 @@ function autoFallbackModes() {
 		}
 		return null;
 	};
-	const replacements = [];
-	const fixOne = (label, draft) => {
+	const replacements: string[] = [];
+	const fixOne = (label: any, draft: any) => {
 		if (!draft.provider || !draft.id) return;
 		const entries = providerIndex.get(draft.provider) || [];
-		if (entries.some((e) => e.id === draft.id)) return;
+		if (entries.some((e: any) => e.id === draft.id)) return;
 		const old = draft.provider + '/' + draft.id;
 		if (entries.length > 0) {
 			draft.id = entries[0].id;
@@ -875,12 +887,12 @@ function autoFallbackModes() {
 }
 
 function renderAutoTitle() {
-	const card = document.getElementById('autotitle-card');
+	const card = el('autotitle-card');
 	if (!card) return;
 	card.classList.toggle('dirty', autoTitleDirty());
 	const providerIndex = buildProviderIndex();
-	const provSel = document.getElementById('autotitle-provider');
-	const idSel = document.getElementById('autotitle-id');
+	const provSel = el('autotitle-provider');
+	const idSel = el('autotitle-id');
 	provSel.innerHTML = providerOptionsHtml(autoTitleDraft.provider, providerIndex);
 	idSel.innerHTML = modelOptionsHtml(autoTitleDraft.id, autoTitleDraft.provider, providerIndex);
 	provSel.onchange = () => {
@@ -897,12 +909,12 @@ function renderAutoTitle() {
 }
 
 function renderCompactModel() {
-	const card = document.getElementById('compactmodel-card');
+	const card = el('compactmodel-card');
 	if (!card) return;
 	card.classList.toggle('dirty', compactModelDirty());
 	const providerIndex = buildProviderIndex();
-	const provSel = document.getElementById('compactmodel-provider');
-	const idSel = document.getElementById('compactmodel-id');
+	const provSel = el('compactmodel-provider');
+	const idSel = el('compactmodel-id');
 	provSel.innerHTML = providerOptionsHtml(compactModelDraft.provider, providerIndex);
 	idSel.innerHTML = modelOptionsHtml(compactModelDraft.id, compactModelDraft.provider, providerIndex);
 	provSel.onchange = () => {
@@ -919,7 +931,7 @@ function renderCompactModel() {
 }
 
 function renderAllowlist() {
-	const root = document.getElementById('allowlist-cards');
+	const root = el('allowlist-cards');
 	if (!root) return;
 	root.innerHTML = '';
 	// Allowlist UI must show ALL models so the user can toggle them — pass
@@ -951,7 +963,7 @@ function renderAllowlist() {
 			'</div>' +
 			'<div class="allowlist-grid" data-allow-grid="' + esc(prov) + '"></div>';
 		root.appendChild(card);
-		const grid = card.querySelector('[data-allow-grid]');
+		const grid = q(card, '[data-allow-grid]');
 		for (const e of entries) {
 			const checked = allowed ? allowed.has(e.id) : true;
 			const label = document.createElement('label');
@@ -965,7 +977,7 @@ function renderAllowlist() {
 		}
 	}
 	// Wire change/click handlers.
-	root.querySelectorAll('input[type="checkbox"][data-allow-prov]').forEach((el) => {
+	qa(root, 'input[type="checkbox"][data-allow-prov]').forEach((el: any) => {
 		el.addEventListener('change', () => {
 			const prov = el.getAttribute('data-allow-prov');
 			const id = el.getAttribute('data-allow-id');
@@ -974,12 +986,12 @@ function renderAllowlist() {
 			// Start from the current effective set (all visible if no filter).
 			const current = Array.isArray(allowlistDraft[prov])
 				? new Set(allowlistDraft[prov])
-				: new Set(entries.map((e) => e.id));
+				: new Set(entries.map((e: any) => e.id));
 			if (el.checked) current.add(id);
 			else current.delete(id);
 			// If user re-checked everything, drop the key entirely (= no filter).
 			if (current.size === entries.length) delete allowlistDraft[prov];
-			else allowlistDraft[prov] = [...current];
+			else allowlistDraft[prov] = [...current] as string[];
 			// Auto-fallback any mode (or autoTitle) whose model just dropped
 			// out of the visible set. Toast surfaces the replacement so the
 			// user notices before they save.
@@ -990,7 +1002,7 @@ function renderAllowlist() {
 			updateSaveBar();
 		});
 	});
-	root.querySelectorAll('button[data-allow-all]').forEach((btn) => {
+	qa(root, 'button[data-allow-all]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-all');
 			if (prov) delete allowlistDraft[prov];
@@ -1004,7 +1016,7 @@ function renderAllowlist() {
 			updateSaveBar();
 		});
 	});
-	root.querySelectorAll('button[data-allow-none]').forEach((btn) => {
+	qa(root, 'button[data-allow-none]').forEach((btn: any) => {
 		btn.addEventListener('click', () => {
 			const prov = btn.getAttribute('data-allow-none');
 			if (prov) allowlistDraft[prov] = [];
@@ -1021,25 +1033,25 @@ function renderAllowlist() {
 }
 
 function renderCompact() {
-	const toggle = document.getElementById('dynamic-compaction');
+	const toggle = el('dynamic-compaction');
 	if (toggle) {
 		toggle.checked = dynamicCompactionDraft;
 		toggle.onchange = () => { dynamicCompactionDraft = toggle.checked; updateSaveBar(); };
 	}
-	const input = document.getElementById('compact-threshold');
+	const input = el('compact-threshold');
 	if (!input) return;
 	input.value = compactDraft;
-	const valueLabel = document.getElementById('compact-value');
+	const valueLabel = el('compact-value');
 	const showValue = () => { if (valueLabel) valueLabel.textContent = input.value + '%'; };
 	showValue();
-	const hint = document.getElementById('compact-default-hint');
+	const hint = el('compact-default-hint');
 	if (hint) hint.textContent = t('settings.compact.defaultHint', { n: defaultCompact() });
 	input.oninput = () => { compactDraft = input.value; showValue(); updateSaveBar(); };
-	const reset = document.getElementById('compact-reset');
+	const reset = el('compact-reset');
 	if (reset) reset.onclick = () => { compactDraft = String(defaultCompact()); input.value = compactDraft; showValue(); updateSaveBar(); };
 }
 
-function render(s) {
+function render(s: any) {
 	diskState = s;
 	modesDraft = {};
 	for (const n of MODE_NAMES) {
@@ -1095,8 +1107,8 @@ function updateOAuthButtons() {
 		}
 	}
 	// Codex usage button + one-shot auto-fetch, gated on Codex being authed.
-	const usageBtn = document.getElementById('codex-usage-btn');
-	const usageOut = document.getElementById('codex-usage');
+	const usageBtn = el('codex-usage-btn');
+	const usageOut = el('codex-usage');
 	if (usageBtn) usageBtn.classList.toggle('hidden', !codexAuthed);
 	if (!codexAuthed) {
 		codexUsageFetched = false;
@@ -1110,11 +1122,11 @@ function updateOAuthButtons() {
 // Codex OAuth inline
 // OAuth login buttons (Codex, Claude) share identical wiring; keyed by their
 // status message kind so the status handler can find the right elements.
-const oauthUis = {};
-function wireOAuth(statusKind, btnId, cancelId, statusId, loginKind, cancelKind) {
-	const btn = document.getElementById(btnId);
-	const cancel = document.getElementById(cancelId);
-	const status = document.getElementById(statusId);
+const oauthUis: Record<string, any> = {};
+function wireOAuth(statusKind: any, btnId: any, cancelId: any, statusId: any, loginKind: any, cancelKind: any) {
+	const btn = el(btnId);
+	const cancel = el(cancelId);
+	const status = el(statusId);
 	if (!btn || !cancel || !status) return;
 	btn.addEventListener('click', () => {
 		btn.disabled = true;
@@ -1133,27 +1145,27 @@ wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'an
 // load when Codex is authed; the button re-fetches.
 let codexUsageFetched = false;
 function requestCodexUsage() {
-	const out = document.getElementById('codex-usage');
+	const out = el('codex-usage');
 	if (out) { out.classList.remove('hidden'); out.textContent = t('settings.usage.checking'); }
 	post({ kind: 'codex-usage' });
 }
 (function wireCodexUsage() {
-	const btn = document.getElementById('codex-usage-btn');
+	const btn = el('codex-usage-btn');
 	if (btn) btn.addEventListener('click', requestCodexUsage);
 })();
-function fmtResetIn(resetAtSec) {
+function fmtResetIn(resetAtSec: any) {
 	const secs = Math.max(0, Math.round(resetAtSec - Date.now() / 1000));
 	const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
 	const parts = d ? [d + 'd', h + 'h'] : h ? [h + 'h', m + 'm'] : [m + 'm'];
 	return t('settings.usage.resetsIn', { t: parts.join(' ') });
 }
-function windowLabel(win) {
+function windowLabel(win: any) {
 	if (win.windowSeconds === 18000) return t('settings.usage.5h');
 	if (win.windowSeconds === 604800) return t('settings.usage.weekly');
 	return Math.round(win.windowSeconds / 3600) + 'h';
 }
-function renderCodexUsage(msg) {
-	const out = document.getElementById('codex-usage');
+function renderCodexUsage(msg: any) {
+	const out = el('codex-usage');
 	if (!out) return;
 	out.classList.remove('hidden');
 	if (msg.error) {
@@ -1173,20 +1185,20 @@ function renderCodexUsage(msg) {
 }
 
 // Add auth (API key)
-document.getElementById('add-auth-btn').addEventListener('click', () => {
-	const id = document.getElementById('new-auth-id').value.trim();
-	const key = document.getElementById('new-auth-key').value;
+el('add-auth-btn').addEventListener('click', () => {
+	const id = el('new-auth-id').value.trim();
+	const key = el('new-auth-key').value;
 	if (!id || !key) { showToast(t('settings.auth.needBoth'), true); return; }
 	authAddsDraft[id] = key;
-	document.getElementById('new-auth-id').value = '';
-	document.getElementById('new-auth-key').value = '';
+	el('new-auth-id').value = '';
+	el('new-auth-key').value = '';
 	renderAuth();
 	updateSaveBar();
 });
 
 // Add custom provider — generate a unique placeholder name so the user can
 // edit it inline (webview can't use window.prompt — it's blocked).
-document.getElementById('add-provider-btn').addEventListener('click', () => {
+el('add-provider-btn').addEventListener('click', () => {
 	let base = 'new-provider';
 	let name = base;
 	let n = 1;
@@ -1199,10 +1211,10 @@ document.getElementById('add-provider-btn').addEventListener('click', () => {
 	updateSaveBar();
 	// Focus the new card's name input
 	setTimeout(() => {
-		const newCard = document.querySelector('.provider-card[data-prov="' + CSS.escape(name) + '"]');
+		const newCard = q(document, '.provider-card[data-prov="' + CSS.escape(name) + '"]');
 		if (newCard) {
 			newCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			const nameInput = newCard.querySelector('input[data-field="__name"]');
+			const nameInput = q(newCard, 'input[data-field="__name"]');
 			if (nameInput) {
 				nameInput.focus();
 				nameInput.select();
@@ -1212,14 +1224,14 @@ document.getElementById('add-provider-btn').addEventListener('click', () => {
 });
 
 // Cancel
-document.getElementById('cancel-btn').addEventListener('click', () => {
+el('cancel-btn').addEventListener('click', () => {
 	if (!diskState) return;
 	render(diskState);
 	showToast(t('settings.toast.reverted'));
 });
 
 // Save
-document.getElementById('save-btn').addEventListener('click', () => {
+el('save-btn').addEventListener('click', () => {
 	const payload = {
 		kind: 'save',
 		modes: true,
@@ -1280,9 +1292,9 @@ window.addEventListener('message', (ev) => {
 });
 
 function wireTabs() {
-	const tabs = Array.from(document.querySelectorAll('.tab-btn'));
-	const panels = Array.from(document.querySelectorAll('.tab-panel'));
-	function activate(name) {
+	const tabs = Array.from(qa(document, '.tab-btn'));
+	const panels = Array.from(qa(document, '.tab-panel'));
+	function activate(name: any) {
 		tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
 		panels.forEach((pn) => pn.classList.toggle('hidden', pn.dataset.tab !== name));
 	}
@@ -1290,6 +1302,6 @@ function wireTabs() {
 	if (tabs.length) activate(tabs[0].dataset.tab);
 }
 wireTabs();
-const langSel = document.getElementById('lang-select');
+const langSel = el('lang-select');
 if (langSel) langSel.addEventListener('change', () => post({ kind: 'set-language', value: langSel.value }));
 post({ kind: 'refresh' });
