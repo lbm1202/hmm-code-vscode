@@ -1,52 +1,10 @@
-// Mirror of src/protocol.ts — kept in sync by convention.
-// Webview is a separate bundle so it can't import from src/; duplicating the
-// string constants here gives us autocomplete + grep-ability on both sides.
+// Webview-side protocol surface. The shared host ↔ webview kind/status
+// constants live in src/protocol-shared.ts and are re-exported here so existing
+// `./protocol` imports keep working — esbuild inlines them into the webview
+// bundle at build time (the file is pure constants, so the "webview can't load
+// host code at runtime" rule doesn't apply). Webview-only additions live below.
 
-export const TO_WEBVIEW = {
-	READY: "ready",
-	EVENT: "event",
-	UI_REQUEST: "ui-request",
-	UI_HINT: "ui-hint",
-	STATE: "state",
-	SESSIONS: "sessions",
-	MODELS: "models",
-	MESSAGES: "messages",
-	STDERR: "stderr",
-	EXIT: "exit",
-} as const;
-
-export const FROM_WEBVIEW = {
-	PROMPT: "prompt",
-	ABORT: "abort",
-	UI_RESPONSE: "ui-response",
-	COMMAND: "command",
-	REQUEST_STATE: "request-state",
-	REQUEST_MODELS: "request-models",
-	REQUEST_MESSAGES: "request-messages",
-	REQUEST_CONTEXT: "request-context",
-	LIST_SESSIONS: "list-sessions",
-	DELETE_SESSION: "delete-session",
-	RENAME_SESSION: "rename-session",
-	/** Open the standalone settings panel. Host executes hmm-code.openSettings. */
-	OPEN_SETTINGS: "open-settings",
-	/** Ctrl/Cmd-click on a file path in a tool summary/header → open in editor. */
-	OPEN_FILE: "open-file",
-	/** Inline slash — host forwards to Pi without echoing to chat. */
-	SLASH: "slash",
-} as const;
-
-export const STATUS_KEYS = {
-	MODE: "mode",
-	MODEL: "model",
-	THINKING: "thinking",
-	OVERRIDDEN: "overridden",
-	CONTEXT: "context",
-	PLAN_HANDOFF: "plan-handoff",
-	// Received from Pi's todo_write but todos render via the tool-call result,
-	// not this channel — mirrored here only to keep the contract complete.
-	TODOS: "todos",
-	AUTO_APPROVE: "auto-approve",
-} as const;
+export { TO_WEBVIEW, FROM_WEBVIEW, STATUS_KEYS } from "../src/protocol-shared";
 
 export const PI_EVENT = {
 	MESSAGE_START: "message_start",

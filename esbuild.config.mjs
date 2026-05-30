@@ -125,19 +125,19 @@ function assertContractsInSync(hmmSrc) {
 		console.warn(`[contract-check] skipped — ${piConstants} not found`);
 		return;
 	}
-	const srcProto = join(__dirname, "src", "protocol.ts");
+	// STATUS_KEYS now has a single VS Code-side source — src/protocol-shared.ts;
+	// both src/protocol.ts and webview/protocol.ts re-export it.
+	const sharedProto = join(__dirname, "src", "protocol-shared.ts");
 	const webProto = join(__dirname, "webview", "protocol.ts");
 	const piKeys = extractStatusValues(piConstants);
-	for (const [label, file] of [["src", srcProto], ["webview", webProto]]) {
-		const mirror = extractStatusValues(file);
-		const missing = [...piKeys].filter((v) => !mirror.has(v));
-		if (missing.length) {
-			throw new Error(
-				`[contract-check] STATUS_KEYS drift: ${label}/protocol.ts is missing ` +
-					`${JSON.stringify(missing)} (present in hmm-code-pi/constants.ts). ` +
-					`Add them so the RPC status contract stays in sync.`,
-			);
-		}
+	const mirror = extractStatusValues(sharedProto);
+	const missing = [...piKeys].filter((v) => !mirror.has(v));
+	if (missing.length) {
+		throw new Error(
+			`[contract-check] STATUS_KEYS drift: src/protocol-shared.ts is missing ` +
+				`${JSON.stringify(missing)} (present in hmm-code-pi/constants.ts). ` +
+				`Add them so the RPC status contract stays in sync.`,
+		);
 	}
 	const piBin = extractBinarySet(piConstants);
 	const webBin = extractBinarySet(webProto);
