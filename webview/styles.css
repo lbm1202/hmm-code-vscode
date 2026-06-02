@@ -511,6 +511,24 @@ body.mod-down .file-link:hover {
 	text-decoration: underline;
 	cursor: pointer;
 }
+/* Full bash command shown inside the expanded tool block (verbatim, wrapped). */
+.tool-bash-cmd {
+	margin: 6px 0 0 0;
+	padding: 6px 8px;
+	background: var(--vscode-textBlockQuote-background);
+	border-left: 2px solid var(--vscode-textBlockQuote-border);
+	overflow: auto;
+	max-height: 220px;
+	font-size: 11px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-family: var(--vscode-editor-font-family);
+	color: var(--vscode-foreground);
+}
+body.mod-down .bash-cmd-link:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
 .diff-prefix {
 	display: inline-block;
 	width: 14px;

@@ -56,6 +56,9 @@ export const FROM_WEBVIEW = {
 	/** Ctrl/Cmd-click on a file path in a tool summary/header. Host opens the
 	 *  file in the editor area (no-op for non-existent paths). */
 	OPEN_FILE: "open-file",
+	/** Ctrl/Cmd-click on a bash command summary. Host opens the full command
+	 *  text in a scratch editor tab (so long/`&&`-chained commands are readable). */
+	OPEN_TEXT: "open-text",
 	/** Inline slash command — bypasses the user-message echo path so a button
 	 *  click doesn't litter the chat with /commands. Host forwards directly to
 	 *  Pi via prompt/no-reply. */

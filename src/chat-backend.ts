@@ -98,6 +98,7 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
 	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
+	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string }
 	| { kind: typeof FROM_WEBVIEW.SLASH; text: string };
 
 export interface ChatBackendOpts {
@@ -594,6 +595,26 @@ export class ChatBackend {
 					this.post({
 						kind: TO_WEBVIEW.STDERR,
 						text: `open-file failed (${abs}): ${(err as Error).message}`,
+					});
+				}
+				return;
+			}
+			case FROM_WEBVIEW.OPEN_TEXT: {
+				// Ctrl/Cmd-click on a bash command → open the full command text in
+				// a scratch (untitled) editor tab so long / `&&`-chained commands
+				// are readable, selectable, and copyable.
+				const text = raw.text;
+				if (typeof text !== "string" || !text) return;
+				try {
+					const doc = await vscode.workspace.openTextDocument({
+						content: text,
+						language: typeof raw.language === "string" ? raw.language : "shellscript",
+					});
+					await vscode.window.showTextDocument(doc, { preview: true });
+				} catch (err) {
+					this.post({
+						kind: TO_WEBVIEW.STDERR,
+						text: `open-text failed: ${(err as Error).message}`,
 					});
 				}
 				return;

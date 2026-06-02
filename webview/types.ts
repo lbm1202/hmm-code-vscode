@@ -58,7 +58,9 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.LIST_SESSIONS }
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
-	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS };
+	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
+	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
+	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string };
 
 export type StatusState = {
 	row: HTMLElement;

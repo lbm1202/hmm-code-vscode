@@ -66,13 +66,26 @@ document.addEventListener(
 	(ev) => {
 		const onlyMod = (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey;
 		if (!onlyMod) return;
-		const target = (ev.target as HTMLElement | null)?.closest?.(".file-link");
-		if (!target) return;
-		const path = target.getAttribute("data-file-path");
-		if (!path) return;
-		ev.preventDefault();
-		ev.stopPropagation();
-		post({ kind: FROM_WEBVIEW.OPEN_FILE, path });
+		const el = ev.target as HTMLElement | null;
+		const fileEl = el?.closest?.(".file-link");
+		if (fileEl) {
+			const path = fileEl.getAttribute("data-file-path");
+			if (!path) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			post({ kind: FROM_WEBVIEW.OPEN_FILE, path });
+			return;
+		}
+		// Ctrl/Cmd-click on a bash command summary / inline block → open the full
+		// command text in a scratch editor tab.
+		const cmdEl = el?.closest?.(".bash-cmd-link");
+		if (cmdEl) {
+			const cmd = cmdEl.getAttribute("data-bash-cmd");
+			if (!cmd) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			post({ kind: FROM_WEBVIEW.OPEN_TEXT, text: cmd, language: "shellscript" });
+		}
 	},
 	true, // capture: beat the <summary> default toggle
 );

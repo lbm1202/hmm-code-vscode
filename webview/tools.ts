@@ -58,6 +58,22 @@ export function buildToolCallBlock(
 		(opts.spinner ? `<span class="tool-spinner" title="${escapeHtml(t("tool.running"))}">⏳</span>` : "");
 	block.appendChild(summary);
 
+	// bash: the summary is a truncated one-liner. When the real command is
+	// longer or multi-line, show it verbatim (wrapped) inside the expanded
+	// block so the user can read the whole thing without leaving the chat.
+	// Also Ctrl/Cmd-clickable to open in an editor (same as the summary).
+	if (toolName === "bash") {
+		const cmd = String((args as { command?: unknown })?.command ?? "").trim();
+		if (cmd && (cmd.includes("\n") || cmd.length > 100)) {
+			const pre = document.createElement("pre");
+			pre.className = "tool-bash-cmd bash-cmd-link";
+			pre.dataset.bashCmd = cmd;
+			pre.title = "Ctrl/Cmd-click to open the full command in an editor";
+			pre.textContent = cmd;
+			block.appendChild(pre);
+		}
+	}
+
 	// Args JSON block only when (a) not interactive (those use a card UI),
 	// (b) not a known built-in (those have a clean summary), and (c) >1 key
 	// worth showing. For typical { path } / { command } args the summary
@@ -420,6 +436,15 @@ export function summaryHtmlForTool(toolName: string, args: any): string {
 	const path = filePathFromArgs(toolName, args);
 	if (path) {
 		return `<span class="tool-args-inline file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open in editor">${escapeHtml(text)}</span>`;
+	}
+	// bash: the summary only shows the truncated first line. When the real
+	// command is longer or multi-line, carry the full text in a data attr so
+	// Ctrl/Cmd-click can open it in a scratch editor tab (mirrors file-link).
+	if (toolName === "bash") {
+		const cmd = String(args?.command ?? "").trim();
+		if (cmd && (cmd.includes("\n") || cmd.length > 100)) {
+			return `<span class="tool-args-inline bash-cmd-link" data-bash-cmd="${escapeHtml(cmd)}" title="Ctrl/Cmd-click to open the full command in an editor">${escapeHtml(text)}</span>`;
+		}
 	}
 	return `<span class="tool-args-inline">${escapeHtml(text)}</span>`;
 }
