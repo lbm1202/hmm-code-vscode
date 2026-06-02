@@ -1242,6 +1242,10 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 .session-iconbtn {
 	width: 30px;
 	flex: 0 0 30px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 1;
 	background: var(--vscode-editor-background);
 	color: var(--vscode-foreground);
 	border: 1px solid var(--vscode-panel-border);

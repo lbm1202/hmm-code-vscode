@@ -287,20 +287,23 @@ export function showConfirmDialog(message: string): Promise<boolean> {
 		yes.className = "primary";
 		yes.textContent = t("chat.modal.yes");
 		yes.addEventListener("click", () => {
-			modalRoot.innerHTML = "";
+			backdrop.remove();
 			resolve(true);
 		});
 		const no = document.createElement("button");
 		no.className = "ghost";
 		no.textContent = t("chat.modal.no");
 		no.addEventListener("click", () => {
-			modalRoot.innerHTML = "";
+			backdrop.remove();
 			resolve(false);
 		});
 		row.append(yes, no);
 		modal.appendChild(row);
 		backdrop.appendChild(modal);
-		modalRoot.innerHTML = "";
+		// Overlay on top of whatever's already open (the session picker) instead
+		// of replacing it, and remove only our own backdrop on resolve — so the
+		// picker stays mounted underneath and the SESSIONS push can re-render it
+		// in place after a delete. showConfirmDialog is only used by that flow.
 		modalRoot.appendChild(backdrop);
 	});
 }
