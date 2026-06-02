@@ -2,7 +2,7 @@
 // confirm/input modal dialogs. Question cards render in the messages area as
 // part of the conversation; the dialogs use a backdrop overlay.
 
-import { els, setEmptyVisibility } from "./dom";
+import { els, forceScrollToBottom, setEmptyVisibility } from "./dom";
 import { safeStringify } from "./helpers";
 import { t } from "./i18n";
 import { FROM_WEBVIEW } from "./protocol";
@@ -74,7 +74,8 @@ export function showModal(req: any): void {
 	const e = els();
 	e.messages.appendChild(card);
 	setEmptyVisibility();
-	e.messages.scrollTop = e.messages.scrollHeight;
+	// An interactive card (ask_user etc.) needs a response — bring it into view.
+	forceScrollToBottom();
 }
 
 function renderSelect(card: HTMLElement, req: any, reply: (r: UiResponse) => void, cancel: () => void): void {

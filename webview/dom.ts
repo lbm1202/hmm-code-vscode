@@ -120,10 +120,38 @@ let _els: DomRefs;
 /** Initialise the singleton DOM refs (call once at boot). */
 export function initDom(root: HTMLElement): DomRefs {
 	_els = mountDom(root);
+	// Track whether the user is pinned to the bottom. Scrolling up unpins
+	// (streaming stops dragging the view down); scrolling back re-pins.
+	_els.messages.addEventListener("scroll", () => {
+		scrollPinned = nearBottom(_els.messages);
+	});
 	return _els;
 }
 /** Singleton DOM refs accessor. */
 export const els = (): DomRefs => _els;
+
+/** Autoscroll pin: true while the user is at/near the bottom of the message
+ *  list. Set false when they scroll up so streaming output doesn't drag the
+ *  viewport down; set true again when they return to the bottom. */
+let scrollPinned = true;
+const SCROLL_PIN_THRESHOLD_PX = 60;
+
+function nearBottom(el: HTMLElement): boolean {
+	return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_PIN_THRESHOLD_PX;
+}
+
+/** Scroll to the bottom ONLY if the user is currently pinned there — for
+ *  streaming/append paths, so reading scrollback isn't fought by autoscroll. */
+export function scrollToBottomIfPinned(): void {
+	if (scrollPinned) _els.messages.scrollTop = _els.messages.scrollHeight;
+}
+
+/** Force-scroll to the bottom and re-pin — for user-driven events (sending a
+ *  message, loading a session) where jumping to the latest is expected. */
+export function forceScrollToBottom(): void {
+	scrollPinned = true;
+	_els.messages.scrollTop = _els.messages.scrollHeight;
+}
 
 /** Toggle empty-state placeholder based on whether messagesEl has children. */
 export function setEmptyVisibility(): void {
@@ -138,7 +166,7 @@ export function appendBubble(role: "user" | "assistant" | "system"): HTMLElement
 	const div = document.createElement("div");
 	div.className = `bubble bubble-${role}`;
 	e.messages.appendChild(div);
-	e.messages.scrollTop = e.messages.scrollHeight;
+	scrollToBottomIfPinned();
 	setEmptyVisibility();
 	return div;
 }
@@ -148,6 +176,8 @@ export function appendUserBubble(text: string): void {
 	// User messages render as plain text with pre-wrap. Avoid markdown <p> wrapping
 	// which adds extra spacing around short messages.
 	div.textContent = text;
+	// Sending a message is an explicit action — always jump to it and re-pin.
+	forceScrollToBottom();
 }
 
 export function appendSystem(text: string): void {

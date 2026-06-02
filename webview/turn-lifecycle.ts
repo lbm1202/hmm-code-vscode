@@ -10,7 +10,7 @@
 // streamText/streamThinking append the delta to a chunks array and schedule a
 // rAF-debounced render — at most one md(joinedText) per frame.
 
-import { appendBubble, els, setEmptyVisibility } from "./dom";
+import { appendBubble, els, scrollToBottomIfPinned, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
 import { t } from "./i18n";
 import { runtime } from "./state";
@@ -34,7 +34,7 @@ export function ensureStatus(): StatusState {
 	row.append(dots, textEl, time);
 	e.messages.appendChild(row);
 	setEmptyVisibility();
-	e.messages.scrollTop = e.messages.scrollHeight;
+	scrollToBottomIfPinned();
 	const startedAt = Date.now();
 	const timer = window.setInterval(() => {
 		time.textContent = `${Math.floor((Date.now() - startedAt) / 1000)}s`;
@@ -116,7 +116,7 @@ export function streamText(delta: string): void {
 	b.text += delta;
 	scheduleTextRender(b);
 	pinStatusToEnd();
-	els().messages.scrollTop = els().messages.scrollHeight;
+	scrollToBottomIfPinned();
 }
 
 export function streamThinking(delta: string): void {
