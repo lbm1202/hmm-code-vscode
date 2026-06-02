@@ -190,8 +190,8 @@ th {
 	border-radius: 3px;
 	padding: 8px;
 	box-sizing: border-box;
-	white-space: pre;
-	overflow-wrap: normal;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 }
 .mode-name { font-weight: 600; font-size: 13px; }
 .mode-name.plan { color: rgb(120, 170, 255); }
