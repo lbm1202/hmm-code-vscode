@@ -17,6 +17,8 @@ import {
 	deleteSession,
 	listSessions,
 	renameSession,
+	subtreeUsage,
+	type ModelUsage,
 	type SessionEntry,
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
@@ -81,6 +83,7 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: unknown[] }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
+	| { kind: typeof TO_WEBVIEW.USAGE; perModel: Record<string, ModelUsage>; sessionCount: number }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -99,6 +102,7 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
 	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_USAGE; file: string }
 	| { kind: typeof FROM_WEBVIEW.SLASH; text: string };
 
 export interface ChatBackendOpts {
@@ -492,6 +496,22 @@ export class ChatBackend {
 					console.error("[hmm-code:chat-backend] get_commands failed:", err);
 				}
 				return;
+			case FROM_WEBVIEW.REQUEST_USAGE: {
+				// ctx-pill click: per-model token totals for the current session and
+				// every session it spawned (parent includes children).
+				const file = raw.file;
+				if (typeof file !== "string" || !file) return;
+				try {
+					const { perModel, sessionCount } = subtreeUsage(file, this.workspaceCwd());
+					this.post({ kind: TO_WEBVIEW.USAGE, perModel, sessionCount });
+				} catch (err) {
+					this.post({
+						kind: TO_WEBVIEW.STDERR,
+						text: `usage failed: ${(err as Error).message}`,
+					});
+				}
+				return;
+			}
 			case FROM_WEBVIEW.LIST_SESSIONS:
 				await this.refreshSessions();
 				return;

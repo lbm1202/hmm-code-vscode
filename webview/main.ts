@@ -8,7 +8,7 @@ import { wirePrompt } from "./prompt";
 import { FROM_WEBVIEW } from "./protocol";
 import { showSessionPicker } from "./session-picker";
 import { wireSlashMenu } from "./slash";
-import { post, ui } from "./state";
+import { post, runtime, ui } from "./state";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
@@ -54,6 +54,14 @@ e.btnAutoApprove.addEventListener("click", () => {
 // which calls ctx.compact + notifies). Same path as the TUI slash.
 e.btnCompact.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.SLASH, text: "/compact" });
+});
+
+// ctx-pill click → token-usage modal for the current session subtree (own +
+// child sessions). Host computes; dispatch's USAGE handler opens the modal.
+e.ctxPill.title = "Click for token usage";
+e.ctxPill.addEventListener("click", () => {
+	const file = runtime.currentSessionFile;
+	if (file) post({ kind: FROM_WEBVIEW.REQUEST_USAGE, file });
 });
 
 setEmptyVisibility();

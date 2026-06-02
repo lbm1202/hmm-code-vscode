@@ -917,7 +917,28 @@ body.mod-down .bash-cmd-link:hover {
 	font-size: 10px;
 	color: var(--vscode-descriptionForeground);
 	font-family: var(--vscode-editor-font-family);
+	cursor: pointer;
 }
+.ctx-pill:hover { color: var(--vscode-foreground); }
+
+/* Token-usage modal (opened from the ctx-pill). */
+.token-table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 12px;
+}
+.token-table th {
+	text-align: right;
+	font-weight: 500;
+	color: var(--vscode-descriptionForeground);
+	padding: 2px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+.token-table th:first-child { text-align: left; }
+.token-table td { padding: 3px 8px; }
+.token-model { font-family: var(--vscode-editor-font-family); }
+.token-num { text-align: right; font-variant-numeric: tabular-nums; }
+.token-total td { border-top: 1px solid var(--vscode-panel-border); font-weight: 600; }
 
 .sendbtn {
 	width: 28px;

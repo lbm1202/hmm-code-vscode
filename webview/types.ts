@@ -43,6 +43,7 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: any[] }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
+	| { kind: typeof TO_WEBVIEW.USAGE; perModel: Record<string, { input: number; output: number }>; sessionCount: number }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -60,7 +61,8 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
 	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
-	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string };
+	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_USAGE; file: string };
 
 export type StatusState = {
 	row: HTMLElement;

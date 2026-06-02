@@ -26,6 +26,7 @@ import {
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
+import { showTokenModal } from "./token-modal";
 import { addToolCall, updateToolPartial, updateToolResult } from "./tools";
 import {
 	ensureStatus,
@@ -115,6 +116,7 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	[TO_WEBVIEW.COMMANDS]: (msg) => {
 		runtime.slashCommands = msg.commands ?? [];
 	},
+	[TO_WEBVIEW.USAGE]: (msg) => showTokenModal(msg.perModel ?? {}, msg.sessionCount ?? 1),
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
 	[TO_WEBVIEW.EXIT]: (msg) => {
 		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`);

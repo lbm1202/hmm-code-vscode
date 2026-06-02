@@ -32,6 +32,9 @@ export const TO_WEBVIEW = {
 	/** Registered slash commands (from Pi's get_commands RPC) for the prompt
 	 *  autocomplete + clean-dispatch path. */
 	COMMANDS: "commands",
+	/** Per-model token usage for the current session subtree (own + children),
+	 *  shown in the ctx-pill modal. */
+	USAGE: "usage",
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
@@ -48,6 +51,8 @@ export const FROM_WEBVIEW = {
 	REQUEST_CONTEXT: "request-context",
 	/** Ask the host for the registered slash command list (get_commands RPC). */
 	REQUEST_COMMANDS: "request-commands",
+	/** Ask the host for the current session subtree's per-model token usage. */
+	REQUEST_USAGE: "request-usage",
 	LIST_SESSIONS: "list-sessions",
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",

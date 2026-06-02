@@ -139,6 +139,67 @@ export function collectCascade(file: string, cwd: string): Set<string> {
 	return set;
 }
 
+export interface ModelUsage {
+	input: number;
+	output: number;
+}
+
+/** Sum input/output tokens per model id across one session's assistant
+ *  messages. Each assistant message carries its own `model` + `usage`, so
+ *  multi-model and branched sessions attribute correctly. */
+export function sessionUsage(file: string): Record<string, ModelUsage> {
+	const out: Record<string, ModelUsage> = {};
+	let text: string;
+	try {
+		text = readFileSync(file, "utf-8");
+	} catch {
+		return out;
+	}
+	for (const line of text.split("\n")) {
+		if (!line || !line.includes('"usage"')) continue;
+		try {
+			const o = JSON.parse(line);
+			const m = (o.message ?? o) as {
+				role?: string;
+				model?: unknown;
+				modelId?: unknown;
+				usage?: { input?: number; output?: number; inputTokens?: number; outputTokens?: number };
+			};
+			if (m.role !== "assistant" || !m.usage) continue;
+			const model =
+				typeof m.model === "string"
+					? m.model
+					: ((m.model as { id?: string })?.id ??
+						(typeof m.modelId === "string" ? m.modelId : "unknown"));
+			const e = (out[model] ??= { input: 0, output: 0 });
+			e.input += Number(m.usage.input ?? m.usage.inputTokens ?? 0) || 0;
+			e.output += Number(m.usage.output ?? m.usage.outputTokens ?? 0) || 0;
+		} catch {
+			/* skip malformed line */
+		}
+	}
+	return out;
+}
+
+/** Aggregate per-model token usage across a session AND all its descendants
+ *  (a parent includes its children). Returns combined per-model totals plus the
+ *  number of sessions counted (1 = no children). */
+export function subtreeUsage(
+	file: string,
+	cwd: string,
+): { perModel: Record<string, ModelUsage>; sessionCount: number } {
+	const files = collectCascade(file, cwd); // file + all descendants
+	const perModel: Record<string, ModelUsage> = {};
+	for (const f of files) {
+		for (const [model, mu] of Object.entries(sessionUsage(f))) {
+			const e = (perModel[model] ??= { input: 0, output: 0 });
+			e.input += mu.input;
+			e.output += mu.output;
+		}
+	}
+	return { perModel, sessionCount: files.size };
+}
+
 /** Delete a session and all descendants (BFS via parentFile pointer). */
 export function deleteSession(file: string, cwd: string): void {
 	const toDelete = [...collectCascade(file, cwd)];
