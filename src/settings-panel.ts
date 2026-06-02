@@ -556,9 +556,10 @@ export class SettingsPanel {
 		if (autoCompactThreshold !== undefined) {
 			const def = SettingsPanel.defaultCompactThreshold();
 			const n = Number(autoCompactThreshold);
-			// Clamp to the same [50, 85] range Pi enforces on load, so the stored
-			// value always equals the one Pi actually uses (no panel/runtime drift).
-			const clamped = Number.isFinite(n) ? Math.min(85, Math.max(50, Math.round(n))) : NaN;
+			// Clamp to the same range Pi enforces on load — [50, 80] with dynamic
+			// compaction on, [50, 90] off — so the stored value matches what Pi uses.
+			const max = dynamicCompaction === false ? 90 : 80;
+			const clamped = Number.isFinite(n) ? Math.min(max, Math.max(50, Math.round(n))) : NaN;
 			if (autoCompactThreshold !== null && Number.isFinite(clamped) && clamped !== def) {
 				raw.autoCompactThreshold = clamped;
 			} else {
@@ -783,7 +784,7 @@ export class SettingsPanel {
 			</label>
 			<div class="desc field-hint" style="margin-top: 4px;">${t("settings.compact.dynamicDesc")}</div>
 			<div class="row" style="margin-top: 12px;">
-				<input type="range" id="compact-threshold" min="50" max="85" step="1" class="slider" />
+				<input type="range" id="compact-threshold" min="50" max="80" step="1" class="slider" />
 				<span class="field-hint slider-value" id="compact-value">75%</span>
 				<span class="field-hint" id="compact-default-hint"></span>
 				<button class="ghost" id="compact-reset">${t("settings.compact.reset")}</button>

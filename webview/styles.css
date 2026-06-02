@@ -511,6 +511,24 @@ body.mod-down .file-link:hover {
 	text-decoration: underline;
 	cursor: pointer;
 }
+/* Full bash command shown inside the expanded tool block (verbatim, wrapped). */
+.tool-bash-cmd {
+	margin: 6px 0 0 0;
+	padding: 6px 8px;
+	background: var(--vscode-textBlockQuote-background);
+	border-left: 2px solid var(--vscode-textBlockQuote-border);
+	overflow: auto;
+	max-height: 220px;
+	font-size: 11px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-family: var(--vscode-editor-font-family);
+	color: var(--vscode-foreground);
+}
+body.mod-down .bash-cmd-link:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
 .diff-prefix {
 	display: inline-block;
 	width: 14px;
@@ -759,6 +777,52 @@ body.mod-down .file-link:hover {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	position: relative;
+}
+
+/* Slash-command autocomplete — floats above the textarea, anchored to the
+   prompt area. Mouse selection only (no keyboard nav yet). */
+.slash-menu {
+	position: absolute;
+	left: 10px;
+	right: 10px;
+	bottom: calc(100% + 4px);
+	z-index: 150;
+	max-height: 240px;
+	overflow-y: auto;
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+	border-radius: 6px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+	padding: 4px;
+}
+
+.slash-item {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 5px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.slash-item:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.slash-name {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 12px;
+	color: var(--vscode-textLink-foreground);
+	flex-shrink: 0;
+}
+
+.slash-desc {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 #prompt-input {
@@ -853,7 +917,28 @@ body.mod-down .file-link:hover {
 	font-size: 10px;
 	color: var(--vscode-descriptionForeground);
 	font-family: var(--vscode-editor-font-family);
+	cursor: pointer;
 }
+.ctx-pill:hover { color: var(--vscode-foreground); }
+
+/* Token-usage modal (opened from the ctx-pill). */
+.token-table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 12px;
+}
+.token-table th {
+	text-align: right;
+	font-weight: 500;
+	color: var(--vscode-descriptionForeground);
+	padding: 2px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+.token-table th:first-child { text-align: left; }
+.token-table td { padding: 3px 8px; }
+.token-model { font-family: var(--vscode-editor-font-family); }
+.token-num { text-align: right; font-variant-numeric: tabular-nums; }
+.token-total td { border-top: 1px solid var(--vscode-panel-border); font-weight: 600; }
 
 .sendbtn {
 	width: 28px;

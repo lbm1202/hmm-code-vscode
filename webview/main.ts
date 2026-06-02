@@ -7,7 +7,8 @@ import { updateModeColor, wirePickers } from "./pickers";
 import { wirePrompt } from "./prompt";
 import { FROM_WEBVIEW } from "./protocol";
 import { showSessionPicker } from "./session-picker";
-import { post, ui } from "./state";
+import { wireSlashMenu } from "./slash";
+import { post, runtime, ui } from "./state";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
@@ -15,6 +16,7 @@ if (!app) throw new Error("#app not found");
 initDom(app);
 wirePickers();
 wirePrompt();
+wireSlashMenu();
 wireDispatch();
 updateModeColor();
 
@@ -54,6 +56,14 @@ e.btnCompact.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.SLASH, text: "/compact" });
 });
 
+// ctx-pill click → token-usage modal for the current session subtree (own +
+// child sessions). Host computes; dispatch's USAGE handler opens the modal.
+e.ctxPill.title = "Click for token usage";
+e.ctxPill.addEventListener("click", () => {
+	const file = runtime.currentSessionFile;
+	if (file) post({ kind: FROM_WEBVIEW.REQUEST_USAGE, file });
+});
+
 setEmptyVisibility();
 
 // Ctrl/Cmd-click on a `.file-link` (rendered by tool summaries + edit-diff
@@ -64,13 +74,26 @@ document.addEventListener(
 	(ev) => {
 		const onlyMod = (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey;
 		if (!onlyMod) return;
-		const target = (ev.target as HTMLElement | null)?.closest?.(".file-link");
-		if (!target) return;
-		const path = target.getAttribute("data-file-path");
-		if (!path) return;
-		ev.preventDefault();
-		ev.stopPropagation();
-		post({ kind: FROM_WEBVIEW.OPEN_FILE, path });
+		const el = ev.target as HTMLElement | null;
+		const fileEl = el?.closest?.(".file-link");
+		if (fileEl) {
+			const path = fileEl.getAttribute("data-file-path");
+			if (!path) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			post({ kind: FROM_WEBVIEW.OPEN_FILE, path });
+			return;
+		}
+		// Ctrl/Cmd-click on a bash command summary / inline block → open the full
+		// command text in a scratch editor tab.
+		const cmdEl = el?.closest?.(".bash-cmd-link");
+		if (cmdEl) {
+			const cmd = cmdEl.getAttribute("data-bash-cmd");
+			if (!cmd) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			post({ kind: FROM_WEBVIEW.OPEN_TEXT, text: cmd, language: "shellscript" });
+		}
 	},
 	true, // capture: beat the <summary> default toggle
 );

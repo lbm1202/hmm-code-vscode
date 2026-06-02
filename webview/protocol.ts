@@ -5,6 +5,7 @@
 // host code at runtime" rule doesn't apply). Webview-only additions live below.
 
 export { TO_WEBVIEW, FROM_WEBVIEW, STATUS_KEYS } from "../src/protocol-shared";
+export type { SlashCommand } from "../src/protocol-shared";
 
 export const PI_EVENT = {
 	MESSAGE_START: "message_start",

@@ -37,9 +37,11 @@ Workflow when a Dependabot PR appears:
 
 ## Smoke test (manual)
 
-Before tagging, at minimum verify:
+`.github/workflows/ci.yml` already runs `tsc --noEmit` + `npm test` on every push and PR, so a green main covers the first two checks below. Before tagging, at minimum verify:
 
-- [ ] `npm run build` succeeds locally without warnings beyond the known `webview/tools.ts` implicit-any errors.
+- [ ] `./node_modules/.bin/tsc --noEmit` reports 0 errors.
+- [ ] `npm test` passes.
+- [ ] `npm run build` succeeds locally without warnings.
 - [ ] `npx @vscode/vsce package` produces a `.vsix` under 30 MB.
 - [ ] Install the local `.vsix` over the previous one: `code --install-extension hmm-code-X.Y.Z.vsix --force`.
 - [ ] Reload the VS Code window. Open the Hmm-code sidebar. Send "hello" to the active model — response arrives.

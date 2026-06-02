@@ -1,8 +1,12 @@
 name: CI
 
 # Runs on every push to main and on pull requests: type-checks the whole
-# extension and runs the unit test suite. The full .vsix build/package is
-# exercised separately by release.yml on tag pushes.
+# extension, runs the unit test suite, and runs a full bundle build so the
+# cross-repo contract guard (assertContractsInSync) validates STATUS_KEYS,
+# BINARY_THINKING_FORMATS, and the four mode prompts against hmm-code-pi. This
+# is what catches a breaking @earendil-works/pi-coding-agent (Dependabot) bump
+# that tsc/tests alone would miss. The .vsix packaging itself stays in
+# release.yml on tag pushes.
 
 on:
   push:
@@ -29,3 +33,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Clone hmm-code-pi (the bundle build needs it as a sibling)
+        run: git clone --depth 1 https://github.com/lbm1202/hmm-code-pi.git ../hmm-code-pi
+
+      - name: Build (bundles Pi + hmm-code-pi; runs the contract-sync guard)
+        run: npm run build

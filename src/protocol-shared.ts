@@ -9,6 +9,16 @@
 // handleFromWebview switch. Constants give us autocomplete + grep-ability and,
 // now, a compile-time guarantee that both sides agree on the strings.
 
+/** A registered slash command surfaced to the prompt autocomplete. Mirrors the
+ *  shape Pi's `get_commands` RPC returns. `source: "extension"` commands run a
+ *  handler with no LLM turn (clean-dispatch, no chat echo); `skill`/`prompt`
+ *  expand into a message to the model. */
+export interface SlashCommand {
+	name: string;
+	description: string;
+	source: "extension" | "skill" | "prompt";
+}
+
 /** kind values on ToWebview (host → webview). */
 export const TO_WEBVIEW = {
 	READY: "ready",
@@ -19,6 +29,12 @@ export const TO_WEBVIEW = {
 	SESSIONS: "sessions",
 	MODELS: "models",
 	MESSAGES: "messages",
+	/** Registered slash commands (from Pi's get_commands RPC) for the prompt
+	 *  autocomplete + clean-dispatch path. */
+	COMMANDS: "commands",
+	/** Per-model token usage for the current session subtree (own + children),
+	 *  shown in the ctx-pill modal. */
+	USAGE: "usage",
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
@@ -33,6 +49,10 @@ export const FROM_WEBVIEW = {
 	REQUEST_MODELS: "request-models",
 	REQUEST_MESSAGES: "request-messages",
 	REQUEST_CONTEXT: "request-context",
+	/** Ask the host for the registered slash command list (get_commands RPC). */
+	REQUEST_COMMANDS: "request-commands",
+	/** Ask the host for the current session subtree's per-model token usage. */
+	REQUEST_USAGE: "request-usage",
 	LIST_SESSIONS: "list-sessions",
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",
@@ -41,6 +61,9 @@ export const FROM_WEBVIEW = {
 	/** Ctrl/Cmd-click on a file path in a tool summary/header. Host opens the
 	 *  file in the editor area (no-op for non-existent paths). */
 	OPEN_FILE: "open-file",
+	/** Ctrl/Cmd-click on a bash command summary. Host opens the full command
+	 *  text in a scratch editor tab (so long/`&&`-chained commands are readable). */
+	OPEN_TEXT: "open-text",
 	/** Inline slash command — bypasses the user-message echo path so a button
 	 *  click doesn't litter the chat with /commands. Host forwards directly to
 	 *  Pi via prompt/no-reply. */

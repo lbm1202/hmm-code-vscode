@@ -7,8 +7,25 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-06-02
+
+First stable on the 0.1.1 line (supersedes 0.1.1-rc1 / rc2). Bundles Pi runtime + hmm-code-pi 0.1.1.
+
+### Added
+- **Token usage modal.** Click the `ctx` pill in the chat footer to see per-model input/output token totals for the current session — aggregated across every session it spawned (a parent includes its children). Each assistant message carries its own model, so multi-model and branched sessions attribute correctly; a Total row appears when more than one model contributed.
+- **Readable bash commands.** A `bash` tool-call summary only shows the truncated first line, so long or `&&`-chained / multi-line commands were unreadable. Expanding the block now shows the full command verbatim (wrapped), and Ctrl/Cmd-clicking the command (summary or block) opens the whole thing in a scratch editor tab — selectable, copyable, syntax-highlighted as shell.
+- **Slash commands in the chat prompt.** Typing a registered command (`/mode`, `/reset`, `/compact`, …) now dispatches it cleanly — no stray user-message bubble and no stuck loading spinner — instead of being echoed and stranding the turn. A `/`-triggered autocomplete menu lists the available commands (fetched live from Pi via `get_commands`); click a suggestion to fill it in. Unknown slashes still go to the model as a normal message. (Keyboard navigation of the menu is not wired yet — mouse selection + Escape/click-outside to dismiss.)
+  - `/plan-execute` is hidden from the menu: it's the TUI engine behind finalize_plan's new-session handoff, not a chat command (in VS Code the finalize_plan dialog is the entry point). It still clean-dispatches if typed in full.
+  - The clean-dispatch path is race-proof: if the command list hasn't loaded yet on a cold session, a `/`-prefixed entry is still dispatched echo-free so it can't strand the spinner; the list is also re-fetched on session start when missing.
+
+### Fixed
+- A "waiting" status row (`응답 대기 중`) no longer lingers after a slash command that opens an interactive picker (bare `/mode`, `/mode-set`). The modal-answer handler optimistically started a turn status on every reply; for a picker that isn't part of a turn, nothing ever cleared it. It now refreshes the status only when a turn is actually in flight.
+
 ### Changed
+- Compaction settings retuned: default auto-summarize threshold 75 → **70%**, and the threshold slider caps at **80%** with dynamic compaction on (the +10% grace band — also 15 → 10% — must stay under 100) or **90%** with it off. Toggling dynamic compaction adjusts the slider's max live.
+- Bundled Pi runtime bumped to **0.78.0** (`@earendil-works/pi-coding-agent`).
 - Internal: shared model alias + allowlist helpers extracted to `src/model-utils.ts`, used by both the chat backend and the settings webview so the chat picker and the settings dropdowns apply the same allowlist predicate. Added a `node --test` suite (`npm test`) and excluded `test/` from the packaged `.vsix`.
+- CI: `.github/workflows/ci.yml` runs `tsc --noEmit` + `npm test` on every push and PR, plus a full bundle build to validate the contract guard.
 
 ## [0.1.1-rc2] — 2026-05-30
 
@@ -81,7 +98,8 @@ First public release.
 - Auto-resume race: switch_session now guarded so the in-flight target session can't be overwritten by an interim STATE for Pi's temp session.
 - Plan handoff race: mode-switch wait is now condition-based (`waitFor(ui.mode === target, 2000)`) instead of a fixed 200ms.
 
-[Unreleased]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1-rc2...HEAD
+[Unreleased]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1-rc2...v0.1.1
 [0.1.1-rc2]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.1-rc1...v0.1.1-rc2
 [0.1.1-rc1]: https://github.com/lbm1202/hmm-code-vscode/compare/v0.1.0...v0.1.1-rc1
 [0.1.0]: https://github.com/lbm1202/hmm-code-vscode/releases/tag/v0.1.0

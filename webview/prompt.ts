@@ -8,6 +8,7 @@
 import { appendUserBubble, els } from "./dom";
 import { t } from "./i18n";
 import { FROM_WEBVIEW, MODE_NAMES } from "./protocol";
+import { hideSlashMenu, isCleanCommand } from "./slash";
 import { post, runtime, ui } from "./state";
 import { ensureTurn } from "./turn-lifecycle";
 
@@ -18,6 +19,19 @@ export function doSend(): void {
 	const e = els();
 	const text = e.prompt.value.trim();
 	if (!text) return;
+	hideSlashMenu();
+	// A recognized extension command (e.g. /mode, /reset, /compact) runs a
+	// handler with no LLM turn. Route it straight to Pi without echoing a user
+	// bubble or arming the optimistic spinner — otherwise the spinner would
+	// hang forever (no turn_end ever arrives) and the chat would show a stray
+	// "/command" message. If the command does start a turn, the real turn_start
+	// event arms the spinner. Unknown slashes / skills / templates fall through
+	// to the normal send path (they go to the model and want the echo).
+	if (isCleanCommand(text)) {
+		e.prompt.value = "";
+		post({ kind: FROM_WEBVIEW.SLASH, text });
+		return;
+	}
 	appendUserBubble(text);
 	e.prompt.value = "";
 	runtime.turnInFlight = true;

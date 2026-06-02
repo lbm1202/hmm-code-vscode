@@ -10,12 +10,15 @@ import {
 	STATUS_KEYS,
 	SESSION_RESET_COMMANDS,
 	TO_WEBVIEW,
+	type SlashCommand,
 } from "./protocol";
 import {
 	collectCascade,
 	deleteSession,
 	listSessions,
 	renameSession,
+	subtreeUsage,
+	type ModelUsage,
 	type SessionEntry,
 } from "./session-manager";
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
@@ -79,6 +82,8 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.SESSIONS; sessions: SessionEntry[] }
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: unknown[] }
+	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
+	| { kind: typeof TO_WEBVIEW.USAGE; perModel: Record<string, ModelUsage>; sessionCount: number }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -90,11 +95,14 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MODELS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MESSAGES }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_CONTEXT }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_COMMANDS }
 	| { kind: typeof FROM_WEBVIEW.LIST_SESSIONS }
 	| { kind: typeof FROM_WEBVIEW.DELETE_SESSION; file: string }
 	| { kind: typeof FROM_WEBVIEW.RENAME_SESSION; file: string; name: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_SETTINGS }
 	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
+	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_USAGE; file: string }
 	| { kind: typeof FROM_WEBVIEW.SLASH; text: string };
 
 export interface ChatBackendOpts {
@@ -476,6 +484,34 @@ export class ChatBackend {
 					this.post({ kind: TO_WEBVIEW.STDERR, text: `get_state failed: ${(err as Error).message}` });
 				}
 				return;
+			case FROM_WEBVIEW.REQUEST_COMMANDS:
+				try {
+					const res = await client.send({ type: "get_commands" });
+					if (res.success) {
+						const data = res.data as { commands?: SlashCommand[] };
+						this.post({ kind: TO_WEBVIEW.COMMANDS, commands: data.commands ?? [] });
+					}
+				} catch (err) {
+					// Non-fatal — the prompt just won't have autocomplete this session.
+					console.error("[hmm-code:chat-backend] get_commands failed:", err);
+				}
+				return;
+			case FROM_WEBVIEW.REQUEST_USAGE: {
+				// ctx-pill click: per-model token totals for the current session and
+				// every session it spawned (parent includes children).
+				const file = raw.file;
+				if (typeof file !== "string" || !file) return;
+				try {
+					const { perModel, sessionCount } = subtreeUsage(file, this.workspaceCwd());
+					this.post({ kind: TO_WEBVIEW.USAGE, perModel, sessionCount });
+				} catch (err) {
+					this.post({
+						kind: TO_WEBVIEW.STDERR,
+						text: `usage failed: ${(err as Error).message}`,
+					});
+				}
+				return;
+			}
 			case FROM_WEBVIEW.LIST_SESSIONS:
 				await this.refreshSessions();
 				return;
@@ -579,6 +615,26 @@ export class ChatBackend {
 					this.post({
 						kind: TO_WEBVIEW.STDERR,
 						text: `open-file failed (${abs}): ${(err as Error).message}`,
+					});
+				}
+				return;
+			}
+			case FROM_WEBVIEW.OPEN_TEXT: {
+				// Ctrl/Cmd-click on a bash command → open the full command text in
+				// a scratch (untitled) editor tab so long / `&&`-chained commands
+				// are readable, selectable, and copyable.
+				const text = raw.text;
+				if (typeof text !== "string" || !text) return;
+				try {
+					const doc = await vscode.workspace.openTextDocument({
+						content: text,
+						language: typeof raw.language === "string" ? raw.language : "shellscript",
+					});
+					await vscode.window.showTextDocument(doc, { preview: true });
+				} catch (err) {
+					this.post({
+						kind: TO_WEBVIEW.STDERR,
+						text: `open-text failed: ${(err as Error).message}`,
 					});
 				}
 				return;

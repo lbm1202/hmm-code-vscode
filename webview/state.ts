@@ -10,6 +10,7 @@ import {
 	BINARY_THINKING_FORMATS,
 	THINKING_LEVELS,
 } from "./protocol";
+import type { SlashCommand } from "./protocol";
 import type { BubbleState, ModelEntry, SessionEntry, StatusState } from "./types";
 
 declare function acquireVsCodeApi(): {
@@ -100,6 +101,9 @@ export const runtime = {
 	lastStateModel: null as any,
 	/** True once we've received a state with thinkingLevelMap/reasoning info. */
 	initialStateReady: false,
+	/** Registered slash commands (from the host's get_commands) for the prompt
+	 *  autocomplete + clean-dispatch path. Empty until the host pushes them. */
+	slashCommands: [] as SlashCommand[],
 };
 
 /** Outstanding UI requests (select/confirm/input/editor) by id. Survives

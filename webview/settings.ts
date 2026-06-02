@@ -732,16 +732,25 @@ function renderAllowlist() {
 }
 
 function renderCompact() {
+	const input = el('compact-threshold');
+	const valueLabel = el('compact-value');
+	const showValue = () => { if (valueLabel && input) valueLabel.textContent = input.value + '%'; };
+	// Dynamic compaction ON adds a +10% grace band, so the threshold caps at 80
+	// (80+10=90, clear of 100). OFF compacts AT the threshold, so it can reach 90.
+	const applyMax = () => {
+		if (!input) return;
+		const max = S.dynamicCompactionDraft ? 80 : 90;
+		input.max = String(max);
+		if (Number(input.value) > max) { input.value = String(max); S.compactDraft = input.value; showValue(); }
+	};
 	const toggle = el('dynamic-compaction');
 	if (toggle) {
 		toggle.checked = S.dynamicCompactionDraft;
-		toggle.onchange = () => { S.dynamicCompactionDraft = toggle.checked; updateSaveBar(); };
+		toggle.onchange = () => { S.dynamicCompactionDraft = toggle.checked; applyMax(); updateSaveBar(); };
 	}
-	const input = el('compact-threshold');
 	if (!input) return;
 	input.value = S.compactDraft;
-	const valueLabel = el('compact-value');
-	const showValue = () => { if (valueLabel) valueLabel.textContent = input.value + '%'; };
+	applyMax();
 	showValue();
 	const hint = el('compact-default-hint');
 	if (hint) hint.textContent = t('settings.compact.defaultHint', { n: defaultCompact() });
