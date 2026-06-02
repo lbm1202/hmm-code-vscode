@@ -10,7 +10,7 @@ plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg)](https://code.visualstudio.com/)
 [![Release](https://img.shields.io/github/v/release/lbm1202/hmm-code-vscode?label=release)](https://github.com/lbm1202/hmm-code-vscode/releases)
-[![Pi-coding-agent](https://img.shields.io/badge/Pi-0.77.x-purple.svg)](https://github.com/badlogic/pi-mono)
+[![Pi-coding-agent](https://img.shields.io/github/package-json/dependency-version/lbm1202/hmm-code-vscode/dev/@earendil-works/pi-coding-agent?label=Pi&color=purple)](https://github.com/badlogic/pi-mono)
 
 [English](README.md) · **한국어**
 
@@ -51,7 +51,7 @@ cd hmm-code-vscode
 npm install
 npm run build           # Pi 런타임 + hmm-code-pi를 out/vendor/ 로 번들
 npx @vscode/vsce package
-code --install-extension hmm-code-0.1.0.vsix --force
+code --install-extension "hmm-code-$(node -p "require('./package.json').version").vsix" --force
 ```
 
 형제 디렉터리가 없으면 빌드가 `hmm-code-pi`를 `node_modules/.cache/` 로 자동 클론합니다. 다른 위치의 기존 클론을 쓰려면 `HMM_CODE_PI_PATH=/path/to/clone` 으로 지정하세요.

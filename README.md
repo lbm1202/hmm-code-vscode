@@ -10,7 +10,7 @@ plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg)](https://code.visualstudio.com/)
 [![Release](https://img.shields.io/github/v/release/lbm1202/hmm-code-vscode?label=release)](https://github.com/lbm1202/hmm-code-vscode/releases)
-[![Pi-coding-agent](https://img.shields.io/badge/Pi-0.77.x-purple.svg)](https://github.com/badlogic/pi-mono)
+[![Pi-coding-agent](https://img.shields.io/github/package-json/dependency-version/lbm1202/hmm-code-vscode/dev/@earendil-works/pi-coding-agent?label=Pi&color=purple)](https://github.com/badlogic/pi-mono)
 
 **English** · [한국어](README.ko.md)
 
@@ -51,7 +51,7 @@ cd hmm-code-vscode
 npm install
 npm run build           # bundles Pi runtime + hmm-code-pi into out/vendor/
 npx @vscode/vsce package
-code --install-extension hmm-code-0.1.0.vsix --force
+code --install-extension "hmm-code-$(node -p "require('./package.json').version").vsix" --force
 ```
 
 If the sibling isn't there, the build auto-clones `hmm-code-pi` into `node_modules/.cache/`. Override with `HMM_CODE_PI_PATH=/path/to/clone` to use an existing clone in any other location.
