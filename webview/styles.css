@@ -1233,6 +1233,19 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 	color: var(--vscode-descriptionForeground);
 	flex: 0 0 auto;
 }
+.compaction-summary > summary {
+	cursor: pointer;
+	opacity: 0.8;
+}
+.compaction-summary-body {
+	margin-top: 6px;
+	white-space: pre-wrap;
+	max-height: 300px;
+	overflow: auto;
+	font-size: 12px;
+	opacity: 0.85;
+}
+
 .session-actions {
 	display: flex;
 	gap: 4px;

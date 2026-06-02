@@ -22,6 +22,8 @@ export const PI_EVENT = {
 	TURN_START: "turn_start",
 	TURN_END: "turn_end",
 	EXTENSION_ERROR: "extension_error",
+	COMPACTION_START: "compaction_start",
+	COMPACTION_END: "compaction_end",
 } as const;
 
 export const ASSISTANT_DELTA = {

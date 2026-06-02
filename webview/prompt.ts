@@ -15,7 +15,7 @@ import { ensureTurn } from "./turn-lifecycle";
 const DEFAULT_PLACEHOLDER = t("chat.promptPlaceholder");
 
 export function doSend(): void {
-	if (runtime.turnInFlight || runtime.pendingQuestionCount > 0) return; // blocked
+	if (runtime.turnInFlight || runtime.compacting || runtime.pendingQuestionCount > 0) return; // blocked
 	const e = els();
 	const text = e.prompt.value.trim();
 	if (!text) return;
@@ -54,20 +54,22 @@ export function updateSendButton(): void {
  *  Send button stays enabled — it doubles as Abort when turnInFlight. */
 export function updatePromptDisabled(): void {
 	const e = els();
-	const blocked = runtime.turnInFlight || runtime.pendingQuestionCount > 0;
+	const blocked = runtime.turnInFlight || runtime.compacting || runtime.pendingQuestionCount > 0;
 	e.prompt.disabled = blocked;
 	e.prompt.classList.toggle("disabled", blocked);
 	e.prompt.setAttribute(
 		"placeholder",
 		blocked
-			? runtime.turnInFlight
-				? t("chat.modelWorking")
-				: t("chat.waitingInput")
+			? runtime.compacting
+				? t("chat.compacting")
+				: runtime.turnInFlight
+					? t("chat.modelWorking")
+					: t("chat.waitingInput")
 			: DEFAULT_PLACEHOLDER,
 	);
-	// Block session-switching while a turn is mid-flight: switching mid-stream
-	// makes Pi drop the in-progress response.
-	const blockSession = runtime.turnInFlight;
+	// Block session-switching while a turn is mid-flight or compacting: switching
+	// mid-stream makes Pi drop the in-progress response / compaction.
+	const blockSession = runtime.turnInFlight || runtime.compacting;
 	(e.btnNew as HTMLButtonElement).disabled = blockSession;
 	(e.btnSessions as HTMLButtonElement).disabled = blockSession;
 	e.btnNew.classList.toggle("disabled", blockSession);

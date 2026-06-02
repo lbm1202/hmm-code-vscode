@@ -185,3 +185,20 @@ export function appendSystem(text: string): void {
 	const div = appendBubble("system");
 	div.textContent = text;
 }
+
+/** Append the collapsed "context compacted — view summary" block. Used both at
+ *  runtime (compaction_end) and when replaying history (Pi keeps the summary as a
+ *  `compactionSummary` message, so it survives reload / session switch). */
+export function appendCompactionSummary(summary: string): void {
+	const div = appendBubble("system");
+	const details = document.createElement("details");
+	details.className = "compaction-summary";
+	const head = document.createElement("summary");
+	head.textContent = t("chat.compactedTitle");
+	details.appendChild(head);
+	const body = document.createElement("div");
+	body.className = "compaction-summary-body";
+	body.textContent = summary.trim() || t("chat.compactedNoSummary");
+	details.appendChild(body);
+	div.appendChild(details);
+}

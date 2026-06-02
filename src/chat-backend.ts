@@ -103,7 +103,8 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.OPEN_FILE; path: string }
 	| { kind: typeof FROM_WEBVIEW.OPEN_TEXT; text: string; language?: string }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_USAGE; file: string }
-	| { kind: typeof FROM_WEBVIEW.SLASH; text: string };
+	| { kind: typeof FROM_WEBVIEW.SLASH; text: string }
+	| { kind: typeof FROM_WEBVIEW.WEBVIEW_READY };
 
 export interface ChatBackendOpts {
 	/** Fires when Pi reports a session name change (initial load or rename). */
@@ -306,6 +307,7 @@ export class ChatBackend {
 			const launch = ChatBackend.getLaunchConfig();
 			c.start({ piBin: launch.cmd, args: launch.args, env: launch.env, cwd });
 			this.client = c;
+			this.disableBuiltinAutoCompaction(c);
 			this.post({ kind: TO_WEBVIEW.READY });
 			// Host-side model re-pull once the new process is up. This is what
 			// refreshes the picker + the settings panel's cached model list after
@@ -316,6 +318,18 @@ export class ChatBackend {
 		} catch (err) {
 			this.post({ kind: TO_WEBVIEW.STDERR, text: `Failed to spawn pi: ${(err as Error).message}` });
 		}
+	}
+
+	/** Disable Pi's BUILT-IN auto-compaction on the live session so the hmm-code-pi
+	 *  extension is the sole compaction authority (it owns the threshold,
+	 *  boundary-only timing, and compactModel via its turn_end/agent_end hooks →
+	 *  ctx.compact()). Pi's built-in otherwise fires at its own reserveTokens point,
+	 *  independent of our configured threshold. autoCompactionEnabled is per-session
+	 *  and re-defaults to enabled whenever a session is created/switched, so we
+	 *  re-send after every session-reset command (new_session/switch_session/fork/
+	 *  clone), not just at spawn. Fire-and-forget. */
+	private disableBuiltinAutoCompaction(client: PiClient): void {
+		client.sendNoReply({ type: "set_auto_compaction", enabled: false } as any);
 	}
 
 	dispose(): void {
@@ -455,6 +469,10 @@ export class ChatBackend {
 						// session_start isn't delivered to RPC subscribers, so we
 						// synthesize one for the webview to clear/reload the view.
 						if (!data?.cancelled) {
+							// The new/switched session re-defaults built-in auto-compaction
+							// to enabled — re-disable so it can't race our extension's
+							// compaction (see disableBuiltinAutoCompaction).
+							this.disableBuiltinAutoCompaction(client);
 							this.post({
 								kind: TO_WEBVIEW.EVENT,
 								event: { type: "session_start", reason: cmd.type },
@@ -554,6 +572,8 @@ export class ChatBackend {
 					try {
 						const res = await client.send({ type: "new_session" });
 						if (res.success) {
+							// New session re-defaults built-in auto-compaction on — re-disable.
+							this.disableBuiltinAutoCompaction(client);
 							// SESSION_START isn't pushed to RPC subscribers for
 							// new_session; synthesize it so the webview clears
 							// the chat and rebinds to the new file.
@@ -596,6 +616,13 @@ export class ChatBackend {
 				return;
 			case FROM_WEBVIEW.SLASH:
 				if (typeof raw.text === "string" && raw.text) this.prompt(raw.text);
+				return;
+			case FROM_WEBVIEW.WEBVIEW_READY:
+				// Webview's listener is now wired — (re-)send READY so its boot
+				// handler (LIST_SESSIONS + auto-resume + state/context/commands) runs.
+				// The eager READY in start() races the webview script load and is
+				// usually dropped on (re)load.
+				this.post({ kind: TO_WEBVIEW.READY });
 				return;
 			case FROM_WEBVIEW.OPEN_FILE: {
 				// Ctrl/Cmd-click on a file path in a tool summary. Resolve

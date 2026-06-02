@@ -1,6 +1,6 @@
 // Host → webview message router + Pi event handler + ui-hint handler.
 
-import { appendSystem, els, setEmptyVisibility } from "./dom";
+import { appendCompactionSummary, appendSystem, els, setEmptyVisibility } from "./dom";
 import { buildPlanExecutionBody, displayModel } from "./helpers";
 import { clearConversation, renderHistory, renderRecentList } from "./history";
 import { showModal } from "./modals";
@@ -47,6 +47,27 @@ import { updatePromptDisabled, updateResetVisibility, updateSendButton } from ".
 const autoApproveDefault = !!(
 	window as unknown as { __HMM_CFG?: { autoApproveDefault?: boolean } }
 ).__HMM_CFG?.autoApproveDefault;
+
+/** Release the compaction input-lock after this long if compaction_end never
+ *  arrives — a real summary completes well under this; a hang/failure is caught. */
+const COMPACT_TIMEOUT_MS = 240_000;
+
+/** Auto-resume runs once per webview load. READY can fire twice (the host's eager
+ *  READY plus the WEBVIEW_READY handshake reply); the data requests are idempotent
+ *  but a double switch_session is not, so guard it. */
+let bootResumeDone = false;
+
+/** Show the compact button only when it's actually usable: enough context to be
+ *  worth compacting (≥20% usage), the chat is idle (no turn in flight — Pi can't
+ *  compact mid-turn anyway), and no compaction is already running. Reads the last
+ *  known context % from `ui.context`. Called on every relevant transition. */
+function refreshCompactBtn(): void {
+	const pct = parseFloat(ui.context || "");
+	els().btnCompact.classList.toggle(
+		"hidden",
+		runtime.compacting || runtime.turnInFlight || !(Number.isFinite(pct) && pct >= 20),
+	);
+}
 
 /** Wire the window message listener. Call once at boot. */
 export function wireDispatch(): void {
@@ -222,6 +243,12 @@ function handlePiEvent(ev: any): void {
 		case PI_EVENT.TURN_START:
 			runtime.turnInFlight = true;
 			updateSendButton();
+			// Hide the compact button immediately while the model works (a turn can
+			// span multiple tool rounds; Pi can't compact until it ends).
+			refreshCompactBtn();
+			// Refresh the context pill: if a just-finished compaction left it
+			// reading "compacted", the new turn restores the live % here.
+			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			return;
 		case PI_EVENT.AGENT_END:
 		case PI_EVENT.TURN_END:
@@ -230,13 +257,50 @@ function handlePiEvent(ev: any): void {
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			return;
+		case PI_EVENT.COMPACTION_START:
+			// Lock input while compacting (same mechanism as a turn). compaction_start
+			// reliably reaches here; the earlier failure was the shadowed `t` above.
+			runtime.compacting = true;
+			els().ctxPill.textContent = t("chat.compacting");
+			// Hide the compact button while compacting; refreshCompactBtn re-shows it
+			// once context climbs back over the threshold on a later turn.
+			refreshCompactBtn();
+			updatePromptDisabled();
+			// Safety: if compaction_end never arrives (failed / hung compaction),
+			// release the lock so the chat doesn't stay frozen forever.
+			if (runtime.compactTimeout != null) clearTimeout(runtime.compactTimeout);
+			runtime.compactTimeout = window.setTimeout(() => {
+				runtime.compactTimeout = null;
+				if (!runtime.compacting) return;
+				runtime.compacting = false;
+				appendSystem(t("chat.compactTimeout"));
+				updatePromptDisabled();
+				post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
+			}, COMPACT_TIMEOUT_MS);
+			return;
+		case PI_EVENT.COMPACTION_END:
+			if (runtime.compactTimeout != null) {
+				clearTimeout(runtime.compactTimeout);
+				runtime.compactTimeout = null;
+			}
+			runtime.compacting = false;
+			if (ev.aborted) {
+				// Aborted/failed — restore the real % instead of claiming success.
+				post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
+			} else {
+				// Show "compacted" until the next turn refreshes the live %.
+				els().ctxPill.textContent = t("chat.compacted");
+				appendCompactionSummary(typeof ev.result?.summary === "string" ? ev.result.summary : "");
+			}
+			updatePromptDisabled();
+			return;
 		case PI_EVENT.EXTENSION_ERROR:
 			appendSystem(`[ext error ${ev.extensionPath ?? "?"} @ ${ev.event ?? "?"}] ${ev.error ?? ""}`);
 			return;
 		default:
 			// Unknown Pi event type — surfaces protocol drift during dev instead
 			// of dropping silently. Harmless events (many) land here too.
-			if (t) console.debug("[hmm-code] unhandled pi event:", t);
+			if (evType) console.debug("[hmm-code] unhandled pi event:", evType);
 	}
 }
 
@@ -296,10 +360,7 @@ function handleSetStatus(key: string, value: string): void {
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
 		e.ctxPill.textContent = `ctx ${value}`;
-		// Compact button only appears once there's enough context to be worth
-		// compacting (≥20% usage) — below that it's noise.
-		const pct = parseFloat(value);
-		e.btnCompact.classList.toggle("hidden", !(Number.isFinite(pct) && pct >= 20));
+		refreshCompactBtn();
 	} else if (key === STATUS_KEYS.PLAN_HANDOFF) {
 		// value format: "<planPath>|<targetMode>"
 		const sep = value.lastIndexOf("|");

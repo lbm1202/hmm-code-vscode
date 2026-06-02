@@ -109,3 +109,10 @@ document.addEventListener("keyup", (e) => {
 	if (!e.ctrlKey && !e.metaKey) updateModDown(false);
 });
 window.addEventListener("blur", () => updateModDown(false));
+
+// Handshake: tell the host we're listening now. The host's eager READY (posted
+// synchronously during resolveWebview, before this script loaded) is dropped,
+// so without this the boot LIST_SESSIONS / auto-resume never fire and the
+// session list stays empty until the user clicks the session button. The host
+// replies with READY → the dispatch READY handler loads sessions + resumes.
+post({ kind: FROM_WEBVIEW.WEBVIEW_READY });

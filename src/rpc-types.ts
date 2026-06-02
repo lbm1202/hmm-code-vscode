@@ -24,6 +24,12 @@ export interface RpcCmdSetThinking extends RpcCommandBase {
 	level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 }
 export interface RpcCmdCompact extends RpcCommandBase { type: "compact" }
+/** Toggle Pi's BUILT-IN auto-compaction. We disable it (enabled:false) at
+ *  spawn so the hmm-code-pi extension is the sole compaction authority — see
+ *  chat-backend.ts:start(). Without this, Pi's built-in fires at its own
+ *  reserveTokens threshold and collides with our extension-driven compaction
+ *  ("Compaction cancelled"). Pi persists this to ~/.pi/settings.json. */
+export interface RpcCmdSetAutoCompaction extends RpcCommandBase { type: "set_auto_compaction"; enabled: boolean }
 export interface RpcCmdGetCommands extends RpcCommandBase { type: "get_commands" }
 export interface RpcCmdGetMessages extends RpcCommandBase { type: "get_messages" }
 export interface RpcCmdGetAvailableModels extends RpcCommandBase { type: "get_available_models" }
@@ -38,6 +44,7 @@ export type RpcCommand =
 	| RpcCmdSetModel
 	| RpcCmdSetThinking
 	| RpcCmdCompact
+	| RpcCmdSetAutoCompaction
 	| RpcCmdGetCommands
 	| RpcCmdGetMessages
 	| RpcCmdGetAvailableModels

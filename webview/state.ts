@@ -78,6 +78,12 @@ export const ui = {
 export const runtime = {
 	/** Between doSend/agent_start and agent_end/turn_end. Blocks prompt input. */
 	turnInFlight: false,
+	/** True while a compaction is in flight (compaction_start → compaction_end).
+	 *  Blocks prompt input and hides the compact button. */
+	compacting: false,
+	/** Safety-timeout handle: releases the compaction lock if compaction_end never
+	 *  arrives (failed / hung compaction). Cleared on compaction_end. */
+	compactTimeout: null as number | null,
 	/** Question card count; >0 blocks prompt input. */
 	pendingQuestionCount: 0,
 	/** Active status row (loading dots + phase text + elapsed). */

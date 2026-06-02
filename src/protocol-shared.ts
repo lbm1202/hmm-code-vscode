@@ -68,6 +68,12 @@ export const FROM_WEBVIEW = {
 	 *  click doesn't litter the chat with /commands. Host forwards directly to
 	 *  Pi via prompt/no-reply. */
 	SLASH: "slash",
+	/** Handshake: the webview posts this once its message listener is wired
+	 *  (end of main.ts). The host replies with READY. Without it, the host's
+	 *  eager READY (sent synchronously during resolveWebview, before the webview
+	 *  script loads) is dropped → no boot LIST_SESSIONS / auto-resume until the
+	 *  user clicks the session button. */
+	WEBVIEW_READY: "webview-ready",
 } as const;
 
 /** setStatus keys we receive from Pi modes ext (and synthesize ourselves).

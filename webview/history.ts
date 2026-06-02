@@ -1,17 +1,27 @@
 // Conversation history rendering: replay past messages from get_messages and
 // build the "recent sessions" list on the empty state.
 
-import { appendBubble, appendUserBubble, els, setEmptyVisibility } from "./dom";
+import { appendBubble, appendCompactionSummary, appendUserBubble, els, forceScrollToBottom, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
 import { t } from "./i18n";
 import { showModal } from "./modals";
 import { FROM_WEBVIEW } from "./protocol";
-import { pendingUiRequests, post, ui } from "./state";
+import { pendingUiRequests, post, runtime, ui } from "./state";
 import { buildToolCallBlock, updateToolResult } from "./tools";
 import { finalizeTurn } from "./turn-lifecycle";
 
 /** Clear all messages and re-render any pending UI requests. */
 export function clearConversation(): void {
+	// A session change (start/switch/load) invalidates any in-flight compaction
+	// from the previous session: clear the lock + its 240s safety timer here so
+	// the new session's input isn't stuck disabled and the timer can't fire into
+	// the wrong session. (finalizeTurn → updateSendButton → updatePromptDisabled
+	// below then re-evaluates input with compacting=false.)
+	if (runtime.compactTimeout != null) {
+		clearTimeout(runtime.compactTimeout);
+		runtime.compactTimeout = null;
+	}
+	runtime.compacting = false;
 	finalizeTurn();
 	els().messages.innerHTML = "";
 	setEmptyVisibility();
@@ -39,12 +49,18 @@ export function renderHistory(messages: any[]): void {
 			// Pass full message-as-result so formatInteractiveResult can read
 			// details.todos / details.answers etc. and pretty-render.
 			updateToolResult(tcid, ok, { content: m.content, details: m.details });
+		} else if (role === "compactionSummary") {
+			// Pi keeps the compaction summary as a message in the session context
+			// (createCompactionSummaryMessage), so replay it as the same collapsed
+			// block the runtime compaction_end shows — this is what makes it survive
+			// reload / session switch.
+			appendCompactionSummary(typeof m.summary === "string" ? m.summary : "");
 		}
 		// other roles (custom, etc) — skip for V0
 	}
 	setEmptyVisibility();
-	const e = els();
-	e.messages.scrollTop = e.messages.scrollHeight;
+	// Loading a session jumps to the latest and re-pins.
+	forceScrollToBottom();
 }
 
 function renderAssistantHistory(m: any): void {
