@@ -459,7 +459,14 @@ export class ChatBackend {
 			case FROM_WEBVIEW.COMMAND: {
 				const cmd = raw.command;
 				try {
-					const res = await client.send(cmd as any, 60_000);
+					// 120s: session-reset commands (switch_session/new_session/fork)
+					// load + rebuild a session, which on a very large session can run
+					// past a tighter ceiling. A premature timeout rejects here while
+					// Pi keeps going, leaving host and webview disagreeing about the
+					// active session (the late success is now dropped, not re-emitted —
+					// see pi-client.handleLine — so it can't desync, but the user would
+					// still see a false failure). The generous ceiling avoids that.
+					const res = await client.send(cmd as any, 120_000);
 					if (!res.success) {
 						this.post({ kind: TO_WEBVIEW.STDERR, text: `${cmd.type} failed: ${res.error}` });
 						return;

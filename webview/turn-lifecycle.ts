@@ -107,6 +107,12 @@ export function finalizeBubble(): void {
 export function finalizeTurn(): void {
 	removeStatus();
 	finalizeBubble();
+	// Catch-all: clear any tool-call spinners whose result never matched. The
+	// per-block result path (updateToolResult) keys on data-tool-call-id; if Pi's
+	// toolcall_end id and tool_execution_end toolCallId ever diverge — or an end
+	// event is dropped — the block's ⏳ would spin forever. A turn boundary means
+	// every tool for that turn is done, so any spinner still up is orphaned.
+	els().messages.querySelectorAll(".tool-spinner").forEach((sp) => sp.remove());
 	updateSendButton();
 }
 

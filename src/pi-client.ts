@@ -190,8 +190,18 @@ export class PiClient extends EventEmitter {
 					return;
 				}
 			}
-			// Unmatched response (no id correlation) — surface as event for visibility.
-			this.emit("event", msg as RpcEvent);
+			// Unmatched response: either a fire-and-forget command's echo (no id —
+			// e.g. set_auto_compaction) or a response that arrived AFTER its send()
+			// already timed out and rejected. Do NOT re-emit as a lifecycle event:
+			// the webview's Pi-event stream doesn't expect `type:"response"`, and a
+			// late success here (e.g. a slow switch_session) re-injected as an "event"
+			// can desync the UI from a command the caller already treated as failed.
+			// Drop it; log for dev visibility.
+			console.debug(
+				"[pi-client] dropping unmatched response:",
+				(msg as { command?: string }).command,
+				(msg as { id?: string }).id ?? "(no id)",
+			);
 			return;
 		}
 

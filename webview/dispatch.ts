@@ -94,22 +94,14 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		// previous session file is in persisted state. Switch back to it so
 		// the user picks up where they left off. Pi spawns a fresh session
 		// by default; this transitions to the previous one once it's ready.
-		const last = persistedSessionFile();
+		const last = bootResumeDone ? null : persistedSessionFile();
 		if (last) {
-			// Set the guard BEFORE the setTimeout so any STATE message that
-			// arrives in the 300ms window (reporting Pi's bootstrap temp
-			// session) won't overwrite `last` in persisted storage. Cleared
-			// in renderState when the target session reports back.
+			bootResumeDone = true;
+			// Set the guard BEFORE switching so any STATE reporting Pi's bootstrap
+			// temp session won't overwrite `last` in persisted storage. Cleared in
+			// renderState when the target session reports back.
 			runtime.pendingSwitchTarget = last;
-			// Small delay so Pi's initial session bootstrap finishes before
-			// we tell it to switch — racing it can cause "session not found"
-			// errors on cold-start.
-			setTimeout(() => {
-				post({
-					kind: FROM_WEBVIEW.COMMAND,
-					command: { type: "switch_session", sessionPath: last },
-				});
-			}, 300);
+			void resumeLastSession(last);
 		}
 	},
 	[TO_WEBVIEW.EVENT]: (msg) => handlePiEvent(msg.event),
@@ -141,17 +133,32 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
 	[TO_WEBVIEW.EXIT]: (msg) => {
 		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`);
-		// A crash/exit mid-turn would otherwise strand the optimistic loading
-		// spinner — end the turn so the input is usable again.
+		// Pi died — EVERY in-flight thing on it (the turn, a compaction, any pending
+		// ask_user/confirm whose await lived in that process) is now dead. Reset all
+		// input-gating state so the chat is usable again after the host respawns Pi;
+		// otherwise a crash mid-compaction or mid-question leaves input permanently
+		// disabled (the 240s compaction timer / the pendingQuestionCount never clear).
 		runtime.turnInFlight = false;
+		runtime.compacting = false;
+		if (runtime.compactTimeout != null) {
+			clearTimeout(runtime.compactTimeout);
+			runtime.compactTimeout = null;
+		}
+		pendingUiRequests.clear();
+		runtime.pendingQuestionCount = 0;
 		finalizeTurn();
+		updatePromptDisabled();
 	},
 };
 
 /** Pi lifecycle / streaming event handler. */
 function handlePiEvent(ev: any): void {
-	const t = ev?.type;
-	switch (t) {
+	// NOTE: do NOT name this `t` — it would shadow the imported i18n `t()` for the
+	// whole function, turning every `t("…")` call here into "<eventType>(…)" → a
+	// "t is not a function" TypeError. That latent bug silently broke status-phase
+	// strings and (visibly) the compaction lock's pill/updatePromptDisabled.
+	const evType = ev?.type;
+	switch (evType) {
 		case PI_EVENT.MESSAGE_START: {
 			if (ev.message?.role !== "assistant") return;
 			ensureTurn();
@@ -427,6 +434,31 @@ function renderState(state: any): void {
 			rememberSessionFile(state.sessionFile);
 		}
 	}
+}
+
+/** Auto-resume the last session after a webview reload. Gates on Pi readiness
+ *  (the first get_state landing — switching during Pi's session bootstrap returns
+ *  "session not found") instead of a blind fixed delay, retries a few times, and
+ *  on give-up clears pendingSwitchTarget so renderState resumes persisting the
+ *  actual active session (otherwise auto-resume stays broken for the rest of this
+ *  webview's life). Covers M-1 (race) + M-3 (latched guard). */
+async function resumeLastSession(target: string): Promise<void> {
+	// pollInitialState (fired from READY) is already polling get_state;
+	// runtime.currentSessionFile is set by renderState on the first response —
+	// that's the "Pi is ready to accept session commands" signal.
+	await waitFor(() => !!runtime.currentSessionFile, 5000);
+	for (let attempt = 0; attempt < 3; attempt++) {
+		if (runtime.pendingSwitchTarget !== target) return; // already switched
+		post({
+			kind: FROM_WEBVIEW.COMMAND,
+			command: { type: "switch_session", sessionPath: target },
+		});
+		// renderState clears pendingSwitchTarget once state.sessionFile === target.
+		await waitFor(() => runtime.pendingSwitchTarget !== target, 4000);
+		if (runtime.pendingSwitchTarget !== target) return; // success
+	}
+	// Gave up — unstick the guard so rememberSessionFile resumes on the next STATE.
+	if (runtime.pendingSwitchTarget === target) runtime.pendingSwitchTarget = undefined;
 }
 
 /** Async sequence: wait for session settle, switch mode if needed, fire plan body.
