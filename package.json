@@ -127,6 +127,6 @@
   "dependencies": {
     "dompurify": "^3.4.7",
     "marked": "^18.0.4",
-    "shiki": "^4.1.0"
+    "shiki": "^4.2.0"
   }
 }
