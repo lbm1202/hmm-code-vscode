@@ -95,6 +95,12 @@ export function diskDynamicCompaction() {
 export function dynamicCompactionDirty() {
 	return S.dynamicCompactionDraft !== diskDynamicCompaction();
 }
+export function diskIncludeOldToolOutputs() {
+	return !!(S.diskState && S.diskState.includeOldToolOutputs === true);
+}
+export function includeOldToolOutputsDirty() {
+	return S.includeOldToolOutputsDraft !== diskIncludeOldToolOutputs();
+}
 export function diskAutoTitlePrompt() {
 	const v = S.diskState && S.diskState.modes && S.diskState.modes.autoTitlePrompt;
 	return typeof v === 'string' ? v : '';
@@ -129,6 +135,7 @@ export function isDirty() {
 	if (allowlistDirty()) return true;
 	if (compactDirty()) return true;
 	if (dynamicCompactionDirty()) return true;
+	if (includeOldToolOutputsDirty()) return true;
 	if (autoTitlePromptDirty()) return true;
 	if (compactInstructionsDirty()) return true;
 	return false;

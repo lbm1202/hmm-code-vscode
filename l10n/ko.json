@@ -197,6 +197,8 @@
   "settings.compact.defaultHint": "(기본 {n}%)",
   "settings.compact.dynamic": "다이나믹 압축",
   "settings.compact.dynamicDesc": "켜짐(기본): 에이전트의 턴 도중에는 끊지 않습니다 — 임계값을 넘으면 턴이 끝나는 경계에서 압축하고, 임계값보다 10% 더 차오를 때만 강제로 압축합니다. 꺼짐: 임계값을 넘는 즉시 턴 도중이라도 압축합니다(기존 방식).",
+  "settings.toolOutputs.include": "오래된 도구 출력 포함",
+  "settings.toolOutputs.includeDesc": "꺼짐(기본): 최근 구간보다 오래된 도구 출력은 모델 컨텍스트에서 짧은 안내문으로 치환됩니다(전체 출력은 저장된 대화 기록에 항상 남습니다) — 컨텍스트를 가볍게 유지해 압축이 덜 자주 일어납니다. 켜짐: 모든 도구 출력을 컨텍스트에 원문 그대로 유지합니다.",
   "settings.dirty.compact": "자동요약 임계값",
   "settings.oauth.authed": "✓ 인증됨",
   "settings.usage.check": "Codex 사용량 확인",

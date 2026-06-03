@@ -197,6 +197,8 @@
   "settings.compact.defaultHint": "(default {n}%)",
   "settings.compact.dynamic": "Dynamic compaction",
   "settings.compact.dynamicDesc": "On (default): never interrupt the agent mid-turn — compact at the turn boundary once usage passes the threshold, with a forced compaction only if usage climbs 10% past it. Off: compact the moment the threshold is crossed, even mid-turn (legacy).",
+  "settings.toolOutputs.include": "Include old tool outputs",
+  "settings.toolOutputs.includeDesc": "Off (default): tool outputs older than a recent window are replaced with a short notice in the model's context (the full output always stays in the saved transcript) — keeps context lean so compaction fires less often. On: keep every tool output in context verbatim.",
   "settings.dirty.compact": "auto-summarize threshold",
   "settings.oauth.authed": "✓ Authenticated",
   "settings.usage.check": "Check Codex usage",

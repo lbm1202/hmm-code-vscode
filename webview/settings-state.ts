@@ -39,6 +39,7 @@ export const S = {
 	allowlistDraft: {} as Record<string, string[]>,     // per-provider id allowlist
 	compactDraft: '',               // auto-compact threshold (effective value)
 	dynamicCompactionDraft: true,   // dynamic compaction toggle (default on)
+	includeOldToolOutputsDraft: false, // include old tool outputs (default off → prune)
 	autoTitlePromptDraft: '',       // auto-title prompt override ('' = default)
 	compactInstructionsDraft: '',   // compaction additional-focus ('' = none)
 	codexUsageFetched: false,       // one-shot guard for the usage auto-fetch
