@@ -41,18 +41,19 @@ const APP_HTML = `
 	</div>
 	<div class="prompt-area">
 		<div class="slash-menu hidden" id="slash-menu"></div>
-		<textarea id="prompt-input" rows="3" placeholder="${t("chat.promptPlaceholder")}" autofocus></textarea>
+		<div class="attachments hidden" id="attachments"></div>
+		<input type="file" id="file-input" accept="image/*" multiple hidden />
+		<textarea id="prompt-input" rows="1" placeholder="${t("chat.promptPlaceholder")}" autofocus></textarea>
 		<div class="prompt-footer">
-			<div class="picker-row">
-				<button class="picker" id="picker-mode"><span class="picker-label">code</span><span class="picker-caret">▲</span></button>
-				<button class="picker" id="picker-model"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
-				<button class="picker" id="picker-thinking"><span class="picker-label">—</span><span class="picker-caret">▲</span></button>
-				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺ ${t("chat.resetLabel")}</button>
-				<button class="picker autoapprove off" id="btn-autoapprove" title="${t("chat.autoApproveTitle")}">🔒 Auto</button>
-				<button class="picker hidden" id="btn-compact" title="${t("chat.compactTitle")}">🗜 ${t("chat.compactLabel")}</button>
+			<div class="footer-left">
+				<button class="composer-icon" id="btn-attach" title="${t("chat.attachTitle")}">＋</button>
+				<button class="composer-icon" id="btn-slash" title="${t("chat.slashTitle")}">/</button>
+				<button class="composer-icon hidden" id="btn-compact" title="${t("chat.compactTitle")}">🗜</button>
+				<span class="ctx-pill" id="ctx-pill">ctx —</span>
 			</div>
 			<div class="footer-right">
-				<span class="ctx-pill" id="ctx-pill">ctx —</span>
+				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺ ${t("chat.resetLabel")}</button>
+				<button class="picker" id="picker-mode"><span class="picker-label">code</span><span class="picker-caret">▾</span></button>
 				<button class="sendbtn" id="send-btn" title="Send (Enter)">↑</button>
 			</div>
 		</div>
@@ -67,21 +68,20 @@ export interface DomRefs {
 	recentList: HTMLElement;
 	prompt: HTMLTextAreaElement;
 	slashMenu: HTMLElement;
+	attachments: HTMLElement;
+	btnAttach: HTMLElement;
+	btnSlash: HTMLElement;
+	fileInput: HTMLInputElement;
 	send: HTMLElement;
 	modalRoot: HTMLElement;
 	popoverRoot: HTMLElement;
 	pickerMode: HTMLElement;
-	pickerModel: HTMLElement;
-	pickerThinking: HTMLElement;
 	pickerModeLabel: HTMLElement;
-	pickerModelLabel: HTMLElement;
-	pickerThinkingLabel: HTMLElement;
 	ctxPill: HTMLElement;
 	btnNew: HTMLElement;
 	btnSessions: HTMLElement;
 	btnSettings: HTMLElement;
 	btnReset: HTMLElement;
-	btnAutoApprove: HTMLElement;
 	btnCompact: HTMLElement;
 }
 
@@ -89,29 +89,26 @@ export interface DomRefs {
 function mountDom(root: HTMLElement): DomRefs {
 	root.innerHTML = APP_HTML;
 	const pickerMode = document.getElementById("picker-mode")!;
-	const pickerModel = document.getElementById("picker-model")!;
-	const pickerThinking = document.getElementById("picker-thinking")!;
 	return {
 		messages: document.getElementById("messages")!,
 		empty: document.getElementById("empty-state")!,
 		recentList: document.getElementById("recent-list")!,
 		prompt: document.getElementById("prompt-input") as HTMLTextAreaElement,
 		slashMenu: document.getElementById("slash-menu")!,
+		attachments: document.getElementById("attachments")!,
+		btnAttach: document.getElementById("btn-attach")!,
+		btnSlash: document.getElementById("btn-slash")!,
+		fileInput: document.getElementById("file-input") as HTMLInputElement,
 		send: document.getElementById("send-btn")!,
 		modalRoot: document.getElementById("modal-root")!,
 		popoverRoot: document.getElementById("popover-root")!,
 		pickerMode,
-		pickerModel,
-		pickerThinking,
 		pickerModeLabel: pickerMode.querySelector(".picker-label") as HTMLElement,
-		pickerModelLabel: pickerModel.querySelector(".picker-label") as HTMLElement,
-		pickerThinkingLabel: pickerThinking.querySelector(".picker-label") as HTMLElement,
 		ctxPill: document.getElementById("ctx-pill")!,
 		btnNew: document.getElementById("btn-new-session")!,
 		btnSessions: document.getElementById("btn-sessions")!,
 		btnSettings: document.getElementById("btn-settings")!,
 		btnReset: document.getElementById("btn-reset")!,
-		btnAutoApprove: document.getElementById("btn-autoapprove")!,
 		btnCompact: document.getElementById("btn-compact")!,
 	};
 }
@@ -171,11 +168,30 @@ export function appendBubble(role: "user" | "assistant" | "system"): HTMLElement
 	return div;
 }
 
-export function appendUserBubble(text: string): void {
+export function appendUserBubble(text: string, images?: { data: string; mimeType: string }[]): void {
 	const div = appendBubble("user");
 	// User messages render as plain text with pre-wrap. Avoid markdown <p> wrapping
 	// which adds extra spacing around short messages.
-	div.textContent = text;
+	if (images && images.length) {
+		const wrap = document.createElement("div");
+		wrap.className = "msg-images";
+		for (const im of images) {
+			const img = document.createElement("img");
+			img.className = "msg-image";
+			img.src = `data:${im.mimeType};base64,${im.data}`;
+			img.alt = t("chat.imageAlt");
+			wrap.appendChild(img);
+		}
+		div.appendChild(wrap);
+		if (text) {
+			const tx = document.createElement("div");
+			tx.className = "msg-usertext";
+			tx.textContent = text;
+			div.appendChild(tx);
+		}
+	} else {
+		div.textContent = text;
+	}
 	// Sending a message is an explicit action — always jump to it and re-pin.
 	forceScrollToBottom();
 }

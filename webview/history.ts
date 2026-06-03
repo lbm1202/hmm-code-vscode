@@ -57,7 +57,8 @@ function renderOneMessage(m: any): void {
 	const role = m.role;
 	if (role === "user") {
 		const text = extractText(m.content);
-		if (text) appendUserBubble(text);
+		const images = extractImages(m.content);
+		if (text || images.length) appendUserBubble(text, images);
 	} else if (role === "assistant") {
 		renderAssistantHistory(m);
 	} else if (role === "toolResult") {
@@ -171,6 +172,13 @@ function extractText(content: any): string {
 		.filter((p) => p && p.type === "text" && typeof p.text === "string")
 		.map((p) => p.text)
 		.join("");
+}
+
+function extractImages(content: any): { data: string; mimeType: string }[] {
+	if (!Array.isArray(content)) return [];
+	return content
+		.filter((p) => p && p.type === "image" && typeof p.data === "string")
+		.map((p) => ({ data: p.data, mimeType: typeof p.mimeType === "string" ? p.mimeType : "image/png" }));
 }
 
 export function renderRecentList(): void {

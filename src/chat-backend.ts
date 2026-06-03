@@ -88,7 +88,7 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
-	| { kind: typeof FROM_WEBVIEW.PROMPT; text: string }
+	| { kind: typeof FROM_WEBVIEW.PROMPT; text: string; images?: { type: "image"; data: string; mimeType: string }[] }
 	| { kind: typeof FROM_WEBVIEW.ABORT }
 	| { kind: typeof FROM_WEBVIEW.UI_RESPONSE; response: RpcExtensionUiResponse }
 	| { kind: typeof FROM_WEBVIEW.COMMAND; command: { type: string; [k: string]: unknown } }
@@ -431,7 +431,11 @@ export class ChatBackend {
 		switch (raw.kind) {
 			case FROM_WEBVIEW.PROMPT:
 				try {
-					const res = await client.send({ type: "prompt", message: raw.text });
+					const res = await client.send(
+						raw.images && raw.images.length
+							? { type: "prompt", message: raw.text, images: raw.images }
+							: { type: "prompt", message: raw.text },
+					);
 					// Pi acks the prompt after preflight succeeds; a FAILED preflight
 					// (no model / no auth) resolves with success:false and emits NO
 					// turn lifecycle events — so the webview's optimistic loading

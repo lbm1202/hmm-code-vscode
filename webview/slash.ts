@@ -122,4 +122,16 @@ export function wireSlashMenu(): void {
 		const area = els().prompt.closest(".prompt-area");
 		if (area && !area.contains(ev.target as Node)) hideSlashMenu();
 	});
+	// "/" toolbar button: seed the textarea with "/" (if not already a command)
+	// and open the full command list. Toggles closed if it's already showing.
+	els().btnSlash.addEventListener("click", () => {
+		if (!els().slashMenu.classList.contains("hidden")) {
+			hideSlashMenu();
+			return;
+		}
+		if (!ta.value.startsWith("/")) ta.value = "/";
+		ta.focus();
+		ta.selectionStart = ta.selectionEnd = ta.value.length;
+		updateSlashMenu();
+	});
 }

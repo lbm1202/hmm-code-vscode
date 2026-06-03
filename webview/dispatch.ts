@@ -1,11 +1,11 @@
 // Host → webview message router + Pi event handler + ui-hint handler.
 
 import { appendCompactionSummary, appendSystem, els, setEmptyVisibility } from "./dom";
-import { buildPlanExecutionBody, displayModel } from "./helpers";
+import { buildPlanExecutionBody } from "./helpers";
 import { clearConversation, renderHistory, renderRecentList } from "./history";
 import { showModal } from "./modals";
 import { t } from "./i18n";
-import { updateModeColor } from "./pickers";
+import { refreshPopover, updateModeColor } from "./pickers";
 import {
 	ASSISTANT_DELTA,
 	FROM_WEBVIEW,
@@ -22,7 +22,6 @@ import {
 	rememberSessionFile,
 	runtime,
 	supportedThinkingLevels,
-	thinkingLabel,
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
@@ -39,7 +38,7 @@ import {
 	streamThinking,
 } from "./turn-lifecycle";
 import type { ToWebview } from "./types";
-import { updatePromptDisabled, updateResetVisibility, updateSendButton } from "./prompt";
+import { updatePromptDisabled, updateSendButton } from "./prompt";
 
 // hmm-code.autoApproveDefault — injected by the host into window.__HMM_CFG
 // (see chat-backend renderChatHtml). When true, freshly started/resumed
@@ -124,6 +123,7 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 			ui.availableThinking = supportedThinkingLevels(eff);
 			ui.thinkingBinary = isBinaryThinking(eff);
 		}
+		refreshPopover(); // populate an open Model tab once the list arrives
 	},
 	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages),
 	[TO_WEBVIEW.COMMANDS]: (msg) => {
@@ -334,36 +334,45 @@ function handleHint(hint: any): void {
 	}
 }
 
+// A mode switch emits several mode/overridden statuses in quick succession
+// (the modes ext applies model + thinking, with transient values in between),
+// and rapid switching can deliver them out of order. Debounce the chip + reset
+// button so only the SETTLED value renders — otherwise the label flickers and
+// the reset button flashes. The click handler already updated the chip
+// optimistically, so this is just confirmation of the final state.
+let modeSettleTimer: ReturnType<typeof setTimeout> | undefined;
+let overriddenSettleTimer: ReturnType<typeof setTimeout> | undefined;
+
 function handleSetStatus(key: string, value: string): void {
 	const e = els();
 	if (key === STATUS_KEYS.MODE) {
 		ui.mode = value || "?";
-		e.pickerModeLabel.textContent = ui.mode;
-		updateModeColor();
+		clearTimeout(modeSettleTimer);
+		modeSettleTimer = setTimeout(() => {
+			els().pickerModeLabel.textContent = ui.mode;
+			updateModeColor();
+		}, 120);
 	} else if (key === STATUS_KEYS.MODEL) {
 		const next = value || "?";
 		const changed = next !== ui.model;
 		ui.model = next;
-		e.pickerModelLabel.textContent = displayModel(value);
+		refreshPopover(); // keep an open Model tab's selection in sync
 		// When the model changes (e.g. modes ext's state.apply runs setModel
 		// after initial get_state), re-pull state so availableThinking gets
 		// recomputed from the new full model object.
 		if (changed) post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 	} else if (key === STATUS_KEYS.THINKING) {
 		ui.thinking = value || "?";
-		e.pickerThinkingLabel.textContent = thinkingLabel();
+		refreshPopover(); // keep an open Effort slider in sync
 	} else if (key === STATUS_KEYS.OVERRIDDEN) {
 		runtime.isOverridden = value === "1";
-		updateResetVisibility();
+		clearTimeout(overriddenSettleTimer);
+		overriddenSettleTimer = setTimeout(() => {
+			els().btnReset.classList.toggle("hidden", !runtime.isOverridden);
+		}, 120);
 	} else if (key === STATUS_KEYS.AUTO_APPROVE) {
+		// State only — surfaced as a toggle row in the mode popover (pickers.ts).
 		ui.autoApprove = value === "on" || value === "true" || value === "1";
-		const btn = e.btnAutoApprove;
-		btn.classList.toggle("on", ui.autoApprove);
-		btn.classList.toggle("off", !ui.autoApprove);
-		btn.textContent = ui.autoApprove ? "🔓 Auto" : "🔒 Auto";
-		btn.title = ui.autoApprove
-			? t("chat.autoApprove.on")
-			: t("chat.autoApprove.off");
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
 		e.ctxPill.textContent = `ctx ${value}`;
@@ -417,8 +426,11 @@ function renderState(state: any): void {
 	}
 	if (state.thinkingLevel) {
 		ui.thinking = String(state.thinkingLevel);
-		e.pickerThinkingLabel.textContent = thinkingLabel();
 	}
+	// A model switch lands its thinking levels here (async, after set_model).
+	// Refresh any open popover so the Effort slider reflects the new model
+	// immediately instead of needing a second click.
+	refreshPopover();
 	if (typeof state.sessionFile === "string") {
 		runtime.currentSessionFile = state.sessionFile;
 		// Guard against the auto-resume race: while a switch_session is in

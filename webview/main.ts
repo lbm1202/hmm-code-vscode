@@ -39,21 +39,21 @@ e.btnSettings.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.OPEN_SETTINGS });
 });
 
-// Auto-approve toggle — sends /auto-approve via the SLASH channel so the
-// command runs Pi-side without appending a user bubble. Pi extension flips
-// state.autoApprove and broadcasts setStatus("auto-approve", "on"|"off")
-// back, which dispatch.ts handler renders on the button.
-// (No webview-level keyboard shortcut: VS Code grabs most Ctrl/Cmd-modified
-//  combos before the webview sees them. Use the button or Pi TUI's
-//  Ctrl+Shift+A shortcut instead.)
-e.btnAutoApprove.addEventListener("click", () => {
-	post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve" });
-});
+// Auto-approve now lives as a toggle row inside the mode picker popover
+// (pickers.ts), which posts the same /auto-approve SLASH command. Pi flips
+// state.autoApprove and broadcasts setStatus("auto-approve", …) back; the
+// dispatch handler updates ui.autoApprove so the popover reflects it on reopen.
 
 // Manual compaction — dispatches /compact (handled by hmm-code-pi's command,
 // which calls ctx.compact + notifies). Same path as the TUI slash.
 e.btnCompact.addEventListener("click", () => {
 	post({ kind: FROM_WEBVIEW.SLASH, text: "/compact" });
+});
+
+// Reset overridden model/thinking back to the mode defaults. Shown only while
+// overridden (dispatch toggles its visibility on the OVERRIDDEN status).
+e.btnReset.addEventListener("click", () => {
+	post({ kind: FROM_WEBVIEW.PROMPT, text: "/reset" });
 });
 
 // ctx-pill click → token-usage modal for the current session subtree (own +

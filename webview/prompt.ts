@@ -5,8 +5,10 @@
 // the cycle because each side only USES the import inside function bodies,
 // not at module top-level evaluation.
 
+import { clearAttachments, getAttachmentsForSend, wireAttachments } from "./attachments";
 import { appendUserBubble, els } from "./dom";
 import { t } from "./i18n";
+import { updateModeColor } from "./pickers";
 import { FROM_WEBVIEW, MODE_NAMES } from "./protocol";
 import { hideSlashMenu, isCleanCommand } from "./slash";
 import { post, runtime, ui } from "./state";
@@ -14,11 +16,20 @@ import { ensureTurn } from "./turn-lifecycle";
 
 const DEFAULT_PLACEHOLDER = t("chat.promptPlaceholder");
 
+/** Grow the textarea to fit its content (one line → up to the CSS max-height,
+ *  then it scrolls). Reset to "auto" first so it can also shrink. */
+export function autosizePrompt(): void {
+	const ta = els().prompt;
+	ta.style.height = "auto";
+	ta.style.height = `${ta.scrollHeight}px`;
+}
+
 export function doSend(): void {
 	if (runtime.turnInFlight || runtime.compacting || runtime.pendingQuestionCount > 0) return; // blocked
 	const e = els();
 	const text = e.prompt.value.trim();
-	if (!text) return;
+	const images = getAttachmentsForSend();
+	if (!text && images.length === 0) return;
 	hideSlashMenu();
 	// A recognized extension command (e.g. /mode, /reset, /compact) runs a
 	// handler with no LLM turn. Route it straight to Pi without echoing a user
@@ -27,16 +38,19 @@ export function doSend(): void {
 	// "/command" message. If the command does start a turn, the real turn_start
 	// event arms the spinner. Unknown slashes / skills / templates fall through
 	// to the normal send path (they go to the model and want the echo).
-	if (isCleanCommand(text)) {
+	// Attachments are never a clean command — fall through so the images send.
+	if (images.length === 0 && isCleanCommand(text)) {
 		e.prompt.value = "";
 		post({ kind: FROM_WEBVIEW.SLASH, text });
 		return;
 	}
-	appendUserBubble(text);
+	appendUserBubble(text, images);
 	e.prompt.value = "";
+	autosizePrompt(); // collapse back to a single line
+	clearAttachments();
 	runtime.turnInFlight = true;
 	ensureTurn(); // creates the standalone status row right away
-	post({ kind: FROM_WEBVIEW.PROMPT, text });
+	post({ kind: FROM_WEBVIEW.PROMPT, text, images });
 	updateSendButton();
 }
 
@@ -79,14 +93,10 @@ export function updatePromptDisabled(): void {
 	e.btnSessions.title = blockSession ? reason : t("chat.resumeSessionBtn");
 }
 
-/** Show/hide the "reset to defaults" button based on runtime.isOverridden. */
-export function updateResetVisibility(): void {
-	els().btnReset.classList.toggle("hidden", !runtime.isOverridden);
-}
-
-/** Wire send button + prompt key handlers + reset button. Call once at boot. */
+/** Wire send button + prompt key handlers. Call once at boot. */
 export function wirePrompt(): void {
 	const e = els();
+	e.prompt.addEventListener("input", autosizePrompt);
 	e.send.addEventListener("click", () => {
 		if (runtime.turnInFlight) post({ kind: FROM_WEBVIEW.ABORT });
 		else doSend();
@@ -123,8 +133,15 @@ export function wirePrompt(): void {
 			ev.preventDefault();
 			const idx = MODE_NAMES.indexOf(ui.mode as any);
 			const next = MODE_NAMES[(idx + dir + MODE_NAMES.length) % MODE_NAMES.length];
+			if (next === ui.mode) return;
+			// Optimistic: advance ui.mode + chip now so rapid Tab presses cycle from
+			// the new value (not a stale one) and never re-send the current mode —
+			// which would make Pi emit "Already in X mode".
+			ui.mode = next;
+			els().pickerModeLabel.textContent = next;
+			updateModeColor();
 			post({ kind: FROM_WEBVIEW.PROMPT, text: `/mode ${next}` });
 		}
 	});
-	e.btnReset.addEventListener("click", () => post({ kind: FROM_WEBVIEW.PROMPT, text: "/reset" }));
+	wireAttachments();
 }
