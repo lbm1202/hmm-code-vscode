@@ -321,7 +321,7 @@ function renderProviders() {
 			const cfg = S.modelsDraft.providers[n];
 			if (!cfg) return;
 			if (!cfg.models) cfg.models = [];
-			cfg.models.push({ id: '', name: '', contextWindow: '', maxTokens: '', reasoning: false });
+			cfg.models.push({ id: '', name: '', contextWindow: '', maxTokens: '', reasoning: false, input: ['text'] });
 			renderProviders();
 			updateSaveBar();
 		});
@@ -361,18 +361,20 @@ function renderModelRows(container: any, provName: any, models: any) {
 	// Header
 	const header = document.createElement('div');
 	header.className = 'model-grid';
-	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">' + esc(t('settings.models.colName')) + '</div><div class="label" style="text-align:center">' + esc(t('settings.models.colReasoning')) + '</div><div class="label">' + esc(t('settings.models.colThinkingFormat')) + '</div><div></div>';
+	header.innerHTML = '<div class="label">#</div><div class="label">ID</div><div class="label">' + esc(t('settings.models.colName')) + '</div><div class="label" style="text-align:center">' + esc(t('settings.models.colReasoning')) + '</div><div class="label" style="text-align:center">' + esc(t('settings.models.colImage')) + '</div><div class="label">' + esc(t('settings.models.colThinkingFormat')) + '</div><div></div>';
 	container.appendChild(header);
 	models.forEach((m: any, idx: any) => {
 		const row = document.createElement('div');
 		row.className = 'model-row-card';
 		const reasoningChecked = m.reasoning ? 'checked' : '';
+		const imageChecked = Array.isArray(m.input) && m.input.includes('image') ? 'checked' : '';
 		const tf = (m.compat && m.compat.thinkingFormat) || '';
 		row.innerHTML =
 			'<div class="row-num">' + (idx + 1) + '</div>' +
 			'<input type="text" placeholder="model-id" value="' + esc(m.id || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="id" />' +
 			'<input type="text" placeholder="(optional)" value="' + esc(m.name || '') + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="name" />' +
 			'<label class="reasoning-cell" title="' + esc(t('settings.models.reasoningTitle')) + '"><input type="checkbox" ' + reasoningChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="reasoning" /></label>' +
+			'<label class="reasoning-cell" title="' + esc(t('settings.models.imageTitle')) + '"><input type="checkbox" ' + imageChecked + ' data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="image" /></label>' +
 			// thinking-format dropdown only applies to reasoning models — hidden
 			// (cell kept for grid alignment) until reasoning is checked.
 			'<div class="tf-cell"><select title="' + esc(t('settings.models.thinkingFormatTitle')) + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat"' + (m.reasoning ? '' : ' style="display:none"') + '>' + thinkingFormatOptionsHtml(tf) + '</select></div>' +
@@ -400,6 +402,11 @@ function renderModelRows(container: any, provName: any, models: any) {
 					delete model.compat.thinkingFormat;
 					if (Object.keys(model.compat).length === 0) delete model.compat;
 				}
+			} else if (f === 'image') {
+				// Vision support → model input modalities. Written explicitly to
+				// models.json (no reliance on Pi's `["text"]` runtime default), so
+				// the file always states the model's image capability outright.
+				model.input = el.checked ? ['text', 'image'] : ['text'];
 			} else {
 				model[f] = isCheckbox ? el.checked : el.value;
 			}

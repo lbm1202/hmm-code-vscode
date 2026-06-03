@@ -350,7 +350,7 @@ th {
 }
 .model-grid {
 	display: grid;
-	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px minmax(0, 1fr) 36px;
+	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px 52px minmax(0, 1fr) 36px;
 	gap: 8px;
 	margin-bottom: 4px;
 }
@@ -363,7 +363,7 @@ th {
 }
 .model-row-card {
 	display: grid;
-	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px minmax(0, 1fr) 36px;
+	grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 52px 52px minmax(0, 1fr) 36px;
 	gap: 8px;
 	align-items: center;
 	margin: 4px 0;
@@ -515,7 +515,7 @@ th {
 
 	/* Model rows: drop the optional 이름 + # columns to give ID/형식 room. */
 	.model-grid, .model-row-card {
-		grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr) 32px;
+		grid-template-columns: minmax(0, 1fr) 46px 46px minmax(0, 1fr) 32px;
 	}
 	.model-grid > :nth-child(1), .model-grid > :nth-child(3),
 	.model-row-card > :nth-child(1), .model-row-card > :nth-child(3) { display: none; }
