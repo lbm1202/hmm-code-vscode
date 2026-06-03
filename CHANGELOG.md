@@ -7,6 +7,27 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-06-04
+
+Bundles Pi runtime + hmm-code-pi 0.1.2.
+
+### Added
+- **Image attachments.** Paste a screenshot, click the ＋ button, or drag-and-drop image files onto the prompt. Attachments are downscaled (longest edge ≤ 1568px), shown as removable thumbnail chips, echoed in the sent message, replayed from the on-disk transcript, and sent to the model as image parts. (Images load from `data:` URLs — the webview CSP allows `data:` but not `blob:`.)
+- **Per-model image-input (vision) toggle** in the Models tab. Writes `input: ["text","image"]` to `models.json` (off writes `["text"]` explicitly). Pi replaces user images with a placeholder for models that don't declare image input, so this toggle is what lets attachments actually reach a vision-capable custom endpoint.
+- **Full on-disk transcript with lazy windowing.** The chat renders the complete session transcript (read from the `.jsonl`) instead of only the compacted model context, so older turns no longer vanish after a compaction. A recent window loads first; an "↑ Load earlier messages" button prepends older chunks on demand (snapped to turn boundaries).
+- **Include old tool outputs** toggle (General tab, default off). Off prunes tool outputs older than a recent window from the model context (the full output stays in the transcript) so context stays lean and compaction fires far less often; on keeps everything verbatim.
+
+### Changed
+- **Redesigned chat composer.** A single rounded, centered (~100-char) input that grows from one line to five then scrolls. Footer: ＋ / slash / compact / ctx on the left; mode / model / send (rounded-square buttons) on the right. The standalone model button is gone — the **mode button opens one tabbed popover** with a `[Mode | Model]` side toggle: *Mode* lists the modes (with icons + descriptions) plus an Auto-approve switch; *Model* lists models plus a sliding **Effort** slider (thinking level) pinned below the scrolling list. Selecting keeps the popover open, and mode/override status updates are debounced so the mode chip and Reset button don't flicker.
+- **Reliable context compaction** + a boot READY handshake so session load / auto-resume fire deterministically. The webview drives compaction (built-in auto-compaction disabled) with a safety timeout that unlocks input if a compaction stalls.
+- **Sky-blue rebrand** — empty-state logo, editor tab icon, and extension icon recolored from green to sky blue.
+- Bundled **shiki 4.2.0** and **hmm-code-pi 0.1.2**.
+
+### Fixed
+- Stability hardening from an adversarial code review (HIGH/MED findings): drop unmatched RPC responses, add command timeouts, clear orphaned tool spinners, reset state on Pi EXIT, and gate auto-resume on readiness.
+- Streaming output follows the bottom only when the view is pinned there — scrolling up to read no longer fights autoscroll.
+- The resume / session-picker modal stays open while deleting sessions; the trash icon is centered.
+
 ## [0.1.1] — 2026-06-02
 
 First stable on the 0.1.1 line (supersedes 0.1.1-rc1 / rc2). Bundles Pi runtime + hmm-code-pi 0.1.1.

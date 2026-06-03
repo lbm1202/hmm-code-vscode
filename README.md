@@ -71,7 +71,7 @@ The mode system, plan handoff, and permission layer come from the bundled [hmm-c
 
 ## In the editor
 
-Interactive tool cards · syntax-highlighted edit/write diffs ([Shiki](https://shiki.style/)) · mode + model picker · permission modals · parent-child session history · tabbed settings panel (auth / models / modes / prompts) · English + Korean UI · self-contained `.vsix` (no separate Pi install).
+Interactive tool cards · syntax-highlighted edit/write diffs ([Shiki](https://shiki.style/)) · **image attachments** (paste / file / drag-drop) · a unified mode/model picker with an effort slider · permission modals · parent-child session history · tabbed settings panel (auth / models / modes / prompts) · English + Korean UI · self-contained `.vsix` (no separate Pi install).
 
 > **Claude (Anthropic) subscription auth:** using a Claude Pro/Max plan with third-party agent tools like this one is officially supported by Anthropic from **2026-06-15** onward — see [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan). Before that date, prefer an Anthropic **API key** (or another provider). ChatGPT Plus/Pro (Codex) subscription auth is available via the OAuth button in the settings panel.
 
@@ -93,15 +93,16 @@ VS Code Extension Host (Node)
         ├── restartAll()         respawn every Pi process (auth change)
         └── reloadAll()          /reload-runtime broadcast (modes/models change)
 
-Webview  (14 modules)
+Webview  (15 modules)
   ├── dispatch          message router + Pi event handler
   ├── turn-lifecycle    status row + bubble + rAF-debounced markdown stream
   ├── tools             interactive cards + LCS diff + Shiki blocks
-  ├── pickers           mode / model / thinking dropdowns
+  ├── pickers           unified mode/model tabbed popover + effort slider
+  ├── attachments       image paste / file picker / drag-drop + resize
   ├── modals            question cards + confirm/input dialogs
   ├── session-picker    parent-child tree with rename / delete
   ├── history           past-message replay (alias-aware)
-  ├── prompt            send / abort + key handlers (IME-safe)
+  ├── prompt            send / abort + key handlers (IME-safe) + autosize
   └── helpers/dom/state/protocol/types/syntax
 
 Pi process (bundled)
