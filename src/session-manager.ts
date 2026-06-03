@@ -181,6 +181,61 @@ export function sessionUsage(file: string): Record<string, ModelUsage> {
 	return out;
 }
 
+/** Read the FULL conversation transcript from a session .jsonl as webview-format
+ *  messages — the entire on-disk record, NOT the compacted model context that
+ *  `get_messages` returns. This is what lets the chat keep showing past messages
+ *  after a compaction: compaction only shrinks the MODEL's context (old turns →
+ *  one summary), it never deletes the saved transcript. The .jsonl is an entry
+ *  TREE (fork/branch via parentId), so we reconstruct the active branch by walking
+ *  parentId up from the last-appended entry (the current leaf), then emit in
+ *  chronological order. Message entries pass straight through (their `.message` is
+ *  already role-based); compaction entries become a `compactionSummary` marker at
+ *  their chronological spot (the compaction point); metadata/custom entries
+ *  (mode-state, todos, model_change, …) are skipped — they aren't conversation. */
+export function readSessionMessages(file: string): unknown[] {
+	let text: string;
+	try {
+		text = readFileSync(file, "utf-8");
+	} catch {
+		return [];
+	}
+	const byId = new Map<string, any>();
+	let leafId: string | undefined;
+	for (const line of text.split("\n")) {
+		if (!line) continue;
+		try {
+			const e = JSON.parse(line);
+			if (e && typeof e.id === "string") {
+				byId.set(e.id, e);
+				leafId = e.id; // last appended entry = current branch leaf
+			}
+		} catch {
+			/* skip malformed (e.g. a partially-written trailing line) */
+		}
+	}
+	// Walk leaf → root via parentId to get only the active branch (ignores
+	// abandoned fork siblings), then reverse to chronological order.
+	const branch: any[] = [];
+	const guard = new Set<string>();
+	let id: string | undefined = leafId;
+	while (id && byId.has(id) && !guard.has(id)) {
+		guard.add(id);
+		const e = byId.get(id);
+		branch.push(e);
+		id = typeof e.parentId === "string" ? e.parentId : undefined;
+	}
+	branch.reverse();
+	const out: unknown[] = [];
+	for (const e of branch) {
+		if (e.type === "message" && e.message) {
+			out.push(e.message);
+		} else if (e.type === "compaction") {
+			out.push({ role: "compactionSummary", summary: e.summary ?? "", timestamp: e.timestamp });
+		}
+	}
+	return out;
+}
+
 /** Aggregate per-model token usage across a session AND all its descendants
  *  (a parent includes its children). Returns combined per-model totals plus the
  *  number of sessions counted (1 = no children). */

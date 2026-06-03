@@ -1245,6 +1245,21 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 	font-size: 12px;
 	opacity: 0.85;
 }
+.load-more-history {
+	display: block;
+	width: 100%;
+	margin: 4px 0 10px;
+	padding: 6px 10px;
+	background: transparent;
+	color: var(--vscode-textLink-foreground);
+	border: 1px dashed var(--vscode-panel-border);
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 12px;
+}
+.load-more-history:hover {
+	background: var(--vscode-list-hoverBackground);
+}
 
 .session-actions {
 	display: flex;

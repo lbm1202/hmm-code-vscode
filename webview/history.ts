@@ -32,32 +32,83 @@ export function clearConversation(): void {
 	}
 }
 
+// ── Lazy history windowing ───────────────────────────────────────────────────
+// The full transcript can be hundreds–thousands of messages; rendering them all
+// up front is heavy. Show the most recent window, then prepend older chunks on
+// demand via a "load earlier" button at the top. Prepend is INCREMENTAL (never
+// clears) so a live streaming turn isn't wiped, and window boundaries snap to a
+// user message (turn start) so a toolCall and its toolResult never land in
+// different chunks (which would orphan the result).
+const INITIAL_WINDOW = 60; // messages rendered on first load
+const WINDOW_CHUNK = 60; // additional messages per "load earlier" click
+let historyBuffer: any[] = [];
+let windowStart = 0;
+
+/** Nearest user-message index at or before `idx` (a clean turn boundary). */
+function snapToTurnStart(idx: number): number {
+	for (let i = Math.min(idx, historyBuffer.length - 1); i >= 0; i--) {
+		if (historyBuffer[i]?.role === "user") return i;
+	}
+	return 0;
+}
+
+function renderOneMessage(m: any): void {
+	if (!m || typeof m !== "object") return;
+	const role = m.role;
+	if (role === "user") {
+		const text = extractText(m.content);
+		if (text) appendUserBubble(text);
+	} else if (role === "assistant") {
+		renderAssistantHistory(m);
+	} else if (role === "toolResult") {
+		// Pass full message-as-result so formatInteractiveResult can read
+		// details.todos / details.answers etc. and pretty-render.
+		updateToolResult(String(m.toolCallId ?? "?"), !m.isError, { content: m.content, details: m.details });
+	} else if (role === "compactionSummary") {
+		// Pi keeps the compaction summary as a message; replay it as the same
+		// collapsed block the runtime compaction_end shows (survives reload/switch).
+		appendCompactionSummary(typeof m.summary === "string" ? m.summary : "");
+	}
+	// other roles (custom, etc) — skip for V0
+}
+
+/** The "↑ load earlier messages" affordance at the top of the list. */
+function makeLoadMoreButton(): HTMLButtonElement {
+	const btn = document.createElement("button");
+	btn.className = "load-more-history";
+	btn.textContent = t("chat.loadMoreHistory", { n: String(windowStart) });
+	btn.addEventListener("click", loadEarlier);
+	return btn;
+}
+
+function loadEarlier(): void {
+	if (windowStart <= 0) return;
+	const box = els().messages;
+	const oldH = box.scrollHeight;
+	const oldT = box.scrollTop;
+	const prev = windowStart;
+	const newStart = prev > WINDOW_CHUNK ? snapToTurnStart(prev - WINDOW_CHUNK) : 0;
+	// Drop the current button, snapshot existing nodes, render the older chunk
+	// (appends at the bottom), then move those new nodes to the front.
+	box.querySelector(".load-more-history")?.remove();
+	const before = new Set(Array.from(box.childNodes));
+	const anchor = box.firstChild;
+	for (let i = newStart; i < prev; i++) renderOneMessage(historyBuffer[i]);
+	const added = Array.from(box.childNodes).filter((n) => !before.has(n));
+	for (const n of added) box.insertBefore(n, anchor);
+	windowStart = newStart;
+	if (windowStart > 0) box.insertBefore(makeLoadMoreButton(), box.firstChild);
+	// Keep the previously-visible messages in place after prepending older ones.
+	box.scrollTop = oldT + (box.scrollHeight - oldH);
+}
+
 export function renderHistory(messages: any[]): void {
 	if (!Array.isArray(messages) || messages.length === 0) return;
 	clearConversation();
-	for (const m of messages) {
-		if (!m || typeof m !== "object") continue;
-		const role = m.role;
-		if (role === "user") {
-			const text = extractText(m.content);
-			if (text) appendUserBubble(text);
-		} else if (role === "assistant") {
-			renderAssistantHistory(m);
-		} else if (role === "toolResult") {
-			const tcid = String(m.toolCallId ?? "?");
-			const ok = !m.isError;
-			// Pass full message-as-result so formatInteractiveResult can read
-			// details.todos / details.answers etc. and pretty-render.
-			updateToolResult(tcid, ok, { content: m.content, details: m.details });
-		} else if (role === "compactionSummary") {
-			// Pi keeps the compaction summary as a message in the session context
-			// (createCompactionSummaryMessage), so replay it as the same collapsed
-			// block the runtime compaction_end shows — this is what makes it survive
-			// reload / session switch.
-			appendCompactionSummary(typeof m.summary === "string" ? m.summary : "");
-		}
-		// other roles (custom, etc) — skip for V0
-	}
+	historyBuffer = messages;
+	windowStart = messages.length > INITIAL_WINDOW ? snapToTurnStart(messages.length - INITIAL_WINDOW) : 0;
+	if (windowStart > 0) els().messages.appendChild(makeLoadMoreButton());
+	for (let i = windowStart; i < messages.length; i++) renderOneMessage(messages[i]);
 	setEmptyVisibility();
 	// Loading a session jumps to the latest and re-pins.
 	forceScrollToBottom();

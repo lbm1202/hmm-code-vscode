@@ -16,6 +16,7 @@ import {
 	collectCascade,
 	deleteSession,
 	listSessions,
+	readSessionMessages,
 	renameSession,
 	subtreeUsage,
 	type ModelUsage,
@@ -675,11 +676,20 @@ export class ChatBackend {
 			}
 			case FROM_WEBVIEW.REQUEST_MESSAGES:
 				try {
-					const res = await client.send({ type: "get_messages" });
-					if (res.success) {
-						const data = res.data as { messages?: unknown[] };
-						this.post({ kind: TO_WEBVIEW.MESSAGES, messages: data.messages ?? [] });
+					// Render the FULL on-disk transcript, not get_messages (which returns
+					// only the compacted model context — so old turns would vanish from
+					// the chat after a compaction). get_state gives the active session
+					// file; readSessionMessages reconstructs its branch from the .jsonl.
+					// Fall back to get_messages for an unsaved/empty session (no file yet).
+					let messages: unknown[] = [];
+					const st = await client.send({ type: "get_state" });
+					const file = st.success ? (st.data as { sessionFile?: unknown })?.sessionFile : undefined;
+					if (typeof file === "string" && file) messages = readSessionMessages(file);
+					if (messages.length === 0) {
+						const res = await client.send({ type: "get_messages" });
+						if (res.success) messages = ((res.data as { messages?: unknown[] }).messages ?? []);
 					}
+					this.post({ kind: TO_WEBVIEW.MESSAGES, messages });
 				} catch (err) {
 					this.post({
 						kind: TO_WEBVIEW.STDERR,

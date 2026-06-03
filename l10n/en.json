@@ -36,6 +36,7 @@
   "chat.compactTimeout": "⚠️ Compaction is taking too long — input unlocked. It may still finish in the background.",
   "chat.compactedTitle": "📦 Context compacted — view summary",
   "chat.compactedNoSummary": "(no summary available)",
+  "chat.loadMoreHistory": "↑ Load earlier messages ({n})",
   "chat.blockSwitchReason": "Responding — stop (■) first, then switch",
   "chat.status.generating": "Generating response",
   "chat.status.toolRunning": "Running tool ({tool})",
