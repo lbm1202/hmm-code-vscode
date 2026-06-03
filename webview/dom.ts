@@ -7,9 +7,9 @@ import { t } from "./i18n";
 // Inline SVG logo (avoids CSP / webview-asset URI plumbing for static art).
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 64" aria-hidden="true">
 	<g style="font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-weight: 900;">
-		<text x="74" y="52" text-anchor="middle" font-size="56" fill="none" stroke="#1a4d1a" stroke-width="1.4">Hmm</text>
-		<text x="71" y="49" text-anchor="middle" font-size="56" fill="none" stroke="#2d7a2d" stroke-width="1.4">Hmm</text>
-		<text x="68" y="46" text-anchor="middle" font-size="56" fill="#5fff5f" stroke="#3a9c3a" stroke-width="1">Hmm</text>
+		<text x="74" y="52" text-anchor="middle" font-size="56" fill="none" stroke="#173e5c" stroke-width="1.4">Hmm</text>
+		<text x="71" y="49" text-anchor="middle" font-size="56" fill="none" stroke="#2d8fc8" stroke-width="1.4">Hmm</text>
+		<text x="68" y="46" text-anchor="middle" font-size="56" fill="#5fd3ff" stroke="#3a9cd6" stroke-width="1">Hmm</text>
 	</g>
 </svg>`;
 
