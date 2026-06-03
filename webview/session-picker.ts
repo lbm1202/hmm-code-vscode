@@ -25,19 +25,37 @@ function countDescendants(file: string, byParent: Map<string, SessionEntry[]>): 
 	return count;
 }
 
-export function showSessionPicker(sessions: SessionEntry[]): void {
+export function showSessionPicker(
+	sessions: SessionEntry[],
+	opts: { loading?: boolean } = {},
+): void {
 	const modalRoot = els().modalRoot;
 	modalRoot.innerHTML = "";
 	const backdrop = document.createElement("div");
 	backdrop.className = "modal-backdrop";
 	const modal = document.createElement("div");
-	modal.className = "modal modal-wide";
+	// `session-picker` is a stable marker so dispatch can re-render this modal
+	// in place when a fresh SESSIONS list arrives — even while it's showing the
+	// loading state (no `.session-tree` yet) or the empty state.
+	modal.className = "modal modal-wide session-picker";
+	// Show the loading state only when there's nothing cached to display yet —
+	// if we already have sessions, render them instantly and let the SESSIONS
+	// response refresh them in place (no loading flash for the common case).
+	const loading = !!opts.loading && sessions.length === 0;
 	const title = document.createElement("div");
 	title.className = "modal-prompt";
-	title.textContent = sessions.length ? t("chat.sessions.title") : t("chat.noSessions");
+	title.textContent = loading
+		? t("chat.sessions.loading")
+		: sessions.length
+			? t("chat.sessions.title")
+			: t("chat.noSessions");
 	modal.appendChild(title);
 
-	if (sessions.length) {
+	if (loading) {
+		const spinner = document.createElement("div");
+		spinner.className = "session-loading";
+		modal.appendChild(spinner);
+	} else if (sessions.length) {
 		const childrenByParent = new Map<string, SessionEntry[]>();
 		const roots: SessionEntry[] = [];
 		// macOS + Windows filesystems are case-insensitive, but path strings

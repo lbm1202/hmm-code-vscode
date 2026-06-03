@@ -28,9 +28,11 @@ e.btnNew.addEventListener("click", () =>
 );
 
 e.btnSessions.addEventListener("click", () => {
-	// Refresh list, then open the modal (post-list-sessions response sets ui.sessions).
+	// Open the picker immediately so the button feels responsive — render the
+	// cached list if we have one, otherwise a loading state. Then refresh: the
+	// SESSIONS response re-renders the open picker in place (see dispatch).
+	showSessionPicker(ui.sessions, { loading: true });
 	post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
-	setTimeout(() => showSessionPicker(ui.sessions), 80);
 });
 
 // Open the standalone settings panel in a new editor tab. Host listens on

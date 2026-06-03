@@ -73,6 +73,7 @@
   "chat.modal.customPlaceholder": "Write your answer, then press Enter or 'Send'…",
   "chat.modal.customPlaceholderOptional": "An answer you'd like to add (optional)",
   "chat.sessions.title": "Resume a session",
+  "chat.sessions.loading": "Loading sessions…",
   "chat.sessions.go": "Go",
   "chat.sessions.goTitle": "Switch to this session",
   "chat.sessions.renameTitle": "Rename",

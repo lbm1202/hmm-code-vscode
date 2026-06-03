@@ -1381,6 +1381,17 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 
 .modal-wide { min-width: min(560px, 90vw); }
 .session-tree { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+/* Loading state shown while the session list is being enumerated (only when
+   there's nothing cached to render — see showSessionPicker). */
+.session-loading {
+	width: 18px;
+	height: 18px;
+	margin: 18px auto;
+	border: 2px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35));
+	border-top-color: var(--vscode-progressBar-background, #3a9cd6);
+	border-radius: 50%;
+	animation: spin 0.7s linear infinite;
+}
 .session-caret {
 	width: 22px;
 	flex: 0 0 22px;

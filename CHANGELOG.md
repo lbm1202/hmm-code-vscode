@@ -10,6 +10,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 ### Fixed
 - **Stale editor-tab title.** Deleting the active session (or switching to a fresh/unnamed one) left the tab showing the gone session's name. The tab title now resets to the default when the active session has no name — driven authoritatively from session state, and reset immediately when a new session is spawned after a delete.
 
+### Changed
+- **Session picker opens instantly.** Clicking the history button now opens the picker immediately — rendering the cached list right away, or a loading spinner if nothing is cached yet — then refreshes the list in place when enumeration completes, instead of waiting on a fixed delay before showing anything.
+
 ## [0.1.2] — 2026-06-04
 
 Bundles Pi runtime + hmm-code-pi 0.1.2.

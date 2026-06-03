@@ -110,9 +110,11 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	[TO_WEBVIEW.SESSIONS]: (msg) => {
 		ui.sessions = msg.sessions;
 		renderRecentList();
-		// If the session picker is currently open, re-render it so delete/rename
-		// take effect immediately.
-		if (els().modalRoot.querySelector(".session-tree")) {
+		// If the session picker is open (incl. its loading/empty state), re-render
+		// it so the fresh list, delete, and rename take effect in place. Match the
+		// stable `.session-picker` marker, not `.session-tree` — the loading state
+		// has no tree yet but must still be replaced when the list arrives.
+		if (els().modalRoot.querySelector(".session-picker")) {
 			showSessionPicker(ui.sessions);
 		}
 	},

@@ -73,6 +73,7 @@
   "chat.modal.customPlaceholder": "자유롭게 답을 적고 Enter 또는 '전송'…",
   "chat.modal.customPlaceholderOptional": "추가하고 싶은 답 (선택)",
   "chat.sessions.title": "세션 이어가기",
+  "chat.sessions.loading": "세션 불러오는 중…",
   "chat.sessions.go": "이동",
   "chat.sessions.goTitle": "이 세션으로 전환",
   "chat.sessions.renameTitle": "이름 변경",
