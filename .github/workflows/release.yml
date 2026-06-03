@@ -59,6 +59,38 @@ jobs:
           path: hmm-code-${{ steps.version.outputs.version }}.vsix
           retention-days: 14
 
+      # Compose the release body from CHANGELOG.md: the section for this tag's
+      # version (everything between "## [X.Y.Z]" and the next "## [" heading) +
+      # the Install boilerplate. softprops then appends the auto-generated commit
+      # list below. CHANGELOG.md is the single source of truth — write the rich
+      # notes (incl. an optional "### ✨ Highlights") there, not on the Release page.
+      - name: Compose release notes from CHANGELOG
+        id: notes
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          # \] anchors the version so ver=0.1.1 doesn't match "## [0.1.1-rc2]".
+          SECTION=$(awk -v ver="$VER" '
+            $0 ~ "^## \\[" ver "\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md)
+          if [ -z "$SECTION" ]; then
+            echo "::warning::No CHANGELOG.md section found for $VER — release body falls back to Install boilerplate only."
+          fi
+          {
+            if [ -n "$SECTION" ]; then
+              printf '## hmm-code %s\n' "$VER"
+              printf '%s\n' "$SECTION"
+              printf '\n---\n\n'
+            fi
+            printf '## Install\n\n'
+            printf 'Download `hmm-code-%s.vsix` below, then in VS Code:\n\n' "$VER"
+            printf '```bash\ncode --install-extension hmm-code-%s.vsix\n```\n\n' "$VER"
+            printf 'The .vsix bundles Pi runtime + hmm-code-pi extension — no separate Pi install required. Reload VS Code window after installing.\n'
+          } > "$NOTES_FILE"
+          echo "path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -68,13 +100,4 @@ jobs:
           # Tags with a pre-release identifier (v0.1.1-rc1, v0.2.0-beta…) are
           # published as GitHub pre-releases; clean vX.Y.Z tags are full releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
-          body: |
-            ## Install
-
-            Download `hmm-code-${{ steps.version.outputs.version }}.vsix` below, then in VS Code:
-
-            ```bash
-            code --install-extension hmm-code-${{ steps.version.outputs.version }}.vsix
-            ```
-
-            The .vsix bundles Pi runtime + hmm-code-pi extension — no separate Pi install required. Reload VS Code window after installing.
+          body_path: ${{ steps.notes.outputs.path }}

@@ -20,7 +20,7 @@ Inside ~1 minute the workflow publishes:
 - A GitHub Release at <https://github.com/lbm1202/hmm-code-vscode/releases/tag/v0.1.1>
 - `hmm-code-0.1.1.vsix` attached for direct download
 
-The release notes are auto-generated (`generate_release_notes: true` in the workflow) and include the boilerplate install instructions from the workflow body. Edit the release page after the fact if you want richer notes — the auto-version is good enough for most patch releases.
+The release notes are composed by the workflow from **CHANGELOG.md** — it extracts the section for the tagged version (everything between `## [X.Y.Z]` and the next `## [` heading), prepends a `## hmm-code X.Y.Z` header, and appends the Install boilerplate + the auto-generated commit list (`generate_release_notes: true`). **CHANGELOG.md is the single source of truth for the Release page** — write the rich notes there (an optional `### ✨ Highlights` subsection carries over verbatim). No manual `gh release edit` needed. If no matching CHANGELOG section is found the body falls back to Install boilerplate only (and CI logs a warning).
 
 ## Dependency updates
 
