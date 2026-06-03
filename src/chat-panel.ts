@@ -53,8 +53,11 @@ export class ChatPanel {
 		panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, "media", "tab-icon.svg");
 		panel.webview.html = renderChatHtml(panel.webview, ctx.extensionUri, renderInfoFromContext(ctx));
 		const backend = new ChatBackend(panel.webview, {
+			// A named session sets the tab title; an empty name (fresh/unnamed
+			// session — e.g. after deleting the active session) resets it to the
+			// default, so the tab never keeps a stale name from a gone session.
 			onSessionName: (name) => {
-				panel.title = name;
+				panel.title = name && name.trim() ? name : "Hmm-code";
 			},
 		});
 		const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME;

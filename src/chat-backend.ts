@@ -262,6 +262,18 @@ export class ChatBackend {
 		}
 	}
 
+	/**
+	 * Push the active session's name to the tab title from an AUTHORITATIVE
+	 * source (get_state / a fresh session). Unlike notifySessionName, an empty
+	 * or absent name is forwarded as "" so the title resets to default — a
+	 * fresh/unnamed session (e.g. spawned after deleting the active one) must
+	 * not keep the gone session's name. (The session_info_changed side-channel
+	 * still uses notifySessionName, which only ever carries a real name.)
+	 */
+	private syncSessionTitle(name: unknown): void {
+		this.opts.onSessionName?.(typeof name === "string" && name.trim() ? name : "");
+	}
+
 	start(cwd: string | undefined): void {
 		if (this.client || this.disposed) return;
 		this.cwd = cwd;
@@ -418,7 +430,7 @@ export class ChatBackend {
 			const stateRes = await client.send({ type: "get_state" });
 			if (stateRes.success) {
 				this.post({ kind: TO_WEBVIEW.STATE, state: stateRes.data });
-				this.notifySessionName((stateRes.data as any)?.sessionName);
+				this.syncSessionTitle((stateRes.data as any)?.sessionName);
 			}
 		} catch (err) {
 			console.error("[hmm-code:chat-backend] resync get_state failed:", err);
@@ -508,7 +520,7 @@ export class ChatBackend {
 					const res = await client.send({ type: "get_state" });
 					if (res.success) {
 						this.post({ kind: TO_WEBVIEW.STATE, state: res.data });
-						this.notifySessionName((res.data as any)?.sessionName);
+						this.syncSessionTitle((res.data as any)?.sessionName);
 					}
 				} catch (err) {
 					this.post({ kind: TO_WEBVIEW.STDERR, text: `get_state failed: ${(err as Error).message}` });
@@ -586,6 +598,11 @@ export class ChatBackend {
 						if (res.success) {
 							// New session re-defaults built-in auto-compaction on — re-disable.
 							this.disableBuiltinAutoCompaction(client);
+							// The spawned session has no name yet — reset the tab title
+							// now so it doesn't keep the just-deleted session's name
+							// (the webview's follow-up get_state would also reset it,
+							// but do it immediately to avoid a visible stale flash).
+							this.syncSessionTitle("");
 							// SESSION_START isn't pushed to RPC subscribers for
 							// new_session; synthesize it so the webview clears
 							// the chat and rebinds to the new file.
