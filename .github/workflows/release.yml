@@ -17,6 +17,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Job-level so the marketplace publish steps can gate on `env.*_PAT != ''`
+    # (secrets can't be referenced directly in a step `if:`). Unset secret →
+    # empty string → that publish is skipped, and the GitHub Release still ships.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - name: Checkout hmm-code-vscode
         uses: actions/checkout@v4
@@ -101,3 +107,17 @@ jobs:
           # published as GitHub pre-releases; clean vX.Y.Z tags are full releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
           body_path: ${{ steps.notes.outputs.path }}
+
+      # Marketplace publishing — uploads the SAME .vsix built above (no rebuild).
+      # Both steps are opt-in: they only run for a clean (non-pre-release) tag AND
+      # when the corresponding token secret is configured, so the release keeps
+      # working before the secrets exist. vsce/ovsx read the PAT from the env.
+      # One-time setup: see RELEASING.md (publisher + Azure DevOps PAT → VSCE_PAT;
+      # Open VSX token → OVSX_PAT; `ovsx create-namespace lbm1202` once).
+      - name: Publish to VS Code Marketplace
+        if: ${{ !contains(github.ref_name, '-') && env.VSCE_PAT != '' }}
+        run: npx --yes @vscode/vsce publish --packagePath "hmm-code-${{ steps.version.outputs.version }}.vsix"
+
+      - name: Publish to Open VSX
+        if: ${{ !contains(github.ref_name, '-') && env.OVSX_PAT != '' }}
+        run: npx --yes ovsx publish "hmm-code-${{ steps.version.outputs.version }}.vsix"

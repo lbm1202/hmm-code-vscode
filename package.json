@@ -12,12 +12,33 @@
     "type": "git",
     "url": "https://github.com/lbm1202/hmm-code-vscode"
   },
+  "bugs": {
+    "url": "https://github.com/lbm1202/hmm-code-vscode/issues"
+  },
+  "homepage": "https://github.com/lbm1202/hmm-code-vscode#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "AI",
+    "Chat",
     "Other"
   ],
+  "keywords": [
+    "pi",
+    "coding agent",
+    "ai",
+    "agent",
+    "chat",
+    "llm",
+    "plan mode",
+    "claude",
+    "openai"
+  ],
+  "galleryBanner": {
+    "color": "#173e5c",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onWebviewPanel:hmm-code.chatPanel",
     "onWebviewPanel:hmm-code.settingsPanel"

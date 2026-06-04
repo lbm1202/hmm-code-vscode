@@ -7,6 +7,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Changed
+- Internal: the release workflow now also publishes the built `.vsix` to the **VS Code Marketplace** (`vsce publish`) and **Open VSX** (`ovsx publish`) — both opt-in, gated on a clean tag + the matching token secret, so releases keep working until the secrets are set. Polished the Marketplace listing metadata (categories, keywords, gallery banner, bugs/homepage). See RELEASING.md for one-time setup.
+
 ## [0.1.3] — 2026-06-04
 
 Bundles Pi runtime + hmm-code-pi 0.1.3.

@@ -22,6 +22,16 @@ Inside ~1 minute the workflow publishes:
 
 The release notes are composed by the workflow from **CHANGELOG.md** — it extracts the section for the tagged version (everything between `## [X.Y.Z]` and the next `## [` heading), prepends a `## hmm-code X.Y.Z` header, and appends the Install boilerplate + the auto-generated commit list (`generate_release_notes: true`). **CHANGELOG.md is the single source of truth for the Release page** — write the rich notes there (an optional `### ✨ Highlights` subsection carries over verbatim). No manual `gh release edit` needed. If no matching CHANGELOG section is found the body falls back to Install boilerplate only (and CI logs a warning).
 
+## Marketplace publishing (VS Code Marketplace + Open VSX)
+
+The release workflow also uploads the built `.vsix` to the **VS Code Marketplace** (`vsce publish`) and **Open VSX** (`ovsx publish`) — Open VSX is what code-server / VSCodium / Cursor install from. Both steps are **opt-in and fail-safe**: they run only for a clean (non-pre-release) tag *and* when the matching token secret exists, so the GitHub Release keeps working before the secrets are configured. They upload the same `.vsix` (no rebuild).
+
+One-time setup:
+1. **VS Code Marketplace** — create the publisher `lbm1202` at <https://marketplace.visualstudio.com/manage> (must match `package.json:publisher`). Generate an Azure DevOps PAT (<https://dev.azure.com> → User Settings → Personal Access Tokens → **Organization: All accessible**, **Scope: Marketplace → Manage**). Add it as the repo secret **`VSCE_PAT`**.
+2. **Open VSX** — sign in at <https://open-vsx.org>, create an access token, and **create the namespace once**: `npx ovsx create-namespace lbm1202 -p <token>`. Add the token as the repo secret **`OVSX_PAT`**.
+
+Add secrets under repo **Settings → Secrets and variables → Actions**. With both set, the next `vX.Y.Z` tag publishes to GitHub Releases + both marketplaces in one run. Pre-release tags (`-rc`, `-beta`) publish to GitHub Releases only. To publish manually instead: `npx @vscode/vsce publish --packagePath hmm-code-X.Y.Z.vsix` and `npx ovsx publish hmm-code-X.Y.Z.vsix -p <token>`.
+
 ## Dependency updates
 
 `.github/dependabot.yml` opens PRs every Monday for:
