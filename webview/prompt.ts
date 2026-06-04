@@ -166,4 +166,17 @@ export function wirePrompt(): void {
 		}
 	});
 	wireAttachments();
+
+	// The composer floats over the message list (CSS .prompt-area is absolute),
+	// so .messages needs a bottom padding equal to the composer's live height to
+	// scroll the last message clear of it. Publish that height as --composer-h on
+	// #app; it updates as the input grows (1→5 lines), the footer wraps, or an
+	// attachment strip appears.
+	const area = e.prompt.closest(".prompt-area") as HTMLElement | null;
+	const app = document.getElementById("app");
+	if (area && app && typeof ResizeObserver !== "undefined") {
+		const sync = () => app.style.setProperty("--composer-h", `${area.offsetHeight}px`);
+		new ResizeObserver(sync).observe(area);
+		sync();
+	}
 }

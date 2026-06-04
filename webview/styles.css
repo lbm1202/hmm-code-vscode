@@ -17,6 +17,8 @@ html, body {
 	flex-direction: column;
 	height: 100vh;
 	overflow: hidden;
+	/* Anchor for the absolutely-positioned floating composer (.prompt-area). */
+	position: relative;
 }
 
 .hidden { display: none !important; }
@@ -77,6 +79,10 @@ html, body {
 	flex: 1;
 	overflow-y: auto;
 	padding: 14px 12px;
+	/* Reserve room for the floating composer so the last message scrolls clear
+	   of it. --composer-h tracks the live composer height (prompt.ts observer);
+	   the fallback covers a 1-line composer before the observer first fires. */
+	padding-bottom: calc(var(--composer-h, 96px) + 16px);
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
@@ -688,6 +694,8 @@ body.mod-down .bash-cmd-link:hover {
 	align-items: center;
 	justify-content: center;
 	padding: 40px 20px;
+	/* Keep the centered welcome content clear of the floating composer. */
+	padding-bottom: calc(var(--composer-h, 96px) + 40px);
 	text-align: center;
 	overflow-y: auto;
 }
@@ -770,15 +778,21 @@ body.mod-down .bash-cmd-link:hover {
 
 /* ── Prompt area ─────────────────────────────────────────────────────────── */
 .prompt-area {
-	flex-shrink: 0;
-	/* Centered column, ~90 chars wide, shrinking to fit narrow panels. */
-	align-self: center;
+	/* Floating composer: overlays the message list (anchored to #app's bottom)
+	   so the full-width chat shows on both sides of — and scrolls behind — the
+	   narrower input box, like Claude Code. .messages carries a matching
+	   padding-bottom (var(--composer-h), kept current by a ResizeObserver in
+	   prompt.ts) so the last message can scroll clear of the composer. */
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 8px;
+	z-index: 5;
+	/* Centered column, ~90 chars wide, shrinking to fit narrow panels (24px
+	   side gutter via auto margins). */
 	width: 90ch;
-	/* Narrow panels: keep a comfortable 24px side gutter (auto margins center it
-	   regardless of the flex parent) so the composer doesn't hug the edges. */
 	max-width: calc(100% - 48px);
-	margin-inline: auto;
-	margin: 8px 0 10px;
+	margin: 0 auto;
 	padding: 8px 10px;
 	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
 	border-radius: 12px;
@@ -786,7 +800,6 @@ body.mod-down .bash-cmd-link:hover {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	position: relative;
 }
 .prompt-area:focus-within {
 	border-color: var(--vscode-focusBorder);
