@@ -771,10 +771,13 @@ body.mod-down .bash-cmd-link:hover {
 /* ── Prompt area ─────────────────────────────────────────────────────────── */
 .prompt-area {
 	flex-shrink: 0;
-	/* Centered column, ~100 chars wide, shrinking to fit narrow panels. */
+	/* Centered column, ~90 chars wide, shrinking to fit narrow panels. */
 	align-self: center;
-	width: 100ch;
-	max-width: calc(100% - 16px);
+	width: 90ch;
+	/* Narrow panels: keep a comfortable 24px side gutter (auto margins center it
+	   regardless of the flex parent) so the composer doesn't hug the edges. */
+	max-width: calc(100% - 48px);
+	margin-inline: auto;
 	margin: 8px 0 10px;
 	padding: 8px 10px;
 	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
@@ -859,9 +862,20 @@ body.mod-down .bash-cmd-link:hover {
 
 .prompt-footer {
 	display: flex;
-	justify-content: space-between;
+	/* When the panel is too narrow to fit both groups on one line, wrap the
+	   right group to a second row (kept right-aligned via footer-right's
+	   margin-left:auto) instead of cramming/breaking the ctx pill. */
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px;
+	gap: 6px 8px;
+	/* Divider between the input and the toolbar row. Negative side margins
+	   cancel .prompt-area's 10px horizontal padding so the line spans the full
+	   box width. Above the line = .prompt-area gap (6px) + this margin-top (2px)
+	   = 8px; below = padding-top (6px). Below is a touch tighter so the heavier
+	   28px button row doesn't make the lower half read as larger. */
+	margin: 2px -10px 0;
+	padding: 6px 10px 0;
+	border-top: 1px solid var(--vscode-panel-border);
 }
 
 .footer-left {
@@ -875,8 +889,9 @@ body.mod-down .bash-cmd-link:hover {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	box-sizing: border-box;
 	width: 28px;
-	height: 26px;
+	height: 28px;
 	padding: 0;
 	background: transparent;
 	border: 1px solid var(--vscode-panel-border);
@@ -921,6 +936,14 @@ body.mod-down .bash-cmd-link:hover {
 #picker-mode {
 	color: var(--mode-color, var(--vscode-foreground));
 	font-weight: 600;
+	/* No resting border/fill — just the glyph + label; hover shows the hit area.
+	   Keep a transparent 1px border so the box size matches the other pickers. */
+	background: transparent;
+	border-color: transparent;
+}
+#picker-mode:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+	border-color: transparent;
 }
 
 .picker-label {
@@ -928,6 +951,17 @@ body.mod-down .bash-cmd-link:hover {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	max-width: 160px;
+}
+
+/* Mode-button glyph (matches the popover row icons). Inherits the button's
+   --mode-color via currentColor, so it tints with the active mode. */
+.picker-mode-icon {
+	display: inline-flex;
+	align-items: center;
+}
+.picker-mode-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
 .picker-caret {
@@ -950,18 +984,31 @@ body.mod-down .bash-cmd-link:hover {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	/* Always hug the right edge — keeps it right-aligned on its own line when
+	   the footer wraps (replaces the old justify-content: space-between). */
+	margin-left: auto;
 }
 
 .ctx-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	/* Match the ＋ / icon buttons exactly (border-box 28px including the 1px border). */
+	box-sizing: border-box;
+	height: 28px;
 	font-size: 10px;
 	color: var(--vscode-descriptionForeground);
 	font-family: var(--vscode-editor-font-family);
 	cursor: pointer;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 8px;
-	padding: 4px 8px;
+	padding: 0 8px;
 	line-height: 1;
+	white-space: nowrap;
 }
+/* While the pill shows a status word (Compacting…/Compacted) the "ctx" prefix
+   is dropped; the live-% path clears `status` to bring it back. */
+.ctx-pill.status .ctx-prefix { display: none; }
 .ctx-pill:hover {
 	color: var(--vscode-foreground);
 	border-color: var(--vscode-focusBorder, var(--vscode-panel-border));
@@ -1584,6 +1631,14 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
  * thing to disappear — it's just metadata, not actionable. */
 @media (max-width: 340px) {
 	.session-id { display: none; }
+	/* Narrow footer: collapse labels to keep one row.
+	   - mode button → icon only (hide "code" label + caret)
+	   - ctx pill → "%" only (hide the "ctx" prefix)
+	   - reset button → "↺" only (hide its label) */
+	.picker-label,
+	.picker-caret,
+	.ctx-prefix,
+	.reset-label { display: none; }
 }
 
 #prompt-input.disabled,

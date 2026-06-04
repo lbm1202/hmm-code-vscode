@@ -124,8 +124,24 @@ export function wirePrompt(): void {
 			ta.value = before + "\n" + after;
 			ta.selectionStart = ta.selectionEnd = start + 1;
 			// Fire an input event so any consumer (e.g. autosize / dirty
-			// tracking) reacts the same as a real keystroke would.
+			// tracking) reacts the same as a real keystroke would. Autosize runs
+			// synchronously here, so the height/scrollHeight below are current.
 			ta.dispatchEvent(new Event("input", { bubbles: true }));
+			// preventDefault above also suppressed the browser's native
+			// caret-into-view scroll, so once the box hits its max-height and
+			// scrolls, the new line stayed hidden until the next real keystroke.
+			// Reveal it: scroll to the bottom when the caret is at the end (the
+			// usual case), otherwise nudge the caret's line into view.
+			if (ta.selectionEnd === ta.value.length) {
+				ta.scrollTop = ta.scrollHeight;
+			} else {
+				const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 18;
+				const caretRow = ta.value.slice(0, ta.selectionEnd).split("\n").length - 1;
+				const caretTop = caretRow * lineH;
+				if (caretTop < ta.scrollTop) ta.scrollTop = caretTop;
+				else if (caretTop + lineH > ta.scrollTop + ta.clientHeight)
+					ta.scrollTop = caretTop + lineH - ta.clientHeight;
+			}
 			return;
 		}
 		if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {

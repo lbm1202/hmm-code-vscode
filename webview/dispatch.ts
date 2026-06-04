@@ -270,7 +270,11 @@ function handlePiEvent(ev: any): void {
 			// Lock input while compacting (same mechanism as a turn). compaction_start
 			// reliably reaches here; the earlier failure was the shadowed `t` above.
 			runtime.compacting = true;
-			els().ctxPill.textContent = t("chat.compacting");
+			// `status` hides the "ctx" prefix while the pill shows a status word
+			// (set the value span, never ctxPill.textContent — that would drop the
+			// prefix/value child spans the live-% path relies on).
+			els().ctxPill.classList.add("status");
+			els().ctxValue.textContent = t("chat.compacting");
 			// Hide the compact button while compacting; refreshCompactBtn re-shows it
 			// once context climbs back over the threshold on a later turn.
 			refreshCompactBtn();
@@ -298,7 +302,8 @@ function handlePiEvent(ev: any): void {
 				post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 			} else {
 				// Show "compacted" until the next turn refreshes the live %.
-				els().ctxPill.textContent = t("chat.compacted");
+				els().ctxPill.classList.add("status");
+				els().ctxValue.textContent = t("chat.compacted");
 				appendCompactionSummary(typeof ev.result?.summary === "string" ? ev.result.summary : "");
 			}
 			updatePromptDisabled();
@@ -377,7 +382,8 @@ function handleSetStatus(key: string, value: string): void {
 		ui.autoApprove = value === "on" || value === "true" || value === "1";
 	} else if (key === STATUS_KEYS.CONTEXT || key === "ctx") {
 		ui.context = value || "?";
-		e.ctxPill.textContent = `ctx ${value}`;
+		e.ctxValue.textContent = value;
+		e.ctxPill.classList.remove("status");
 		refreshCompactBtn();
 	} else if (key === STATUS_KEYS.PLAN_HANDOFF) {
 		// value format: "<planPath>|<targetMode>"

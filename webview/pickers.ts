@@ -93,10 +93,12 @@ function showPopover(anchor: HTMLElement, options: PickerOption[]): void {
 
 /** Update the mode-color CSS var on the mode picker chip. */
 export function updateModeColor(): void {
-	els().pickerMode.style.setProperty(
-		"--mode-color",
-		MODE_COLORS[ui.mode] ?? "var(--vscode-foreground)",
-	);
+	const e = els();
+	e.pickerMode.style.setProperty("--mode-color", MODE_COLORS[ui.mode] ?? "var(--vscode-foreground)");
+	// Keep the mode-button glyph in sync with the active mode. updateModeColor is
+	// already called from every mode-change site (status dispatch, Tab cycle,
+	// popover selection, boot), so the icon updates without extra wiring.
+	e.pickerModeIcon.innerHTML = MODE_ICON[ui.mode] ?? "";
 }
 
 /** Wire the mode picker click handler. Call once at boot. */

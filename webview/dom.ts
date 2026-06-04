@@ -49,11 +49,11 @@ const APP_HTML = `
 				<button class="composer-icon" id="btn-attach" title="${t("chat.attachTitle")}">＋</button>
 				<button class="composer-icon" id="btn-slash" title="${t("chat.slashTitle")}">/</button>
 				<button class="composer-icon hidden" id="btn-compact" title="${t("chat.compactTitle")}">🗜</button>
-				<span class="ctx-pill" id="ctx-pill">ctx —</span>
+				<span class="ctx-pill" id="ctx-pill"><span class="ctx-prefix">ctx</span><span class="ctx-value" id="ctx-value">—</span></span>
 			</div>
 			<div class="footer-right">
-				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺ ${t("chat.resetLabel")}</button>
-				<button class="picker" id="picker-mode"><span class="picker-label">code</span><span class="picker-caret">▾</span></button>
+				<button class="picker hidden" id="btn-reset" title="${t("chat.resetTitle")}">↺<span class="reset-label"> ${t("chat.resetLabel")}</span></button>
+				<button class="picker" id="picker-mode"><span class="picker-mode-icon" id="picker-mode-icon"></span><span class="picker-label">code</span><span class="picker-caret">▾</span></button>
 				<button class="sendbtn" id="send-btn" title="Send (Enter)">↑</button>
 			</div>
 		</div>
@@ -77,7 +77,9 @@ export interface DomRefs {
 	popoverRoot: HTMLElement;
 	pickerMode: HTMLElement;
 	pickerModeLabel: HTMLElement;
+	pickerModeIcon: HTMLElement;
 	ctxPill: HTMLElement;
+	ctxValue: HTMLElement;
 	btnNew: HTMLElement;
 	btnSessions: HTMLElement;
 	btnSettings: HTMLElement;
@@ -104,7 +106,9 @@ function mountDom(root: HTMLElement): DomRefs {
 		popoverRoot: document.getElementById("popover-root")!,
 		pickerMode,
 		pickerModeLabel: pickerMode.querySelector(".picker-label") as HTMLElement,
+		pickerModeIcon: document.getElementById("picker-mode-icon")!,
 		ctxPill: document.getElementById("ctx-pill")!,
+		ctxValue: document.getElementById("ctx-value")!,
 		btnNew: document.getElementById("btn-new-session")!,
 		btnSessions: document.getElementById("btn-sessions")!,
 		btnSettings: document.getElementById("btn-settings")!,
