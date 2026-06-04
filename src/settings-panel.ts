@@ -449,11 +449,91 @@ export class SettingsPanel {
 						kind: "discovered-models",
 						requestId,
 						ids: ids.sort((a: string, b: string) => a.localeCompare(b)),
+						// Same response carries each model's context window (max_model_len
+						// etc.) → adding a discovered model pre-fills contextWindow.
+						contexts: ((): Record<string, number> => {
+							const c: Record<string, number> = {};
+							for (const m of data) {
+								const id = String(m?.id ?? m?.name ?? "").trim();
+								if (!id) continue;
+								const cw = Number(
+									m?.max_model_len ??
+										m?.max_context_length ??
+										m?.context_length ??
+										m?.max_position_embeddings ??
+										m?.context_window ??
+										Number.NaN,
+								);
+								if (Number.isFinite(cw) && cw > 0) c[id] = cw;
+							}
+							return c;
+						})(),
 					});
 				} catch (err) {
 					panel.webview.postMessage({
 						kind: "discovered-models",
 						requestId,
+						error: (err as Error).message,
+					});
+				}
+				return;
+			}
+			case "detect-context": {
+				// Read each model's context window from `${baseUrl}/models` and
+				// return an { id: contextWindow } map. Servers expose it under
+				// different keys: vLLM/omlx `max_model_len`, LM Studio
+				// `max_context_length`, others `context_length` /
+				// `max_position_embeddings`. (Plain OpenAI / vanilla mlx_lm.server
+				// don't expose it → empty map → "none detected".)
+				const baseUrl = String(msg.baseUrl ?? "").trim();
+				const apiKey = String(msg.apiKey ?? "").trim();
+				const requestId = String(msg.requestId ?? "");
+				const providerName = String(msg.providerName ?? "");
+				if (!baseUrl) {
+					panel.webview.postMessage({
+						kind: "detected-context",
+						requestId,
+						providerName,
+						error: t("settings.discover.emptyBaseUrl"),
+					});
+					return;
+				}
+				try {
+					const url = baseUrl.replace(/\/+$/, "") + "/models";
+					const headers: Record<string, string> = { Accept: "application/json" };
+					if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+					const res = await fetch(url, { headers });
+					if (!res.ok) {
+						const text = await res.text().catch(() => "");
+						throw new Error(`HTTP ${res.status} ${res.statusText}${text ? `: ${text.slice(0, 200)}` : ""}`);
+					}
+					const json: any = await res.json();
+					const data = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+					const contexts: Record<string, number> = {};
+					for (const m of data) {
+						const id = String(m?.id ?? m?.name ?? "").trim();
+						if (!id) continue;
+						const cw = Number(
+							m?.max_model_len ??
+								m?.max_context_length ??
+								m?.context_length ??
+								m?.max_position_embeddings ??
+								m?.context_window ??
+								Number.NaN,
+						);
+						if (Number.isFinite(cw) && cw > 0) contexts[id] = cw;
+					}
+					panel.webview.postMessage({
+						kind: "detected-context",
+						requestId,
+						providerName,
+						contexts,
+					});
+				} catch (err) {
+					panel.webview.postMessage({
+						kind: "detected-context",
+						requestId,
+						providerName,
 						error: (err as Error).message,
 					});
 				}

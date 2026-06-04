@@ -247,6 +247,7 @@ function renderProviders() {
 			'</div>' +
 			'<div class="subsection-header">' +
 				'<h3>' + esc(t('settings.providers.models')) + '</h3>' +
+				'<button class="ghost" data-detect-ctx title="' + esc(t('settings.providers.detectCtxTitle')) + '">' + esc(t('settings.providers.detectCtx')) + '</button>' +
 				'<button class="ghost" data-discover>' + esc(t('settings.providers.discover')) + '</button>' +
 			'</div>' +
 			'<div data-models-area></div>' +
@@ -344,6 +345,28 @@ function renderProviders() {
 				apiKey: cfg.apiKey || '',
 				requestId: discoveryState[n].requestId,
 				providerName: n,  // echo back so we can route the response
+			});
+		});
+	});
+	// Detect context windows: fetch `${baseUrl}/models` and fill each model's
+	// contextWindow from the server's reported max length (max_model_len etc.).
+	qa(root, 'button[data-detect-ctx]').forEach((btn: any) => {
+		btn.addEventListener('click', () => {
+			const card = btn.closest('.provider-card');
+			const n = card?.dataset.prov;
+			if (!n) return;
+			const cfg = S.modelsDraft.providers[n];
+			if (!cfg?.baseUrl) {
+				showToast(t('settings.providers.baseUrlFirst'), true);
+				return;
+			}
+			showToast(t('settings.models.detectCtxBusy'));
+			post({
+				kind: 'detect-context',
+				baseUrl: cfg.baseUrl,
+				apiKey: cfg.apiKey || '',
+				providerName: n,
+				requestId: 'r' + Date.now(),
 			});
 		});
 	});
@@ -538,7 +561,7 @@ function renderDiscoveryFor(container: any, provName: any) {
 		if (!cfg.models) cfg.models = [];
 		const existingIds = new Set(cfg.models.map((m: any) => m.id));
 		for (const id of st.selected) {
-			if (!existingIds.has(id)) cfg.models.push({ id, name: '', contextWindow: '', maxTokens: '', reasoning: false });
+			if (!existingIds.has(id)) cfg.models.push({ id, name: '', contextWindow: (st.contexts && st.contexts[id]) || '', maxTokens: '', reasoning: false });
 		}
 		showToast(t('settings.disc.added', { n: st.selected.size }));
 		delete discoveryState[provName];
@@ -974,9 +997,35 @@ window.addEventListener('message', (ev) => {
 			if (st.requestId !== msg.requestId) continue;
 			st.loading = false;
 			if (msg.error) { st.error = msg.error; }
-			else { st.ids = msg.ids || []; st.selected = new Set(); }
+			else { st.ids = msg.ids || []; st.selected = new Set(); st.contexts = msg.contexts || {}; }
 			renderProviders();
 			break;
+		}
+	}
+	else if (msg.kind === 'detected-context') {
+		if (msg.error) { showToast(msg.error, true); return; }
+		const cfg = S.modelsDraft.providers[msg.providerName];
+		const contexts = msg.contexts || {};
+		let n = 0;
+		if (cfg?.models) {
+			for (const m of cfg.models) {
+				const cw = contexts[m.id];
+				if (typeof cw === 'number' && cw > 0 && m.contextWindow !== cw) {
+					m.contextWindow = cw;
+					n++;
+				}
+			}
+		}
+		if (n > 0) {
+			renderProviders();
+			updateSaveBar();
+			showToast(t('settings.models.detectCtxDone', { n: String(n) }));
+		} else {
+			// Either the server didn't report any sizes, or values already matched.
+			showToast(
+				Object.keys(contexts).length ? t('settings.models.detectCtxNoChange') : t('settings.models.detectCtxNone'),
+				!Object.keys(contexts).length,
+			);
 		}
 	}
 });
