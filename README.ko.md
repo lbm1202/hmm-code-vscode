@@ -7,6 +7,7 @@
 **[Pi 코딩 에이전트](https://github.com/badlogic/pi-mono)를 위한 네이티브 VS Code UI.**
 plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 · 자체 완결형 `.vsix`
 
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/lbm1202/hmm-code-vscode/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg)](https://code.visualstudio.com/)
 [![Release](https://img.shields.io/github/v/release/lbm1202/hmm-code-vscode?label=release)](https://github.com/lbm1202/hmm-code-vscode/releases)
@@ -19,6 +20,8 @@ plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 
 </div>
 
 ---
+
+> ⚠️ **베타.** Hmm-code는 활발히 개발 중입니다 — 거친 부분과 릴리스 간 호환성 깨짐이 있을 수 있습니다. 버그 제보와 피드백 환영합니다.
 
 > 에디터를 떠나지 않고 VS Code 패널에서 Pi 코딩 에이전트 세션을 다룹니다 — 모드 인식 diff, 계획 우선 워크플로, 권한 프롬프트, 세션 히스토리.
 

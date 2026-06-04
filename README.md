@@ -7,6 +7,7 @@
 **A native VS Code UI for the [Pi coding agent](https://github.com/badlogic/pi-mono).**
 plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection · self-contained `.vsix`
 
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/lbm1202/hmm-code-vscode/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg)](https://code.visualstudio.com/)
 [![Release](https://img.shields.io/github/v/release/lbm1202/hmm-code-vscode?label=release)](https://github.com/lbm1202/hmm-code-vscode/releases)
@@ -19,6 +20,8 @@ plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection 
 </div>
 
 ---
+
+> ⚠️ **Beta.** Hmm-code is under active development — expect rough edges and occasional breaking changes between releases. Bug reports and feedback are very welcome.
 
 > Drive a Pi coding agent session from a VS Code panel — mode-aware diffs, plan-first workflow, permission prompts, and session history without leaving your editor.
 
