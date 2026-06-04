@@ -6,7 +6,7 @@
 // keep their original bytes. The on-the-wire base64 has no `data:` prefix; the
 // `data:` URL is kept only for the in-webview thumbnail preview.
 
-import { appendSystem, els } from "./dom";
+import { appendSystem, buildImageBadge, defaultImageName, els } from "./dom";
 import { t } from "./i18n";
 
 const MAX_EDGE = 1568; // longest-edge cap (Anthropic's recommended vision max)
@@ -20,6 +20,7 @@ export interface ImagePart {
 
 interface Attachment {
 	id: string;
+	name: string; // filename (picker/drop) or a mime-derived default (paste)
 	mimeType: string;
 	data: string; // raw base64
 	dataUrl: string; // data: URL for the thumbnail preview
@@ -64,14 +65,14 @@ function splitDataUrl(dataUrl: string, fallbackMime: string): { mimeType: string
  *  Note: the image is loaded from a `data:` URL, NOT `URL.createObjectURL`. The
  *  chat webview CSP allows `img-src ... data:` but not `blob:`, so loading an
  *  Image from an object URL fails (onerror) and no chip ever appears. */
-async function processBlob(blob: Blob): Promise<Attachment | null> {
+async function processBlob(blob: Blob, name: string): Promise<Attachment | null> {
 	try {
 		const srcDataUrl = await blobToDataUrl(blob);
 		const img = await loadImage(srcDataUrl);
 		const longest = Math.max(img.naturalWidth, img.naturalHeight);
 		if (longest <= MAX_EDGE || longest === 0) {
 			const { mimeType, data } = splitDataUrl(srcDataUrl, blob.type || "image/png");
-			return { id: String(++idCounter), mimeType, data, dataUrl: srcDataUrl };
+			return { id: String(++idCounter), name, mimeType, data, dataUrl: srcDataUrl };
 		}
 		const scale = MAX_EDGE / longest;
 		const w = Math.max(1, Math.round(img.naturalWidth * scale));
@@ -85,7 +86,7 @@ async function processBlob(blob: Blob): Promise<Attachment | null> {
 		const outMime = blob.type === "image/jpeg" ? "image/jpeg" : "image/png";
 		const dataUrl = canvas.toDataURL(outMime, outMime === "image/jpeg" ? 0.92 : undefined);
 		const { mimeType, data } = splitDataUrl(dataUrl, outMime);
-		return { id: String(++idCounter), mimeType, data, dataUrl };
+		return { id: String(++idCounter), name, mimeType, data, dataUrl };
 	} catch {
 		return null;
 	}
@@ -103,7 +104,9 @@ export async function addBlobs(blobs: Blob[]): Promise<void> {
 	const take = images.slice(0, room);
 	if (images.length > take.length) appendSystem(t("chat.attachTooMany", { n: String(MAX_COUNT) }));
 	for (const blob of take) {
-		const att = await processBlob(blob);
+		// File (picker/drop) carries a name; a pasted blob doesn't → mime default.
+		const name = (blob as File).name || defaultImageName(blob.type || "image/png");
+		const att = await processBlob(blob, name);
 		if (att) pending.push(att);
 	}
 	renderChips();
@@ -118,19 +121,13 @@ function renderChips(): void {
 	}
 	strip.classList.remove("hidden");
 	for (const a of pending) {
-		const chip = document.createElement("div");
-		chip.className = "attachment-chip";
-		const img = document.createElement("img");
-		img.src = a.dataUrl;
-		img.alt = t("chat.imageAlt");
-		chip.appendChild(img);
-		const rm = document.createElement("button");
-		rm.className = "attachment-remove";
-		rm.title = t("chat.attachRemove");
-		rm.textContent = "×";
-		rm.addEventListener("click", () => removeAttachment(a.id));
-		chip.appendChild(rm);
-		strip.appendChild(chip);
+		strip.appendChild(
+			buildImageBadge({
+				dataUrl: a.dataUrl,
+				name: a.name,
+				onRemove: () => removeAttachment(a.id),
+			}),
+		);
 	}
 }
 
@@ -154,6 +151,12 @@ export function hasAttachments(): boolean {
 /** Pi image parts for the outgoing prompt (drops the preview-only dataUrl). */
 export function getAttachmentsForSend(): ImagePart[] {
 	return pending.map((a) => ({ type: "image", data: a.data, mimeType: a.mimeType }));
+}
+
+/** Image metadata for echoing into the sent user bubble (includes the filename,
+ *  which the Pi parts omit). Call before clearAttachments(). */
+export function getAttachmentsForBubble(): { data: string; mimeType: string; name: string }[] {
+	return pending.map((a) => ({ data: a.data, mimeType: a.mimeType, name: a.name }));
 }
 
 /** Wire paste / file-picker / drag-and-drop. Call once at boot. */

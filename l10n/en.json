@@ -40,6 +40,7 @@
   "chat.attachRemove": "Remove",
   "chat.attachTooMany": "Up to {n} images",
   "chat.imageAlt": "attachment",
+  "chat.lightboxClose": "Close",
   "chat.slashTitle": "Slash commands",
   "chat.autoApproveLabel": "Auto-approve",
   "chat.picker.effort": "Effort",

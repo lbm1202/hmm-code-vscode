@@ -5,7 +5,12 @@
 // the cycle because each side only USES the import inside function bodies,
 // not at module top-level evaluation.
 
-import { clearAttachments, getAttachmentsForSend, wireAttachments } from "./attachments";
+import {
+	clearAttachments,
+	getAttachmentsForBubble,
+	getAttachmentsForSend,
+	wireAttachments,
+} from "./attachments";
 import { appendUserBubble, els } from "./dom";
 import { t } from "./i18n";
 import { updateModeColor } from "./pickers";
@@ -29,6 +34,7 @@ export function doSend(): void {
 	const e = els();
 	const text = e.prompt.value.trim();
 	const images = getAttachmentsForSend();
+	const bubbleImages = getAttachmentsForBubble(); // capture names before clear
 	if (!text && images.length === 0) return;
 	hideSlashMenu();
 	// A recognized extension command (e.g. /mode, /reset, /compact) runs a
@@ -44,7 +50,7 @@ export function doSend(): void {
 		post({ kind: FROM_WEBVIEW.SLASH, text });
 		return;
 	}
-	appendUserBubble(text, images);
+	appendUserBubble(text, bubbleImages);
 	e.prompt.value = "";
 	autosizePrompt(); // collapse back to a single line
 	clearAttachments();

@@ -172,7 +172,90 @@ export function appendBubble(role: "user" | "assistant" | "system"): HTMLElement
 	return div;
 }
 
-export function appendUserBubble(text: string, images?: { data: string; mimeType: string }[]): void {
+/** Default filename for an image that arrived without one (paste / replay). */
+export function defaultImageName(mimeType: string): string {
+	const ext = mimeType === "image/jpeg" ? "jpg" : (/image\/(\w+)/.exec(mimeType)?.[1] ?? "png");
+	return `image.${ext}`;
+}
+
+/** Fullscreen image preview, opened by clicking an image badge. Layers over
+ *  whatever else is mounted in modalRoot (removes only its own backdrop). */
+export function showImageLightbox(dataUrl: string): void {
+	const root = els().modalRoot;
+	const backdrop = document.createElement("div");
+	backdrop.className = "lightbox-backdrop";
+	const img = document.createElement("img");
+	img.className = "lightbox-img";
+	img.src = dataUrl;
+	const close = document.createElement("button");
+	close.className = "lightbox-close";
+	close.textContent = "×";
+	close.title = t("chat.lightboxClose");
+	const dismiss = () => {
+		backdrop.remove();
+		document.removeEventListener("keydown", onKey);
+	};
+	const onKey = (e: KeyboardEvent) => {
+		if (e.key === "Escape") dismiss();
+	};
+	close.addEventListener("click", dismiss);
+	backdrop.addEventListener("click", (e) => {
+		if (e.target === backdrop) dismiss(); // click outside the image
+	});
+	document.addEventListener("keydown", onKey);
+	backdrop.append(img, close);
+	root.appendChild(backdrop);
+}
+
+/** Compact image badge (thumbnail + filename + dimensions). Used both as a
+ *  composer attachment chip (removable) and inside a sent user bubble. Clicking
+ *  the badge (but not its × button) opens the fullscreen preview; the W×H is
+ *  read from the image once it loads. */
+export function buildImageBadge(opts: {
+	dataUrl: string;
+	name: string;
+	onRemove?: () => void;
+}): HTMLElement {
+	const chip = document.createElement("div");
+	chip.className = "attachment-chip";
+	chip.title = opts.name;
+
+	const thumb = document.createElement("img");
+	thumb.className = "attachment-thumb";
+	thumb.src = opts.dataUrl;
+	thumb.alt = t("chat.imageAlt");
+
+	const nameEl = document.createElement("span");
+	nameEl.className = "attachment-name";
+	nameEl.textContent = opts.name;
+	// Dimensions sit inline after the name (gray), filled once the image loads.
+	const dims = document.createElement("span");
+	dims.className = "attachment-dims";
+	thumb.addEventListener("load", () => {
+		if (thumb.naturalWidth) dims.textContent = `${thumb.naturalWidth}×${thumb.naturalHeight}`;
+	});
+
+	chip.append(thumb, nameEl, dims);
+	chip.addEventListener("click", () => showImageLightbox(opts.dataUrl));
+
+	if (opts.onRemove) {
+		const rm = document.createElement("button");
+		rm.className = "attachment-remove";
+		rm.title = t("chat.attachRemove");
+		rm.textContent = "×";
+		rm.addEventListener("click", (e) => {
+			e.stopPropagation(); // don't open the lightbox
+			opts.onRemove!();
+		});
+		chip.appendChild(rm);
+	}
+	return chip;
+}
+
+export function appendUserBubble(
+	text: string,
+	images?: { data: string; mimeType: string; name?: string }[],
+): void {
 	const div = appendBubble("user");
 	// User messages render as plain text with pre-wrap. Avoid markdown <p> wrapping
 	// which adds extra spacing around short messages.
@@ -180,11 +263,12 @@ export function appendUserBubble(text: string, images?: { data: string; mimeType
 		const wrap = document.createElement("div");
 		wrap.className = "msg-images";
 		for (const im of images) {
-			const img = document.createElement("img");
-			img.className = "msg-image";
-			img.src = `data:${im.mimeType};base64,${im.data}`;
-			img.alt = t("chat.imageAlt");
-			wrap.appendChild(img);
+			wrap.appendChild(
+				buildImageBadge({
+					dataUrl: `data:${im.mimeType};base64,${im.data}`,
+					name: im.name || defaultImageName(im.mimeType),
+				}),
+			);
 		}
 		div.appendChild(wrap);
 		if (text) {

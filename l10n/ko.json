@@ -40,6 +40,7 @@
   "chat.attachRemove": "제거",
   "chat.attachTooMany": "이미지는 최대 {n}개",
   "chat.imageAlt": "첨부 이미지",
+  "chat.lightboxClose": "닫기",
   "chat.slashTitle": "슬래시 명령",
   "chat.autoApproveLabel": "자동 승인",
   "chat.picker.effort": "Effort",

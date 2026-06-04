@@ -1546,59 +1546,115 @@ button.ghost:hover { background: var(--vscode-list-hoverBackground); }
 	flex-wrap: wrap;
 	gap: 6px;
 }
+/* Compact image badge: thumbnail + filename + W×H. Shared by the composer
+   attachment strip (with a × remove) and sent user bubbles (click to zoom). */
 .attachment-chip {
-	position: relative;
-	width: 48px;
-	height: 48px;
-	border-radius: 6px;
-	overflow: hidden;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 200px;
+	padding: 3px 6px 3px 3px;
 	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background);
+	cursor: pointer;
 }
-.attachment-chip img {
-	width: 100%;
-	height: 100%;
+.attachment-chip:hover {
+	border-color: var(--vscode-focusBorder, var(--vscode-panel-border));
+}
+.attachment-thumb {
+	width: 22px;
+	height: 22px;
+	flex: 0 0 22px;
 	object-fit: cover;
+	border-radius: 4px;
 	display: block;
 }
+/* Filename: shrinks + ellipsizes so a long name can't push the dimensions out. */
+.attachment-name {
+	flex: 0 1 auto;
+	min-width: 0;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* Dimensions: gray, inline to the right of the name, never truncated. */
+.attachment-dims {
+	flex: 0 0 auto;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family);
+}
 .attachment-remove {
-	position: absolute;
-	top: 1px;
-	right: 1px;
-	width: 16px;
-	height: 16px;
+	flex: 0 0 auto;
+	width: 15px;
+	height: 15px;
 	padding: 0;
-	line-height: 14px;
+	line-height: 13px;
 	border: none;
 	border-radius: 50%;
-	background: rgba(0, 0, 0, 0.6);
-	color: #fff;
-	font-size: 12px;
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25));
+	color: var(--vscode-foreground);
+	font-size: 11px;
 	cursor: pointer;
 }
 .attachment-remove:hover {
-	background: rgba(0, 0, 0, 0.85);
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.45));
 }
 .prompt-area.drag-over {
 	outline: 2px dashed var(--vscode-focusBorder);
 	outline-offset: -4px;
 }
 
-/* Sent/echoed image attachments inside a user bubble. */
+/* Image badges inside a sent user bubble (each chip carries its own surface, so
+   it stays readable on the accent-colored bubble). */
 .msg-images {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
 	margin-bottom: 6px;
 }
-.msg-image {
-	max-width: 220px;
-	max-height: 220px;
-	border-radius: 6px;
-	border: 1px solid var(--vscode-panel-border);
-}
 .msg-usertext {
 	white-space: pre-wrap;
 	word-break: break-word;
+}
+
+/* Fullscreen image preview (lightbox), opened by clicking an image badge. */
+.lightbox-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 32px;
+	background: rgba(0, 0, 0, 0.8);
+}
+.lightbox-img {
+	max-width: 90vw;
+	max-height: 90vh;
+	border-radius: 6px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.lightbox-close {
+	position: fixed;
+	top: 12px;
+	right: 16px;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+.lightbox-close:hover {
+	background: rgba(0, 0, 0, 0.8);
 }
 
 .session-actions {
