@@ -7,11 +7,27 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
-### Fixed
-- **Stale editor-tab title.** Deleting the active session (or switching to a fresh/unnamed one) left the tab showing the gone session's name. The tab title now resets to the default when the active session has no name — driven authoritatively from session state, and reset immediately when a new session is spawned after a delete.
+## [0.1.3] — 2026-06-04
+
+Bundles Pi runtime + hmm-code-pi 0.1.3.
+
+### ✨ Highlights
+- **Image attachments now show as compact badges** (thumbnail + filename + dimensions) and open a fullscreen lightbox on click, instead of large inline thumbnails.
+- **Composer polish** — a per-mode glyph on the mode button, a divider above the toolbar, and a footer that collapses cleanly to icons on narrow panels.
+
+### Added
+- **Image-attachment badges + lightbox.** Attached images render as a compact badge — thumbnail + filename + W×H dimensions (dimensions inline in gray; a long filename ellipsizes rather than pushing them out) — in both the composer strip and sent user bubbles. Clicking a badge opens a fullscreen preview (dark backdrop, close button, click-outside / `Esc` to dismiss). Filenames come from the picked/dropped file, or a mime-derived default for pasted/replayed images.
+- **Mode-button glyph.** The mode button shows a per-mode icon (code `</>`, plan, debug, ask) beside the label, matching the mode popover.
 
 ### Changed
-- **Session picker opens instantly.** Clicking the history button now opens the picker immediately — rendering the cached list right away, or a loading spinner if nothing is cached yet — then refreshes the list in place when enumeration completes, instead of waiting on a fixed delay before showing anything.
+- **Composer refinements.** No resting border/fill on the mode button (hover shows the hit-area); a divider line between the input and the toolbar row; the ctx pill height aligned to the ＋/ buttons; the input column narrowed to ~90ch with a comfortable side gutter on narrow panels.
+- **Compact footer at narrow widths.** At ≤340px the footer collapses to one row — mode button → icon only, ctx pill → "%" only, reset → "↺" only — and otherwise wraps the right-hand group to a second line instead of cramming.
+- **Session picker opens instantly.** Clicking the history button opens the picker immediately — the cached list right away, or a loading spinner if nothing is cached yet — then refreshes in place when enumeration completes, instead of waiting on a fixed delay.
+- Internal: the release workflow now composes the GitHub Release body from this CHANGELOG's matching version section (single source of truth — see RELEASING.md).
+
+### Fixed
+- **Shift+Enter scrolls the caret into view.** Because the newline is inserted manually (the native keystroke is unreliable in SSH-remote webviews), the browser's caret-into-view scroll was lost, so a new line past the 5-line max stayed hidden until the next keystroke.
+- **Stale editor-tab title.** Deleting the active session (or switching to a fresh/unnamed one) left the tab showing the gone session's name. The title now resets to the default when the active session has no name — driven authoritatively from session state, and reset immediately when a new session is spawned after a delete.
 
 ## [0.1.2] — 2026-06-04
 
