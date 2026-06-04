@@ -57,14 +57,14 @@ const COMPACT_TIMEOUT_MS = 240_000;
 let bootResumeDone = false;
 
 /** Show the compact button only when it's actually usable: enough context to be
- *  worth compacting (≥20% usage), the chat is idle (no turn in flight — Pi can't
+ *  worth compacting (≥35% usage), the chat is idle (no turn in flight — Pi can't
  *  compact mid-turn anyway), and no compaction is already running. Reads the last
  *  known context % from `ui.context`. Called on every relevant transition. */
 function refreshCompactBtn(): void {
 	const pct = parseFloat(ui.context || "");
 	els().btnCompact.classList.toggle(
 		"hidden",
-		runtime.compacting || runtime.turnInFlight || !(Number.isFinite(pct) && pct >= 20),
+		runtime.compacting || runtime.turnInFlight || !(Number.isFinite(pct) && pct >= 35),
 	);
 }
 

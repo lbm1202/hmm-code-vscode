@@ -9,6 +9,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ### Changed
 - **Floating composer.** The input box now overlays the message list (anchored to the bottom) instead of taking its own full-width row, so the full-width chat shows on both sides of — and scrolls behind — the narrower input, like Claude Code. The message list reserves a matching bottom space (tracked live as the composer grows / wraps) so the last message stays clear of the input.
+- The **manual Compact button** now appears once context usage reaches **35%** (was 20%).
 
 ## [0.1.4] — 2026-06-04
 
