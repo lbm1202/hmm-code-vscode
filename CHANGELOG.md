@@ -7,16 +7,26 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
-### Changed
-- **Floating composer.** The input box now overlays the message list (anchored to the bottom) instead of taking its own full-width row, so the full-width chat shows on both sides of — and scrolls behind — the narrower input, like Claude Code. The message list reserves a matching bottom space (tracked live as the composer grows / wraps) so the last message stays clear of the input.
-- The **manual Compact button** now appears once context usage reaches **35%** (was 20%).
+## [0.1.5] — 2026-06-05
+
+Bundles Pi runtime + hmm-code-pi 0.1.5.
+
+### ✨ Highlights
+- **Floating composer** — the input box overlays the message list, so the full-width chat shows on both sides of (and scrolls behind) the narrower input, like Claude Code.
+- **Context-window awareness** — auto-detect each model's window from `/v1/models`, a gauge in the token-usage modal, and a `ctx %` that updates the moment you switch model or mode.
 
 ### Added
 - **Context-window auto-detection** (settings → Models). Discovering models now also reads each model's context window from the same `/v1/models` response (vLLM/omlx `max_model_len`, LM Studio `max_context_length`, `context_length`, …) and pre-fills `contextWindow` when a discovered model is added. A per-provider **Detect context** button backfills `contextWindow` for already-added models the same way. Servers that don't report a size (plain OpenAI, vanilla mlx_lm.server) are left untouched. Keeps the chat `ctx %` and auto-compaction accurate without hand-editing models.json.
 - **Context-window gauge** in the token-usage modal (click the `ctx` pill). Shows the current model's context fill as a bar — used / max tokens + percent — that turns amber past 70% (auto-compact zone) and red past 90%.
 
+### Changed
+- **Floating composer.** The input box now overlays the message list (anchored to the bottom) instead of taking its own full-width row, so the full-width chat shows on both sides of — and scrolls behind — the narrower input, like Claude Code. The message list reserves a matching bottom space (tracked live as the composer grows / wraps) so the last message stays clear of the input.
+- The **manual Compact button** now appears once context usage reaches **35%** (was 20%).
+- **`ctx %` updates on a model / mode switch** (Pi). The context percentage now reflects the new model's window immediately on a switch, instead of staying stale until the next assistant response.
+
 ### Fixed
 - **Loading-dots animation reset.** The "thinking" status row was re-appended to the DOM on every stream delta (to keep it pinned at the bottom), which restarted its CSS animation — so the dots flickered back to frame 0 on each chunk. It now only re-pins when something new was actually appended after it.
+- **Auto-corrected `edit` tool calls with a misplaced `path`** (Pi). Local models sometimes nest `path` inside an `edits[]` entry instead of at the top level, failing schema validation; the call is now normalized (path hoisted) before validation so it succeeds on the first try.
 
 ## [0.1.4] — 2026-06-04
 
