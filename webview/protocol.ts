@@ -32,6 +32,10 @@ export const ASSISTANT_DELTA = {
 	TOOLCALL_END: "toolcall_end",
 } as const;
 
+// Chat-side mode order: drives the popover list (pickers.ts) and the Tab /
+// Shift+Tab cycle (prompt.ts) — code-first. NOTE: the settings panel uses a
+// DIFFERENT order (plan-first, the workflow order) in settings-state.ts:MODE_NAMES.
+// These are deliberately independent — do not "sync" one to the other.
 export const MODE_NAMES = ["code", "plan", "debug", "ask"] as const;
 export type ModeName = (typeof MODE_NAMES)[number];
 

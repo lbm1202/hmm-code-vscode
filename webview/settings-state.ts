@@ -22,6 +22,10 @@ export const el = (id: string): any => document.getElementById(id);
 export const q = (root: any, sel: string): any => root.querySelector(sel);
 export const qa = (root: any, sel: string): any[] => Array.from(root.querySelectorAll(sel));
 
+// Settings-panel display order — plan-first (the plan → code → debug → ask
+// workflow order). Intentionally DIFFERENT from the chat-side order in
+// protocol.ts:MODE_NAMES (code-first, drives the Tab cycle). Independent on
+// purpose — don't unify them.
 export const MODE_NAMES = ["plan", "code", "debug", "ask"];
 export const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
 export const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];

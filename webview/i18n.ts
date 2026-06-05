@@ -2,8 +2,8 @@
 // window.__HMM_I18N before the bundle loads (see chat-backend renderChatHtml).
 // t() reads from it with the same {param} substitution as the host i18n.
 //
-// Note: tool-call rendering (tools.ts) is intentionally NOT routed through
-// this — those strings are fixed English regardless of locale.
+// Tool-call rendering (tools.ts) also routes through t() (the tool.* keys),
+// so tool-call blocks localize with the rest of the chat.
 
 type Params = Record<string, string | number>;
 
