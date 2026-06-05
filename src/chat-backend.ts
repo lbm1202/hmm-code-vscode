@@ -84,7 +84,12 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: unknown[] }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
-	| { kind: typeof TO_WEBVIEW.USAGE; perModel: Record<string, ModelUsage>; sessionCount: number }
+	| {
+			kind: typeof TO_WEBVIEW.USAGE;
+			perModel: Record<string, ModelUsage>;
+			sessionCount: number;
+			context?: { tokens: number; contextWindow: number; percent: number };
+	  }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -545,7 +550,26 @@ export class ChatBackend {
 				if (typeof file !== "string" || !file) return;
 				try {
 					const { perModel, sessionCount } = subtreeUsage(file, this.workspaceCwd());
-					this.post({ kind: TO_WEBVIEW.USAGE, perModel, sessionCount });
+					// Also pull the current model's live context fill (tokens / window
+					// / %) so the modal can draw a gauge. get_session_stats carries
+					// getContextUsage(); it's optional — a failure just omits the gauge.
+					let context: { tokens: number; contextWindow: number; percent: number } | undefined;
+					try {
+						const stats = await client.send({ type: "get_session_stats" });
+						const cu = stats.success ? (stats.data as any)?.contextUsage : undefined;
+						if (
+							cu &&
+							typeof cu.tokens === "number" &&
+							typeof cu.contextWindow === "number" &&
+							cu.contextWindow > 0 &&
+							typeof cu.percent === "number"
+						) {
+							context = { tokens: cu.tokens, contextWindow: cu.contextWindow, percent: cu.percent };
+						}
+					} catch {
+						/* gauge is best-effort */
+					}
+					this.post({ kind: TO_WEBVIEW.USAGE, perModel, sessionCount, context });
 				} catch (err) {
 					this.post({
 						kind: TO_WEBVIEW.STDERR,

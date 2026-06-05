@@ -13,6 +13,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ### Added
 - **Context-window auto-detection** (settings → Models). Discovering models now also reads each model's context window from the same `/v1/models` response (vLLM/omlx `max_model_len`, LM Studio `max_context_length`, `context_length`, …) and pre-fills `contextWindow` when a discovered model is added. A per-provider **Detect context** button backfills `contextWindow` for already-added models the same way. Servers that don't report a size (plain OpenAI, vanilla mlx_lm.server) are left untouched. Keeps the chat `ctx %` and auto-compaction accurate without hand-editing models.json.
+- **Context-window gauge** in the token-usage modal (click the `ctx` pill). Shows the current model's context fill as a bar — used / max tokens + percent — that turns amber past 70% (auto-compact zone) and red past 90%.
 
 ## [0.1.4] — 2026-06-04
 

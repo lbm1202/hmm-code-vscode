@@ -14,6 +14,7 @@ function fmt(n: number): string {
 export function showTokenModal(
 	perModel: Record<string, { input: number; output: number }>,
 	sessionCount: number,
+	context?: { tokens: number; contextWindow: number; percent: number },
 ): void {
 	const modalRoot = els().modalRoot;
 
@@ -35,6 +36,31 @@ export function showTokenModal(
 			? `This session + ${children} child session${children === 1 ? "" : "s"}`
 			: "This session";
 	modal.appendChild(sub);
+
+	// Context-window gauge for the CURRENT model (tokens / window + % fill).
+	if (context && context.contextWindow > 0) {
+		const pct = Math.max(0, Math.min(100, context.percent));
+		const gauge = document.createElement("div");
+		gauge.className = "ctx-gauge";
+		const label = document.createElement("div");
+		label.className = "ctx-gauge-label";
+		const left = document.createElement("span");
+		left.textContent = "Context";
+		const right = document.createElement("span");
+		right.className = "ctx-gauge-nums";
+		right.textContent = `${fmt(context.tokens)} / ${fmt(context.contextWindow)} · ${pct.toFixed(1)}%`;
+		label.append(left, right);
+		const track = document.createElement("div");
+		track.className = "ctx-gauge-track";
+		const fill = document.createElement("div");
+		fill.className = "ctx-gauge-fill";
+		// Warn as the window fills: amber past 70% (auto-compact zone), red past 90%.
+		fill.classList.add(pct >= 90 ? "danger" : pct >= 70 ? "warn" : "ok");
+		fill.style.width = `${pct}%`;
+		track.appendChild(fill);
+		gauge.append(label, track);
+		modal.appendChild(gauge);
+	}
 
 	const models = Object.entries(perModel).sort(
 		(a, b) => b[1].input + b[1].output - (a[1].input + a[1].output),

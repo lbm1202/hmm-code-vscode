@@ -1046,6 +1046,35 @@ body.mod-down .bash-cmd-link:hover {
 .token-num { text-align: right; font-variant-numeric: tabular-nums; }
 .token-total td { border-top: 1px solid var(--vscode-panel-border); font-weight: 600; }
 
+/* Context-window gauge in the token-usage modal. */
+.ctx-gauge { margin: 10px 0 4px; }
+.ctx-gauge-label {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	font-size: 12px;
+	margin-bottom: 5px;
+}
+.ctx-gauge-nums {
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family);
+	font-variant-numeric: tabular-nums;
+}
+.ctx-gauge-track {
+	height: 8px;
+	border-radius: 999px;
+	background: var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	overflow: hidden;
+}
+.ctx-gauge-fill {
+	height: 100%;
+	border-radius: 999px;
+	transition: width 0.2s ease;
+	background: var(--vscode-progressBar-background, #3a9cd6);
+}
+.ctx-gauge-fill.warn { background: var(--vscode-charts-orange, #e0a030); }
+.ctx-gauge-fill.danger { background: var(--vscode-charts-red, #d64646); }
+
 .sendbtn {
 	width: 32px;
 	height: 28px;

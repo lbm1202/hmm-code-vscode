@@ -43,7 +43,12 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
 	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: any[] }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
-	| { kind: typeof TO_WEBVIEW.USAGE; perModel: Record<string, { input: number; output: number }>; sessionCount: number }
+	| {
+			kind: typeof TO_WEBVIEW.USAGE;
+			perModel: Record<string, { input: number; output: number }>;
+			sessionCount: number;
+			context?: { tokens: number; contextWindow: number; percent: number };
+	  }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
