@@ -60,9 +60,18 @@ export function removeStatus(): void {
 	runtime.status = null;
 }
 
-/** Keep the status row visually anchored to the bottom of messagesEl. */
+/** Keep the status row visually anchored to the bottom of messagesEl.
+ *  Only re-append when it isn't ALREADY the last child — re-appending detaches
+ *  and re-attaches the node, which restarts the loading-dots CSS animation. This
+ *  is called on every stream delta, so an unconditional appendChild made the
+ *  dots reset to frame 0 on each chunk; the guard keeps the animation smooth and
+ *  only moves the row when something new was appended after it (bubble / tool). */
 export function pinStatusToEnd(): void {
-	if (runtime.status) els().messages.appendChild(runtime.status.row);
+	if (!runtime.status) return;
+	const messages = els().messages;
+	if (messages.lastElementChild !== runtime.status.row) {
+		messages.appendChild(runtime.status.row);
+	}
 }
 
 export function ensureBubble(): BubbleState {
