@@ -7,6 +7,14 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- **Tool-call status dots.** Every finished tool call shows a green (success) / red (failure) dot on its summary line. On failure the result block now collapses — only the red dot shows, click to expand; success keeps the existing long-output auto-collapse.
+- **Pinned task-list panel** (default on). When the agent uses the task-list tool, the full list is pinned to the top of the chat and updated live, while the in-stream block collapses to a one-line summary; a **Done** button appears once every task is complete and dismisses the panel (a later incomplete update re-shows it). The panel re-seeds from history on reload. Toggle in **settings → General** ("Pin task list to the top"); off → the full list renders inline as before.
+- **Continue-after-auto-compaction toggle** (settings → General, default on) for the Pi extension's new auto-continue behavior — resume the remaining tasks after a turn-boundary auto-compaction.
+
+### Changed
+- **Tool-output pruning is now sticky** (Pi). The kept-verbatim window no longer re-slides every request, so the prompt cache stops thrashing on tool-heavy, high-context turns (roughly one cache break per prune batch instead of one per tool turn). The keep-floor + batch size auto-derive from the model's context window and the auto-compact threshold.
+
 ## [0.1.5] — 2026-06-05
 
 Bundles Pi runtime + hmm-code-pi 0.1.5.
