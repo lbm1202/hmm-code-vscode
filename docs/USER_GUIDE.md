@@ -63,8 +63,8 @@ Pi TUI shortcuts (`Alt+T`, `Alt+X`, `Ctrl+Shift+A`) are described in the [Pi ext
 
 ### Generic tools (`read` / `grep` / `find` / `ls` / `bash`)
 - One-line summary: `bash` shows the first command line + `(+N lines)` hint; `read` shows path + `[start-end]`.
-- Outputs longer than 10 lines collapse with an `N lines` hint.
-- Errors get a red `✗`; successes have no badge (raw output stands on its own).
+- Every finished call gets a **status dot** on its summary line — **green** for success, **red** for failure.
+- On **success**, output longer than 10 lines collapses with an `N lines` hint. On **failure**, the result is hidden (only the red dot shows) — click the row to expand it.
 
 ### `edit` / `write` / `multi_edit` (diff view)
 - **Clickable path header** — Ctrl/Cmd + click opens the file in the editor.
@@ -82,6 +82,7 @@ Pi TUI shortcuts (`Alt+T`, `Alt+X`, `Ctrl+Shift+A`) are described in the [Pi ext
 ### Interactive tools (`ask_user` / `todo_write` / `finalize_plan` / `request_mode_switch`)
 - Card UI — question + options, todo checklists, accept/decline buttons.
 - Raw JSON is suppressed to save context.
+- **Pinned task list** (on by default): when the agent runs `todo_write`, the full list is pinned to the top of the chat and updated live, while the in-stream block collapses to a one-line summary. A **Done** button appears once every task is complete and dismisses the panel; a later incomplete update re-shows it. Turn it off in settings → General to render the full list inline instead.
 
 ### Sanitized markdown
 - Model output is rendered via marked → DOMPurify. `<script>`, `on*` handlers, `javascript:` URLs, `<iframe>` / `<object>` / `<embed>` / `<form>` are stripped before reaching the DOM.
@@ -142,7 +143,7 @@ Click the 🕘 button at the top → session tree modal.
 Footer ⚙ button or `Cmd+Shift+P` → "Hmm-code: Open Settings". Full reference: [SETTINGS.md](SETTINGS.md).
 
 Five tabs:
-- **General**: UI language, auto-title model, dynamic-compaction toggle + auto-summarization threshold (50–85%), and the summary (compaction) model.
+- **General**: UI language, auto-title model, auto-summarization threshold (50–85%, default 70%) + dynamic-compaction / continue-after-compaction toggles, the summary (compaction) model, the *include old tool outputs* toggle, and the *pin task list to the top* toggle.
 - **Authentication**: API keys, Codex / Claude OAuth logins, Codex usage readout.
 - **Models**: custom providers (self-hosted vLLM / Ollama) + the per-provider model filter (allowlist).
 - **Modes**: each mode's model / thinking level.

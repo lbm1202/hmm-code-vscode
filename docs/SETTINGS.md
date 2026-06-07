@@ -51,10 +51,17 @@ The model used to generate session titles in the background (`auto-title.ts`).
 - **Set**: that model is used unconditionally (saved as `modes.json:autoTitle.{provider,id}`).
 
 ### Context auto-summarization
-When usage reaches the **threshold** (slider, 50–85%; default 75%, stored as `modes.json:autoCompactThreshold`), the conversation is summarized (compacted) to free room.
+When usage reaches the **threshold** (slider, 50–85%; default 70%, stored as `modes.json:autoCompactThreshold`), the conversation is summarized (compacted) to free room.
 
-- **Dynamic compaction** (toggle, on by default — `modes.json:dynamicCompaction`): compaction waits for the agent's multi-step turn to finish (the turn boundary) instead of cutting it mid-loop; it only force-compacts mid-turn if usage climbs 15% past the threshold. Off = legacy behavior (compact the moment the threshold is crossed, even mid-turn).
+- **Dynamic compaction** (toggle, on by default — `modes.json:dynamicCompaction`): compaction waits for the agent's multi-step turn to finish (the turn boundary) instead of cutting it mid-loop; it only force-compacts mid-turn if usage climbs 10% past the threshold. Off = legacy behavior (compact the moment the threshold is crossed, even mid-turn).
+- **Continue after auto-compaction** (toggle, on by default — `modes.json:autoContinueAfterCompact`): when a turn-boundary auto-compaction finishes and the task list still has incomplete items, the agent is automatically prompted to continue the remaining work. Stops once all tasks are done, or after a few rounds with no task completed; manual compaction never auto-continues.
 - **Summary (compaction) model** (`modes.json:compactModel`): the model that writes the compaction summary. **Empty = the active session model.** Set a dedicated (cheaper/faster) model to offload summarization off your chat model.
+
+### Tool outputs in context
+- **Include old tool outputs** (toggle, OFF by default — `modes.json:includeOldToolOutputs`). Off (the default) replaces tool outputs older than a recent window with a short notice in the model's context — the **full output always stays in the saved transcript** — so the live context stays lean and full compaction fires far less often. The kept-verbatim window is *sticky* (it doesn't re-slide every request, so the prompt cache stops thrashing on long, tool-heavy sessions) and its size auto-derives from the model's context window + the auto-summarization threshold. On = keep every tool output in context verbatim.
+
+### Task list
+- **Pin task list to the top** (toggle, ON by default — `modes.json:todoPanel`). On (the default): when the agent uses the task-list tool, the list is pinned to the top of the chat and updated live, the in-chat update collapses to a one-line summary, and a **Done** button appears once every task is complete. Off: the full task list renders inline in the chat (legacy).
 
 ---
 
@@ -174,7 +181,7 @@ Save (3 modes · auto-title model · model filter)  [Save]
 
 Internal flow:
 1. `models.json` first (aliases derived from custom models feed into `modes.json:modelAliases`).
-2. Collect those aliases and write `modes.json` — mode configs (incl. system prompts) + autoTitle + autoTitlePrompt + modelAllowlist + autoCompactThreshold + dynamicCompaction + compactModel + compactInstructions, all at once.
+2. Collect those aliases and write `modes.json` — mode configs (incl. system prompts) + autoTitle + autoTitlePrompt + modelAllowlist + autoCompactThreshold + dynamicCompaction + includeOldToolOutputs + todoPanel + autoContinueAfterCompact + compactModel + compactInstructions, all at once.
 3. Apply the `auth.json` delta (adds + removes).
 4. Route:
    - **Auth changed** → `restartChat` (`ChatBackend.restartAll`) — respawn every Pi process.

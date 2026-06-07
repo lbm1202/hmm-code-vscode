@@ -69,12 +69,13 @@ A disciplined, mode-driven coding agent — the workflow, not the widgets:
 - **Plan-first by design** — every code change goes `plan → code`. `plan`/`debug`/`ask` can't edit or write; only `code` touches your files, after a plan handoff (`finalize_plan`).
 - **Permission-gated** — a layered permission system decides `allow` / `ask` / `deny` per tool call (mode defaults + `.piignore`), surfaced as confirm prompts. Session-scoped **auto-approve** when you want to move fast.
 - **Dynamic compaction** — context auto-summarizes at the turn boundary instead of cutting the agent mid-turn (toggle + 50–85% threshold; manual **Compact** button).
+- **Lean, cache-stable context** — old tool outputs are pruned to a short notice past a *sticky* recent window (the full output stays in the transcript), so long sessions stay cheap and the prompt cache doesn't thrash; after a boundary compaction the agent can auto-continue the remaining tasks.
 
 The mode system, plan handoff, and permission layer come from the bundled [hmm-code-pi](https://github.com/lbm1202/hmm-code-pi) extension — this repo is the native VS Code UI for it.
 
 ## In the editor
 
-Interactive tool cards · syntax-highlighted edit/write diffs ([Shiki](https://shiki.style/)) · **image attachments** (paste / file / drag-drop, shown as badges with a click-to-zoom lightbox) · a unified mode/model picker with an effort slider · permission modals · parent-child session history · tabbed settings panel (auth / models / modes / prompts) · English + Korean UI · self-contained `.vsix` (no separate Pi install).
+Interactive tool cards · **green/red tool-call status dots** (failures collapse, click to expand) · a **pinned task-list panel** that tracks `todo_write` live · syntax-highlighted edit/write diffs ([Shiki](https://shiki.style/)) · **image attachments** (paste / file / drag-drop, shown as badges with a click-to-zoom lightbox) · a unified mode/model picker with an effort slider · permission modals · parent-child session history · tabbed settings panel (auth / models / modes / prompts) · English + Korean UI · self-contained `.vsix` (no separate Pi install).
 
 > **Claude (Anthropic) subscription auth:** using a Claude Pro/Max plan with third-party agent tools like this one is officially supported by Anthropic from **2026-06-15** onward — see [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan). Before that date, prefer an Anthropic **API key** (or another provider). ChatGPT Plus/Pro (Codex) subscription auth is available via the OAuth button in the settings panel.
 
