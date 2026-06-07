@@ -7,6 +7,15 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-06-08
+
+Bundles Pi runtime + hmm-code-pi 0.1.6.
+
+### ✨ Highlights
+- **Pinned task list** — when the agent works a `todo_write` checklist, it's pinned to the top of the chat and updated live (the in-stream block collapses to one line); a **Done** button clears it once everything is complete.
+- **Tool-call status dots** — green for success, red for failure; failed calls now collapse (click to expand).
+- **Cache-stable context** — tool-output pruning is now *sticky*, so the prompt cache stops thrashing on long, tool-heavy sessions, and the agent can auto-continue the remaining tasks after a turn-boundary compaction.
+
 ### Added
 - **Tool-call status dots.** Every finished tool call shows a green (success) / red (failure) dot on its summary line. On failure the result block now collapses — only the red dot shows, click to expand; success keeps the existing long-output auto-collapse.
 - **Pinned task-list panel** (default on). When the agent uses the task-list tool, the full list is pinned to the top of the chat and updated live, while the in-stream block collapses to a one-line summary; a **Done** button appears once every task is complete and dismisses the panel (a later incomplete update re-shows it). The panel re-seeds from history on reload. Toggle in **settings → General** ("Pin task list to the top"); off → the full list renders inline as before.
