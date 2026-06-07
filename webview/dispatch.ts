@@ -22,10 +22,12 @@ import {
 	rememberSessionFile,
 	runtime,
 	supportedThinkingLevels,
+	todoPanelEnabled,
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
 import { showTokenModal } from "./token-modal";
+import { updateTodoPanel } from "./todo-panel";
 import { addToolCall, updateToolPartial, updateToolResult } from "./tools";
 import {
 	ensureStatus,
@@ -399,9 +401,18 @@ function handleSetStatus(key: string, value: string): void {
 			command: { type: "new_session", parentSession: runtime.currentSessionFile },
 		});
 	} else if (key === STATUS_KEYS.TODOS) {
-		// Received from Pi's todo_write, but todos render from the todo_write
-		// tool-call result (see tools.ts), not this status channel. Acknowledge
-		// so it doesn't trip the unknown-key warning below.
+		// Full task list pushed by Pi's todo_write. When the pinned panel is on,
+		// drive it from here (the in-stream block then collapses to one line; see
+		// updateToolResult). When off, this stays a no-op and the full list
+		// renders inline as before.
+		if (todoPanelEnabled) {
+			try {
+				const parsed = JSON.parse(value);
+				if (parsed && Array.isArray(parsed.todos)) updateTodoPanel(parsed.todos);
+			} catch {
+				/* malformed status payload — ignore */
+			}
+		}
 	} else if (key) {
 		console.warn("[hmm-code] unhandled setStatus key:", key);
 	}

@@ -50,6 +50,19 @@ function readModelMaps(): {
 	}
 }
 
+/** modes.json `todoPanel` flag (default ON) for the chat webview's pinned todo
+ *  panel. Read from modes.json (a settings-panel field), not vscode config;
+ *  injected into __HMM_CFG. True unless explicitly set false. */
+function readTodoPanel(): boolean {
+	try {
+		if (!existsSync(MODES_JSON_PATH)) return true;
+		const raw = JSON.parse(readFileSync(MODES_JSON_PATH, "utf-8")) as { todoPanel?: boolean };
+		return raw?.todoPanel !== false;
+	} catch {
+		return true;
+	}
+}
+
 /** Attach aliases to a raw Pi model list — used for the static cache that
  *  feeds the settings panel (which wants ALL models, no allowlist filter). */
 function attachAliases(raw: ModelEntry[], aliases: Record<string, string>): ModelEntry[] {
@@ -828,6 +841,7 @@ export function renderChatHtml(
 		autoApproveDefault: vscode.workspace
 			.getConfiguration("hmm-code")
 			.get<boolean>("autoApproveDefault", false),
+		todoPanel: readTodoPanel(),
 	});
 	return `<!DOCTYPE html>
 <html lang="${resolveLocale()}">

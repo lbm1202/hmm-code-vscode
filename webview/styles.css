@@ -305,6 +305,22 @@ html, body {
 	to { transform: rotate(360deg); }
 }
 
+/* Green/red status dot on a finished tool-call summary (set in updateToolResult).
+   Pins to the far right of the summary line; when a line-count hint is present it
+   already right-aligns the group, so the dot drops its auto-margin to avoid
+   splitting the free space (which would un-pin it). */
+.tool-status-dot {
+	margin-left: auto;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex: 0 0 auto;
+	align-self: center;
+}
+.tool-result-lines + .tool-status-dot { margin-left: 0; }
+.tool-status-dot.tool-ok { background: var(--vscode-charts-green, #4ec9b0); }
+.tool-status-dot.tool-fail { background: var(--vscode-errorForeground, #f48771); }
+
 .tool-call-interactive {
 	border-color: var(--vscode-focusBorder, var(--vscode-panel-border));
 	background: color-mix(in srgb, var(--vscode-editorWidget-background) 80%, var(--vscode-focusBorder, transparent) 20%);
@@ -636,6 +652,53 @@ body.mod-down .bash-cmd-link:hover {
 }
 .todo-in_progress .todo-icon { color: var(--vscode-charts-blue, #569cd6); }
 .todo-pending .todo-label { color: var(--vscode-descriptionForeground); }
+
+/* ── Pinned todo panel (top of chat) ─────────────────────────────────────── */
+.todo-panel {
+	flex: 0 0 auto;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	padding: 8px 12px;
+}
+.todo-panel-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	user-select: none;
+}
+.todo-panel-caret {
+	width: 12px;
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+.todo-panel-title {
+	flex: 1;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+.todo-panel-done {
+	background: transparent;
+	border: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 10px;
+	padding: 1px 8px;
+	border-radius: 10px;
+}
+.todo-panel-done:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+.todo-panel-body {
+	margin-top: 8px;
+	/* Keep the header (progress + Done) fixed and scroll the list past ~10 rows;
+	   capped at 38vh so it never crowds the message list on short panels. */
+	max-height: min(230px, 38vh);
+	overflow-y: auto;
+}
 
 /* ── Status row (in-messages turn indicator) ────────────────────────────── */
 .status-row {

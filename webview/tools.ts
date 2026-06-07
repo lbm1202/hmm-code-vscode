@@ -7,6 +7,7 @@ import { cssEscape, escapeHtml, md, safeStringify, summarizeArgs } from "./helpe
 import { highlightBlock, highlightLine, langFromPath } from "./syntax";
 import { ensureBubble, pinStatusToEnd } from "./turn-lifecycle";
 import { t } from "./i18n";
+import { todoPanelEnabled } from "./state";
 
 /** Tools whose primary UX is a question card. Pretty-render their result block. */
 export const INTERACTIVE_TOOLS = new Set([
@@ -502,10 +503,19 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 		`[data-tool-call-id="${cssEscape(toolCallId)}"]`,
 	);
 	if (!block) return;
-	// Remove the running spinner from the summary.
+	// Remove the running spinner; replace it with a green (ok) / red (fail) dot.
 	block.querySelector(".tool-spinner")?.remove();
+	setStatusDot(block, ok);
 
 	const toolName = block.dataset.toolName ?? "";
+
+	// Pinned-todo mode: the full list lives in the top panel (todo-panel.ts), so
+	// the in-stream todo_write block stays collapsed to its one-line summary.
+	if (toolName === "todo_write" && todoPanelEnabled) {
+		block.querySelector(".tool-result-streaming")?.remove();
+		(block as HTMLDetailsElement).open = false;
+		return;
+	}
 
 	// 1. Interactive-tool pretty renderer (ask_user / todo_write / etc.)
 	const interactivePretty = formatInteractiveResult(toolName, output, ok);
@@ -517,7 +527,7 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 			: "tool-result tool-result-pretty tool-result-err";
 		div.innerHTML = interactivePretty;
 		block.appendChild(div);
-		(block as HTMLDetailsElement).open = true;
+		(block as HTMLDetailsElement).open = ok;
 		return;
 	}
 
@@ -531,7 +541,7 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 			: "tool-result tool-result-pretty tool-result-err";
 		div.innerHTML = builtinPretty.html;
 		block.appendChild(div);
-		(block as HTMLDetailsElement).open = builtinPretty.open;
+		(block as HTMLDetailsElement).open = ok ? builtinPretty.open : false;
 		if (builtinPretty.summaryHint) {
 			appendSummaryHint(block, builtinPretty.summaryHint);
 		}
@@ -564,9 +574,9 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 	if (lineCount > 1) {
 		appendSummaryHint(block, `${lineCount} lines`);
 	}
-	// Auto-collapse long output so the chat stays scrollable. Errors stay open
-	// so the user sees the failure immediately.
-	if (ok && lineCount > COLLAPSE_LINES_THRESHOLD) {
+	// Collapse on failure (only the red dot shows; click to expand). On success,
+	// auto-collapse only long output so the chat stays scrollable.
+	if (!ok || lineCount > COLLAPSE_LINES_THRESHOLD) {
 		(block as HTMLDetailsElement).open = false;
 	}
 }
@@ -579,7 +589,23 @@ function appendSummaryHint(block: HTMLElement, text: string): void {
 	const hint = document.createElement("span");
 	hint.className = "tool-result-lines";
 	hint.textContent = text;
-	summary.appendChild(hint);
+	// Keep the status dot (if already set) the LAST summary child so it pins to
+	// the far right; the hint slots in just before it.
+	const dot = summary.querySelector(".tool-status-dot");
+	if (dot) summary.insertBefore(hint, dot);
+	else summary.appendChild(hint);
+}
+
+/** Set the green/red status dot on a finished tool call's summary (one per
+ *  block, replacing any prior). Green = success, red = failure. Appended last so
+ *  it sits at the far right of the summary line. */
+function setStatusDot(block: HTMLElement, ok: boolean): void {
+	const summary = block.querySelector("summary");
+	if (!summary) return;
+	summary.querySelector(".tool-status-dot")?.remove();
+	const dot = document.createElement("span");
+	dot.className = `tool-status-dot ${ok ? "tool-ok" : "tool-fail"}`;
+	summary.appendChild(dot);
 }
 
 /** Pretty-format for Pi built-in tool results. Returns null to fall through. */
@@ -642,6 +668,36 @@ export function extractToolText(output: any): string {
 	return safeStringify(output);
 }
 
+/** Progress label "n/m" for a todos list (shared by the in-stream block header
+ *  and the pinned panel header). */
+export function todoProgressLabel(todos: any[]): string {
+	const done = todos.filter((x) => x?.status === "completed").length;
+	return t("tool.todoHeader", { done, total: todos.length });
+}
+
+/** Shared todo-list `<ul>` markup — used by BOTH the in-stream result block and
+ *  the pinned panel (todo-panel.ts) so they can't drift. Caller handles the
+ *  empty case + any header. */
+export function renderTodoListHtml(todos: any[]): string {
+	const ICON: Record<string, string> = {
+		pending: "☐",
+		in_progress: "▶",
+		completed: "☑",
+		cancelled: "✕",
+	};
+	const items = todos
+		.map((x) => {
+			const icon = ICON[x?.status] ?? "•";
+			const cls = `todo-item todo-${x?.status} todo-pri-${x?.priority ?? "medium"}`;
+			const pri = x?.priority && x.priority !== "medium"
+				? `<span class="todo-pri">${escapeHtml(x.priority)}</span>`
+				: "";
+			return `<li class="${cls}"><span class="todo-icon">${escapeHtml(icon)}</span><span class="todo-label">${escapeHtml(String(x?.content ?? ""))}</span>${pri}</li>`;
+		})
+		.join("");
+	return `<ul class="todo-list">${items}</ul>`;
+}
+
 /** Pretty-format the result for interactive tools. Returns "" to fall through. */
 export function formatInteractiveResult(toolName: string, output: any, ok: boolean): string {
 	const details = output?.details ?? {};
@@ -671,26 +727,9 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 	if (toolName === "todo_write") {
 		const todos: any[] = details?.todos ?? [];
 		if (todos.length === 0) return `<span class="status-text">${escapeHtml(t("tool.empty"))}</span>`;
-		const ICON: Record<string, string> = {
-			pending: "☐",
-			in_progress: "▶",
-			completed: "☑",
-			cancelled: "✕",
-		};
-		const done = todos.filter((t) => t.status === "completed").length;
-		const items = todos
-			.map((t) => {
-				const icon = ICON[t.status] ?? "•";
-				const cls = `todo-item todo-${t.status} todo-pri-${t.priority ?? "medium"}`;
-				const pri = t.priority && t.priority !== "medium"
-					? `<span class="todo-pri">${escapeHtml(t.priority)}</span>`
-					: "";
-				return `<li class="${cls}"><span class="todo-icon">${escapeHtml(icon)}</span><span class="todo-label">${escapeHtml(String(t.content ?? ""))}</span>${pri}</li>`;
-			})
-			.join("");
 		return (
-			`<div class="todo-header">${escapeHtml(t("tool.todoHeader", { done, total: todos.length }))}</div>` +
-			`<ul class="todo-list">${items}</ul>`
+			`<div class="todo-header">${escapeHtml(todoProgressLabel(todos))}</div>` +
+			renderTodoListHtml(todos)
 		);
 	}
 	if (toolName === "finalize_plan") {

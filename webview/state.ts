@@ -74,6 +74,13 @@ export const ui = {
 	autoApprove: false,
 };
 
+/** hmm-code settings → modes.json `todoPanel` (default ON), injected by the host
+ *  into window.__HMM_CFG (chat-backend renderChatHtml). When true, todo_write
+ *  drives a pinned top panel and the in-stream todo block collapses to one line;
+ *  when false, the full list renders inline (legacy). Read once at boot. */
+export const todoPanelEnabled =
+	(window as unknown as { __HMM_CFG?: { todoPanel?: boolean } }).__HMM_CFG?.todoPanel !== false;
+
 /** Per-session UI flags. */
 export const runtime = {
 	/** Between doSend/agent_start and agent_end/turn_end. Blocks prompt input. */
@@ -110,6 +117,12 @@ export const runtime = {
 	/** Registered slash commands (from the host's get_commands) for the prompt
 	 *  autocomplete + clean-dispatch path. Empty until the host pushes them. */
 	slashCommands: [] as SlashCommand[],
+	/** Pinned-todo-panel state (when todoPanelEnabled): the last todos list plus
+	 *  UI flags — dismissed via the all-complete "Done" button (re-shown on the
+	 *  next non-all-complete todo_write), and the caret collapse state. */
+	todos: [] as any[],
+	todoDismissed: false,
+	todoCollapsed: false,
 };
 
 /** Outstanding UI requests (select/confirm/input/editor) by id. Survives

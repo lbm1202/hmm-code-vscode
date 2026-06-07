@@ -6,7 +6,8 @@ import { md } from "./helpers";
 import { t } from "./i18n";
 import { showModal } from "./modals";
 import { FROM_WEBVIEW } from "./protocol";
-import { pendingUiRequests, post, runtime, ui } from "./state";
+import { pendingUiRequests, post, runtime, todoPanelEnabled, ui } from "./state";
+import { resetTodoPanel, updateTodoPanel } from "./todo-panel";
 import { buildToolCallBlock, updateToolResult } from "./tools";
 import { finalizeTurn } from "./turn-lifecycle";
 
@@ -24,6 +25,7 @@ export function clearConversation(): void {
 	runtime.compacting = false;
 	finalizeTurn();
 	els().messages.innerHTML = "";
+	resetTodoPanel();
 	setEmptyVisibility();
 	// Re-render any UI requests we were waiting on. The Pi-side awaits are
 	// still pending under the same ids, so reply correlation still works.
@@ -110,6 +112,18 @@ export function renderHistory(messages: any[]): void {
 	windowStart = messages.length > INITIAL_WINDOW ? snapToTurnStart(messages.length - INITIAL_WINDOW) : 0;
 	if (windowStart > 0) els().messages.appendChild(makeLoadMoreButton());
 	for (let i = windowStart; i < messages.length; i++) renderOneMessage(messages[i]);
+	// Seed the pinned panel from the last todo_write in the FULL transcript (it
+	// may predate the rendered window), so the panel survives reload/switch.
+	if (todoPanelEnabled) {
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const m = messages[i];
+			const td = m?.details?.todos;
+			if (m?.role === "toolResult" && Array.isArray(td) && td.length) {
+				updateTodoPanel(td);
+				break;
+			}
+		}
+	}
 	setEmptyVisibility();
 	// Loading a session jumps to the latest and re-pins.
 	forceScrollToBottom();

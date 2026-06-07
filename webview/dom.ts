@@ -28,6 +28,7 @@ const APP_HTML = `
 			<button class="iconbtn" id="btn-settings" title="${t("chat.settingsBtn")}">⚙</button>
 		</div>
 	</div>
+	<div class="todo-panel hidden" id="todo-panel"></div>
 	<div class="messages" id="messages"></div>
 	<div class="empty-state hidden" id="empty-state">
 		<div class="empty-logo">${LOGO_SVG}</div>
@@ -64,6 +65,7 @@ const APP_HTML = `
 
 export interface DomRefs {
 	messages: HTMLElement;
+	todoPanel: HTMLElement;
 	empty: HTMLElement;
 	recentList: HTMLElement;
 	prompt: HTMLTextAreaElement;
@@ -93,6 +95,7 @@ function mountDom(root: HTMLElement): DomRefs {
 	const pickerMode = document.getElementById("picker-mode")!;
 	return {
 		messages: document.getElementById("messages")!,
+		todoPanel: document.getElementById("todo-panel")!,
 		empty: document.getElementById("empty-state")!,
 		recentList: document.getElementById("recent-list")!,
 		prompt: document.getElementById("prompt-input") as HTMLTextAreaElement,

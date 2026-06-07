@@ -9,6 +9,7 @@ import { FROM_WEBVIEW } from "./protocol";
 import { showSessionPicker } from "./session-picker";
 import { wireSlashMenu } from "./slash";
 import { post, runtime, ui } from "./state";
+import { wireTodoPanel } from "./todo-panel";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
@@ -18,6 +19,7 @@ wirePickers();
 wirePrompt();
 wireSlashMenu();
 wireDispatch();
+wireTodoPanel();
 updateModeColor();
 
 // ── Topbar buttons ───────────────────────────────────────────────────────────
