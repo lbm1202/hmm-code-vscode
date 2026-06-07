@@ -44,6 +44,8 @@ export const S = {
 	compactDraft: '',               // auto-compact threshold (effective value)
 	dynamicCompactionDraft: true,   // dynamic compaction toggle (default on)
 	includeOldToolOutputsDraft: false, // include old tool outputs (default off → prune)
+	todoPanelDraft: true,              // pinned todo panel (default on)
+	autoContinueDraft: true,           // auto-continue after compaction (default on)
 	autoTitlePromptDraft: '',       // auto-title prompt override ('' = default)
 	compactInstructionsDraft: '',   // compaction additional-focus ('' = none)
 	codexUsageFetched: false,       // one-shot guard for the usage auto-fetch

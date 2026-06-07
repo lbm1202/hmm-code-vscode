@@ -2,7 +2,7 @@
 // settings-state.ts; disk readers + dirty checks in settings-disk.ts.
 import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS, API_TYPES, API_TYPE_HTML, S } from "./settings-state";
 import {
-	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
+	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskTodoPanel, diskAutoContinue, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
 } from "./settings-disk";
 import { requestCodexUsage, renderCodexUsage } from "./settings-codex";
 import { buildProviderIndex, providerOptionsHtml, modelOptionsHtml, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
@@ -783,6 +783,16 @@ function renderCompact() {
 		tio.checked = S.includeOldToolOutputsDraft;
 		tio.onchange = () => { S.includeOldToolOutputsDraft = tio.checked; updateSaveBar(); };
 	}
+	const tpt = el('todo-panel-toggle');
+	if (tpt) {
+		tpt.checked = S.todoPanelDraft;
+		tpt.onchange = () => { S.todoPanelDraft = tpt.checked; updateSaveBar(); };
+	}
+	const acc = el('auto-continue-compact');
+	if (acc) {
+		acc.checked = S.autoContinueDraft;
+		acc.onchange = () => { S.autoContinueDraft = acc.checked; updateSaveBar(); };
+	}
 	if (!input) return;
 	input.value = S.compactDraft;
 	applyMax();
@@ -810,6 +820,8 @@ function render(s: any) {
 	S.compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
 	S.dynamicCompactionDraft = diskDynamicCompaction();
 	S.includeOldToolOutputsDraft = diskIncludeOldToolOutputs();
+	S.todoPanelDraft = diskTodoPanel();
+	S.autoContinueDraft = diskAutoContinue();
 	S.autoTitlePromptDraft = diskAutoTitlePrompt() || defaultAutoTitle();
 	S.compactInstructionsDraft = diskCompactInstructions();
 
@@ -954,6 +966,8 @@ el('save-btn').addEventListener('click', () => {
 		autoCompactThreshold: (() => { const n = parseInt(S.compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
 		dynamicCompaction: S.dynamicCompactionDraft,
 		includeOldToolOutputs: S.includeOldToolOutputsDraft,
+		todoPanel: S.todoPanelDraft,
+		autoContinueAfterCompact: S.autoContinueDraft,
 		autoTitlePrompt: autoTitleOverrideFromDraft(),
 		compactInstructions: S.compactInstructionsDraft,
 	};

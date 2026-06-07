@@ -101,6 +101,20 @@ export function diskIncludeOldToolOutputs() {
 export function includeOldToolOutputsDirty() {
 	return S.includeOldToolOutputsDraft !== diskIncludeOldToolOutputs();
 }
+export function diskTodoPanel() {
+	// Default ON: anything but an explicit `false` means enabled.
+	return !(S.diskState && S.diskState.todoPanel === false);
+}
+export function todoPanelDirty() {
+	return S.todoPanelDraft !== diskTodoPanel();
+}
+export function diskAutoContinue() {
+	// Default ON: anything but an explicit `false` means enabled.
+	return !(S.diskState && S.diskState.autoContinueAfterCompact === false);
+}
+export function autoContinueDirty() {
+	return S.autoContinueDraft !== diskAutoContinue();
+}
 export function diskAutoTitlePrompt() {
 	const v = S.diskState && S.diskState.modes && S.diskState.modes.autoTitlePrompt;
 	return typeof v === 'string' ? v : '';
@@ -136,6 +150,8 @@ export function isDirty() {
 	if (compactDirty()) return true;
 	if (dynamicCompactionDirty()) return true;
 	if (includeOldToolOutputsDirty()) return true;
+	if (todoPanelDirty()) return true;
+	if (autoContinueDirty()) return true;
 	if (autoTitlePromptDirty()) return true;
 	if (compactInstructionsDirty()) return true;
 	return false;

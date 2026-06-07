@@ -201,6 +201,10 @@ export class SettingsPanel {
 					: true,
 			includeOldToolOutputs:
 				modes && typeof modes === "object" && modes.includeOldToolOutputs === true,
+			todoPanel: !(modes && typeof modes === "object" && modes.todoPanel === false),
+			autoContinueAfterCompact: !(
+				modes && typeof modes === "object" && modes.autoContinueAfterCompact === false
+			),
 		};
 	}
 
@@ -392,6 +396,8 @@ export class SettingsPanel {
 						msg.autoTitlePrompt,
 						msg.compactInstructions,
 						msg.includeOldToolOutputs,
+						msg.todoPanel,
+						msg.autoContinueAfterCompact,
 					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
@@ -607,6 +613,8 @@ export class SettingsPanel {
 		autoTitlePrompt?: string | null,
 		compactInstructions?: string | null,
 		includeOldToolOutputs?: boolean,
+		todoPanel?: boolean,
+		autoContinueAfterCompact?: boolean,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
 		// Dynamic compaction (default on). Store only when explicitly off so
@@ -620,6 +628,17 @@ export class SettingsPanel {
 		if (includeOldToolOutputs !== undefined) {
 			if (includeOldToolOutputs === true) raw.includeOldToolOutputs = true;
 			else delete raw.includeOldToolOutputs;
+		}
+		// Pinned todo panel (default ON). Store only when explicitly off so
+		// modes.json stays clean at the default.
+		if (todoPanel !== undefined) {
+			if (todoPanel === false) raw.todoPanel = false;
+			else delete raw.todoPanel;
+		}
+		// Auto-continue after compaction (default ON). Store only when explicitly off.
+		if (autoContinueAfterCompact !== undefined) {
+			if (autoContinueAfterCompact === false) raw.autoContinueAfterCompact = false;
+			else delete raw.autoContinueAfterCompact;
 		}
 		// Auto-title system-prompt override + compaction additional-focus.
 		// Empty/whitespace → delete the field so the built-in default applies.
@@ -881,6 +900,22 @@ export class SettingsPanel {
 					<span>${t("settings.toolOutputs.include")}</span>
 				</label>
 				<div class="desc field-hint" style="margin-top: 4px;">${t("settings.toolOutputs.includeDesc")}</div>
+				<label class="toggle-row" for="todo-panel-toggle" style="margin-top: 10px;">
+					<span class="switch">
+						<input type="checkbox" id="todo-panel-toggle" />
+						<span class="switch-track"><span class="switch-thumb"></span></span>
+					</span>
+					<span>${t("settings.todoPanel.label")}</span>
+				</label>
+				<div class="desc field-hint" style="margin-top: 4px;">${t("settings.todoPanel.desc")}</div>
+				<label class="toggle-row" for="auto-continue-compact" style="margin-top: 10px;">
+					<span class="switch">
+						<input type="checkbox" id="auto-continue-compact" />
+						<span class="switch-track"><span class="switch-thumb"></span></span>
+					</span>
+					<span>${t("settings.autoContinue.label")}</span>
+				</label>
+				<div class="desc field-hint" style="margin-top: 4px;">${t("settings.autoContinue.desc")}</div>
 			<div class="row" style="margin-top: 12px;">
 				<input type="range" id="compact-threshold" min="50" max="80" step="1" class="slider" />
 				<span class="field-hint slider-value" id="compact-value">75%</span>
