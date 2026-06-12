@@ -7,6 +7,20 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-06-12
+
+Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.7.
+
+### ✨ Highlights
+- **Pi runtime updated to 0.79.1** — adds Claude Fable 5 (Anthropic / Bedrock) plus a stack of provider and `models.json` fixes.
+- **Workspace folders stay trusted.** Pi 0.79 added a trust gate before loading project-local `.pi/` resources; Hmm-code now trusts the folder you opened, so project settings/skills keep loading without a prompt.
+- **Marketplace-first install docs** — install with `ext install lbm1202.hmm-code`.
+
+### Changed
+- **Bundled Pi runtime 0.78.0 → 0.79.1.** Upstream highlights: Claude Fable 5, project-trust gating for project-local settings / resources / instructions / packages, `models.json` schema + OpenAI Responses custom-provider handling fixes (`compat.supportsDeveloperRole: false`), and neutral wording in the compaction summary prompt.
+- **Launch the bundled Pi with `--approve`** so project-local `.pi/` resources load under 0.79's new trust gate — in headless RPC there is no prompt to answer, so an unapproved project would otherwise silently skip them. Hmm-code's own AGENTS.md injection and permission rules are read directly and were never affected.
+- **Install docs now lead with the VS Code Marketplace** (`ext install lbm1202.hmm-code`); the `.vsix` download stays documented for code-server / VSCodium / Cursor (Open VSX), where Hmm-code is not published.
+
 ## [0.1.8] — 2026-06-12
 
 Bundles Pi runtime + hmm-code-pi 0.1.7.
