@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-06-12
+
+Bundles Pi runtime + hmm-code-pi 0.1.7.
+
+### Changed
+- The agent's system prompt now includes the active session id (Pi).
+
 ## [0.1.6] — 2026-06-08
 
 Bundles Pi runtime + hmm-code-pi 0.1.6.
