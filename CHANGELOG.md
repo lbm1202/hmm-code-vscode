@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-06-12
+
+Bundles Pi runtime + hmm-code-pi 0.1.7.
+
+### Changed
+- Dependency updates: `dompurify` 3.4.7 → 3.4.10, `marked` 18.0.4 → 18.0.5.
+
 ## [0.1.7] — 2026-06-12
 
 Bundles Pi runtime + hmm-code-pi 0.1.7.
