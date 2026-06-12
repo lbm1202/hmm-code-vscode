@@ -6,6 +6,15 @@
 // deterministic behavior (no conflicts with whatever the user has at
 // ~/.pi/agent/extensions/).
 //
+// `--approve` trusts the workspace folder so Pi loads its project-local
+// resources (`.pi/` settings/skills/prompt-templates) without prompting. Pi
+// gates these behind a trust decision, and in our headless RPC mode there is no
+// UI to answer the prompt — without --approve a project that has a `.pi/`
+// directory would silently run untrusted (project-local resources skipped).
+// The user already trusts the folder by opening it in their editor, so we opt
+// in on their behalf; hmm-code's own AGENTS.md injection and permission rules
+// are read directly and are unaffected either way.
+//
 // If the bundle is missing the .vsix is broken — we surface a loud warning
 // and fall back to `pi` on PATH so the user at least gets *some* response
 // rather than a silent failure. That fallback path is unsupported.
@@ -36,7 +45,7 @@ export function getPiLaunchConfig(ctx: vscode.ExtensionContext): PiLaunchConfig 
 	if (existsSync(bundledCli) && existsSync(bundledHmmCodePi)) {
 		return {
 			cmd: process.execPath,
-			args: [bundledCli, "--no-extensions", "-e", bundledHmmCodePi],
+			args: [bundledCli, "--no-extensions", "--approve", "-e", bundledHmmCodePi],
 			env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", HMM_CODE_LANG: lang },
 			source: "bundled",
 		};
