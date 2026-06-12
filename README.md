@@ -29,7 +29,21 @@ plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection 
 
 ## Install
 
-### From a release (recommended)
+### From the VS Code Marketplace (recommended)
+
+Open the Extensions view (`Cmd/Ctrl+Shift+X`), search **Hmm-code**, and click **Install** — or paste this into Quick Open (`Cmd/Ctrl+P`):
+
+```
+ext install lbm1202.hmm-code
+```
+
+Listing: <https://marketplace.visualstudio.com/items?itemName=lbm1202.hmm-code>
+
+Then click the Hmm-code icon in the Activity Bar (or run "Hmm-code: Open Chat in Sidebar" from the Command Palette).
+
+### From a release `.vsix`
+
+For **code-server, VSCodium, Cursor**, or any editor that pulls extensions from Open VSX — where Hmm-code is **not** published — install the bundled `.vsix` directly:
 
 ```bash
 # Grab the latest .vsix from GitHub Releases
@@ -37,13 +51,13 @@ curl -L -o hmm-code.vsix \
   "$(curl -s https://api.github.com/repos/lbm1202/hmm-code-vscode/releases/latest \
      | grep browser_download_url | cut -d'"' -f4)"
 
-# Install
+# VS Code desktop
 code --install-extension hmm-code.vsix
+# …or code-server
+# code-server --install-extension hmm-code.vsix --force
 ```
 
-Or browse <https://github.com/lbm1202/hmm-code-vscode/releases> and use VS Code's Extensions panel → `…` menu → **Install from VSIX…**
-
-Then click the Hmm-code icon in the Activity Bar (or run "Hmm-code: Open Chat in Sidebar" from the Command Palette).
+Or browse <https://github.com/lbm1202/hmm-code-vscode/releases> and use the Extensions panel → `…` menu → **Install from VSIX…**
 
 ### Build from source
 Clone both repos side by side (the build expects `hmm-code-pi` as a sibling of `hmm-code-vscode`):

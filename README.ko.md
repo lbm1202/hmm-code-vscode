@@ -29,7 +29,21 @@ plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 
 
 ## 설치
 
-### 릴리즈에서 설치 (권장)
+### VS Code 마켓플레이스에서 설치 (권장)
+
+확장 뷰(`Cmd/Ctrl+Shift+X`)를 열고 **Hmm-code** 를 검색해 **설치**를 누르거나, Quick Open(`Cmd/Ctrl+P`)에 다음을 붙여넣으세요:
+
+```
+ext install lbm1202.hmm-code
+```
+
+마켓플레이스: <https://marketplace.visualstudio.com/items?itemName=lbm1202.hmm-code>
+
+설치 후 Activity Bar의 Hmm-code 아이콘을 클릭하거나, 명령 팔레트에서 "Hmm-code: Open Chat in Sidebar" 를 실행합니다.
+
+### 릴리즈 `.vsix`에서 설치
+
+**code-server, VSCodium, Cursor** 등 Open VSX에서 확장을 받는 에디터(Hmm-code가 게시되어 있지 **않음**)에서는 번들 `.vsix`를 직접 설치하세요:
 
 ```bash
 # GitHub Releases에서 최신 .vsix 받기
@@ -37,13 +51,13 @@ curl -L -o hmm-code.vsix \
   "$(curl -s https://api.github.com/repos/lbm1202/hmm-code-vscode/releases/latest \
      | grep browser_download_url | cut -d'"' -f4)"
 
-# 설치
+# VS Code 데스크톱
 code --install-extension hmm-code.vsix
+# …또는 code-server
+# code-server --install-extension hmm-code.vsix --force
 ```
 
-또는 <https://github.com/lbm1202/hmm-code-vscode/releases> 에서 받아 VS Code 확장 패널 → `…` 메뉴 → **Install from VSIX…** 로 설치하세요.
-
-설치 후 Activity Bar의 Hmm-code 아이콘을 클릭하거나, 명령 팔레트에서 "Hmm-code: Open Chat in Sidebar" 를 실행합니다.
+또는 <https://github.com/lbm1202/hmm-code-vscode/releases> 에서 받아 확장 패널 → `…` 메뉴 → **Install from VSIX…** 로 설치하세요.
 
 ### 소스에서 빌드
 두 저장소를 나란히 클론합니다 (빌드는 `hmm-code-pi`가 `hmm-code-vscode`의 형제 디렉터리에 있다고 가정):
