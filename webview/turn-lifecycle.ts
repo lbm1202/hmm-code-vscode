@@ -166,6 +166,9 @@ function renderTextNow(b: BubbleState): void {
 	const isBlank = b.text.trim().length === 0;
 	b.textEl.classList.toggle("hidden", isBlank);
 	if (!isBlank) b.textEl.innerHTML = md(b.text);
+	// Scroll AFTER the DOM grows (this runs in a rAF, a frame after streamText's
+	// own scroll) so autoscroll tracks the rendered height, not the pre-render one.
+	scrollToBottomIfPinned();
 }
 
 function scheduleThinkingRender(b: BubbleState): void {
@@ -178,4 +181,7 @@ function scheduleThinkingRender(b: BubbleState): void {
 
 function renderThinkingNow(b: BubbleState): void {
 	if (b.thinkingEl) b.thinkingEl.innerHTML = md(b.thinking);
+	// streamThinking never scrolls (unlike streamText), so thinking growth left the
+	// view behind. Track it here, after the thinking block grows.
+	scrollToBottomIfPinned();
 }

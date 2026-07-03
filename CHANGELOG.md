@@ -7,6 +7,26 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-07-03
+
+Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.8.
+
+### ✨ Highlights
+- **The `edit` tool now auto-corrects shifted indentation.** Weak / local models often get the code right but author an edit's `oldText` at the wrong indent depth (e.g. 8 spaces when the file uses 4). The exact-match edit then failed and the model fell back to opaque shell writes. Edits now reconcile a whole-block indentation shift against the file and apply at the file's real indent — language-agnostic (spaces or tabs; Python, JS, Java, Go, …).
+- **Readable hint when an edit can't be matched.** The result now shows the file's actual bytes near the closest line with whitespace made visible (`·` space, `→` tab), so the model self-corrects instead of shelling out.
+- **Fixed chat scroll freezing** during streamed responses.
+
+### Added
+- **Structural-whitespace-tolerant `edit` reconciliation.** An indentation-shifted `oldText` is located by dedent-anchored matching (relative structure is preserved and verified), and on a unique match it's rewritten to the file's exact bytes with `newText` re-indented to the file's level. Conservative by design: it bails on ambiguous matches or tab/space mismatches rather than risk editing the wrong place.
+- **Visible-whitespace edit failure hint** showing the closest file region with `·`/`→` and any duplicate candidate locations.
+
+### Changed
+- **Removed the `Session ID` line from the system prompt** — it was informational only and nothing read it back.
+
+### Fixed
+- **Chat scroll froze mid-response.** Auto-scroll now tracks the rendered height after the debounced markdown render (both text and thinking blocks) instead of scrolling before the DOM grew.
+- **Korean (IME) input on iPad / code-server:** pressing Shift+Enter while a Hangul syllable was still composing duplicated the syllable and swallowed the line break (e.g. `안녀` + Shift+Enter → `안녀녀`). The newline is now left to the browser's native handling, which composes correctly, with a fallback for webviews that eat the keystroke.
+
 ## [0.1.9] — 2026-06-12
 
 Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.7.

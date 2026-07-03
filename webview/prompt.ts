@@ -21,12 +21,54 @@ import { ensureTurn } from "./turn-lifecycle";
 
 const DEFAULT_PLACEHOLDER = t("chat.promptPlaceholder");
 
+// Tracks IME composition. On desktop (where composition events fire) it keeps an
+// Enter that merely commits a syllable from being treated as "send". iOS Safari
+// does NOT fire composition events for Hangul (it drives composition via
+// delete-and-retype input events), so this stays false there — the Shift+Enter
+// handler relies on native newline insertion, not any composition signal.
+let imeComposing = false;
+
+// Set on a Shift+Enter keydown; the newline is left to the native textarea (which
+// is IME-correct on iOS). If the next input event fires, native handled it — clear
+// the flag and do NOT splice (avoids a doubled newline). If no input fires (some
+// SSH-remote VS Code webviews eat the keystroke), a short timer splices one in.
+let shiftEnterPending = false;
+
 /** Grow the textarea to fit its content (one line → up to the CSS max-height,
  *  then it scrolls). Reset to "auto" first so it can also shrink. */
 export function autosizePrompt(): void {
 	const ta = els().prompt;
 	ta.style.height = "auto";
 	ta.style.height = `${ta.scrollHeight}px`;
+}
+
+/** Scroll a clamped textarea so the caret's line is visible (native caret-scroll
+ *  is lost when we preventDefault / splice manually). */
+function revealCaretLine(ta: HTMLTextAreaElement): void {
+	if (ta.selectionEnd === ta.value.length) {
+		ta.scrollTop = ta.scrollHeight;
+	} else {
+		const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 18;
+		const caretRow = ta.value.slice(0, ta.selectionEnd).split("\n").length - 1;
+		const caretTop = caretRow * lineH;
+		if (caretTop < ta.scrollTop) ta.scrollTop = caretTop;
+		else if (caretTop + lineH > ta.scrollTop + ta.clientHeight)
+			ta.scrollTop = caretTop + lineH - ta.clientHeight;
+	}
+}
+
+/** Manually splice a newline at the caret. Used ONLY as a fallback for webviews
+ *  that eat the native Shift+Enter keystroke (SSH-remote VS Code). On iOS Safari
+ *  the native path handles the newline IME-correctly, so we never splice there —
+ *  splicing mid-Hangul (which iOS drives via delete-and-retype input events, with
+ *  NO composition events) reflows the syllable and duplicates it ("안녀녀"). */
+function insertNewlineAtCaret(ta: HTMLTextAreaElement): void {
+	const start = ta.selectionStart ?? ta.value.length;
+	const end = ta.selectionEnd ?? ta.value.length;
+	ta.value = ta.value.slice(0, start) + "\n" + ta.value.slice(end);
+	ta.selectionStart = ta.selectionEnd = start + 1;
+	ta.dispatchEvent(new Event("input", { bubbles: true }));
+	revealCaretLine(ta);
 }
 
 export function doSend(): void {
@@ -107,48 +149,51 @@ export function wirePrompt(): void {
 		if (runtime.turnInFlight) post({ kind: FROM_WEBVIEW.ABORT });
 		else doSend();
 	});
+	// Track IME composition (desktop only — iOS Safari doesn't fire these for Hangul).
+	e.prompt.addEventListener("compositionstart", () => {
+		imeComposing = true;
+	});
+	e.prompt.addEventListener("compositionend", () => {
+		imeComposing = false;
+	});
+	e.prompt.addEventListener("input", () => {
+		// A native newline (or any input) landed after our Shift+Enter — native
+		// handled it, so cancel the manual fallback to avoid a doubled newline.
+		if (shiftEnterPending) {
+			shiftEnterPending = false;
+			revealCaretLine(e.prompt);
+		}
+	});
 	e.prompt.addEventListener("keydown", (ev) => {
-		// IME composing: never intercept — let the input method finish first.
-		if ((ev as any).isComposing || ev.keyCode === 229) return;
+		const composing = imeComposing || (ev as any).isComposing || ev.keyCode === 229;
 		if (ev.key === "Enter" && !ev.shiftKey) {
+			// Enter: during IME composition (desktop, where composition events fire)
+			// let the IME commit — don't send. On iOS there are no composition
+			// signals, but the current syllable is already complete in the value, so
+			// sending it is correct.
+			if (composing) return;
 			ev.preventDefault();
 			doSend();
 			return;
 		}
-		// Shift+Enter — insert newline EXPLICITLY. Relying on the textarea's
-		// default newline behavior turned out to be unreliable in SSH-remote
-		// VS Code webviews (some intermediate layer eats the keystroke before
-		// the textarea sees it). Doing the splice ourselves guarantees it
-		// works in every environment.
 		if (ev.key === "Enter" && ev.shiftKey) {
-			ev.preventDefault();
+			// Shift+Enter = newline. Let the textarea insert it NATIVELY — the browser
+			// handles its own IME correctly, which is essential on iOS Safari: its
+			// Hangul input uses delete-and-retype input events (no composition
+			// events), and splicing the newline ourselves reflows the syllable and
+			// duplicates it ("안녀" + Shift+Enter → "안녀녀"). The native insert fires an
+			// input event, which cancels shiftEnterPending (see the input listener) so
+			// we don't double it. Fallback: some SSH-remote VS Code webviews EAT the
+			// keystroke → no input event fires → the timer below splices one in.
 			const ta = e.prompt;
-			const start = ta.selectionStart ?? ta.value.length;
-			const end = ta.selectionEnd ?? ta.value.length;
-			const before = ta.value.slice(0, start);
-			const after = ta.value.slice(end);
-			ta.value = before + "\n" + after;
-			ta.selectionStart = ta.selectionEnd = start + 1;
-			// Fire an input event so any consumer (e.g. autosize / dirty
-			// tracking) reacts the same as a real keystroke would. Autosize runs
-			// synchronously here, so the height/scrollHeight below are current.
-			ta.dispatchEvent(new Event("input", { bubbles: true }));
-			// preventDefault above also suppressed the browser's native
-			// caret-into-view scroll, so once the box hits its max-height and
-			// scrolls, the new line stayed hidden until the next real keystroke.
-			// Reveal it: scroll to the bottom when the caret is at the end (the
-			// usual case), otherwise nudge the caret's line into view.
-			if (ta.selectionEnd === ta.value.length) {
-				ta.scrollTop = ta.scrollHeight;
-			} else {
-				const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 18;
-				const caretRow = ta.value.slice(0, ta.selectionEnd).split("\n").length - 1;
-				const caretTop = caretRow * lineH;
-				if (caretTop < ta.scrollTop) ta.scrollTop = caretTop;
-				else if (caretTop + lineH > ta.scrollTop + ta.clientHeight)
-					ta.scrollTop = caretTop + lineH - ta.clientHeight;
-			}
-			return;
+			const before = ta.value;
+			shiftEnterPending = true;
+			setTimeout(() => {
+				if (!shiftEnterPending) return; // native handled it (input fired)
+				shiftEnterPending = false;
+				if (ta.value === before && !imeComposing) insertNewlineAtCaret(ta);
+			}, 40);
+			return; // NO preventDefault → keep the native newline
 		}
 		if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
 			const dir = ev.shiftKey ? -1 : 1;
