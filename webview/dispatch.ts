@@ -133,10 +133,11 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	},
 	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages, msg.stats),
 	[TO_WEBVIEW.COMMANDS]: (msg) => {
-		// stats-record is the webview's own machine-dispatched bridge (stats →
-		// session entry) — hide it from the user-facing autocomplete.
+		// stats-record / auth-refresh are machine-dispatched bridges (stats →
+		// session entry, OAuth token refresh) — hide them from the user-facing
+		// autocomplete.
 		runtime.slashCommands = (msg.commands ?? []).filter(
-			(c: { name: string }) => c.name !== "stats-record",
+			(c: { name: string }) => c.name !== "stats-record" && c.name !== "auth-refresh",
 		);
 	},
 	[TO_WEBVIEW.USAGE]: (msg) => showTokenModal(msg.perModel ?? {}, msg.sessionCount ?? 1, msg.context),

@@ -7,6 +7,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Fixed
+- **Usage checks no longer fail with "HTTP 401 (token expired)".** When the stored OAuth access token has expired, the usage lookup now asks the running Pi to refresh it first (an AuthStorage key-resolve — no LLM turn, no chat pollution; Pi stays the single writer of auth.json), then fetches. Applies to the topbar usage modal and both settings-panel usage buttons, for Claude and Codex.
+
 ### Changed
 - **Model pickers in the settings panel are a single dropdown now.** The Modes tab (and the auto-title / compaction model overrides) drop the separate provider select — every model is listed in one dropdown grouped by provider, and picking a model sets its provider implicitly. Previously the model list stayed empty until a provider was chosen.
 

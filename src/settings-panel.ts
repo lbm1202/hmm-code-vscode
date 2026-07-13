@@ -20,6 +20,7 @@ import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { fetchAnthropicUsage } from "./anthropic-usage";
 import { codexOAuthLogin } from "./oauth-codex";
 import { fetchCodexUsage } from "./codex-usage";
+import { ensureFreshOAuth } from "./auth-refresh";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
@@ -377,6 +378,9 @@ export class SettingsPanel {
 			}
 			case "anthropic-usage": {
 				try {
+					// Expired token → have a running Pi refresh it first (no LLM turn)
+					// instead of surfacing the 401 "run a chat turn or re-login" hint.
+					await ensureFreshOAuth("anthropic", (s) => ChatBackend.promptFirst(s));
 					const usage = await fetchAnthropicUsage();
 					panel.webview.postMessage({ kind: "anthropic-usage-result", usage });
 				} catch (err) {
@@ -402,6 +406,7 @@ export class SettingsPanel {
 			}
 			case "codex-usage": {
 				try {
+					await ensureFreshOAuth("openai-codex", (s) => ChatBackend.promptFirst(s));
 					const usage = await fetchCodexUsage();
 					panel.webview.postMessage({ kind: "codex-usage-result", usage });
 				} catch (err) {

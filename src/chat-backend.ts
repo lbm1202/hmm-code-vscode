@@ -27,6 +27,7 @@ import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { applyAllowlist, findAlias } from "./model-utils";
 import { collectSubscriptionUsage, type SubUsageEntry } from "./sub-usage";
+import { ensureFreshOAuth, OAUTH_USAGE_PROVIDERS } from "./auth-refresh";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -258,6 +259,19 @@ export class ChatBackend {
 	 *  triggers `restartAll()` after auth changes so every Pi process picks
 	 *  up the new auth.json — not just the sidebar. */
 	private static _live = new Set<ChatBackend>();
+
+	/** Dispatch a slash command on any one live backend (they share Pi state on
+	 *  disk — auth.json etc., so which instance runs it doesn't matter). Returns
+	 *  false when no chat is running. Used by the settings panel for
+	 *  /auth-refresh before its usage lookups. */
+	static promptFirst(slashCommand: string): boolean {
+		for (const b of ChatBackend._live) {
+			b.prompt(slashCommand);
+			return true;
+		}
+		return false;
+	}
+
 	static restartAll(): void {
 		let any = false;
 		for (const b of ChatBackend._live) {
@@ -655,9 +669,16 @@ export class ChatBackend {
 			}
 			case FROM_WEBVIEW.REQUEST_SUB_USAGE:
 				// Topbar usage button: plan usage for every connected subscription.
-				// collectSubscriptionUsage never rejects (per-provider catch). The
-				// echoed token lets the modal drop replies that arrive after it
-				// closed or reopened.
+				// Expired OAuth tokens would 401 the usage endpoints — have Pi
+				// refresh them first (no LLM turn). collectSubscriptionUsage never
+				// rejects (per-provider catch). The echoed token lets the modal
+				// drop replies that arrive after it closed or reopened.
+				for (const p of OAUTH_USAGE_PROVIDERS) {
+					await ensureFreshOAuth(p, (s) => {
+						this.prompt(s);
+						return true;
+					});
+				}
 				this.post({ kind: TO_WEBVIEW.SUB_USAGE, token: raw.token, entries: await collectSubscriptionUsage() });
 				return;
 			case FROM_WEBVIEW.LIST_SESSIONS:
