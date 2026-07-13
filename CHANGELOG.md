@@ -9,12 +9,12 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ### Added
 - **Topbar subscription-usage button.** Sits between the session and settings buttons; opens a modal showing plan usage for every connected subscription — Claude Pro/Max (session 5h / weekly / extra-usage credits) and ChatGPT Codex (5h / weekly, plan name) — as the same gauge bars the token modal uses, with reset times. Fetched fresh on every open; read-only.
-- **Mode chip hover tooltip.** Hovering the composer's mode button shows the live `mode · model · thinking` triple, so the active model is visible without opening the popover.
+- **Mode chip hover card.** Hovering the composer's mode button shows a styled card — mode name in the mode color, plus live Model and Effort rows — so the active model is visible without opening the popover. (A custom card, not the native tooltip: the OS one has a long delay and skips after clicks, which made it look broken.)
 - **OpenAI Codex subscription login restored.** The settings Auth tab regains the ChatGPT Plus/Pro row (browser OAuth login, cancel, per-plan usage check) that 0.1.11 removed. Credentials land in `auth.json[openai-codex]` in the shape Pi's AuthStorage refreshes natively.
 - **`max` thinking level.** The Effort slider, settings-panel thinking dropdowns, and mode configs accept the new top level for models that declare it (adaptive Claude models, GPT-5.6). Shown only when the model's `thinkingLevelMap` explicitly maps it — same gating as `xhigh`.
 
 ### Changed
-- **Topbar icons are monochrome now.** The sessions and usage buttons swap their color-emoji glyphs (🕘 📊) for plain text symbols (◷, ▁▄▇ mini-bars; the gear gets an explicit text-presentation selector), so all four buttons render in the editor foreground color.
+- **Topbar icons are monochrome now.** The sessions and usage buttons swap their color-emoji glyphs (🕘 📊) for plain text symbols (☰ list, ％ percent; the gear gets an explicit text-presentation selector), so all four buttons render in the editor foreground color.
 - **Bundled Pi runtime updated 0.79.1 → 0.80.6.** Notable upstream changes: Claude Sonnet 5 + GPT-5.6 model catalogs, `max` thinking level, per-message reasoning-token usage reporting, compaction fixes (post-compaction token budgeting, custom-entry ordering during streaming, split-turn summary serialization), `get_entries`/`get_tree` RPC commands, and security updates to vulnerable transitive dependencies (undici, protobufjs).
 - Dependency updates: dompurify 3.4.10 → 3.4.12, shiki 4.2.0 → 4.3.1, marked 18.0.5 → 18.0.6.
 - Build tooling: esbuild 0.24.2 → 0.28.1 (clears the GHSA-67mh-4wv8-2f99 dev-server advisory; identical bundle output, `npm audit` now clean).

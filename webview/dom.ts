@@ -26,8 +26,8 @@ const VERSION_LINE = `v${__info?.version ?? "?"} · ${__info?.publisher ?? "?"}`
 // in the webview — text glyphs sidestep both. U+FE0E forces text presentation
 // on ⚙ (emoji-capable but text-default; the selector pins it).
 const ICON_PLUS = "＋"; // U+FF0B fullwidth plus
-const ICON_HISTORY = "◷"; // U+25F7 circle with upper-right quadrant (clock face)
-const ICON_USAGE = "▁▄▇"; // block elements — mini bar chart
+const ICON_SESSIONS = "☰"; // U+2630 trigram — session list
+const ICON_USAGE = "％"; // U+FF05 fullwidth percent — plan usage
 const ICON_GEAR = "⚙︎"; // U+2699 gear, text presentation
 
 const APP_HTML = `
@@ -35,7 +35,7 @@ const APP_HTML = `
 		<div class="topbar-title">Hmm-code</div>
 		<div class="topbar-actions">
 			<button class="iconbtn" id="btn-new-session" title="${t("chat.newSessionBtn")}">${ICON_PLUS}</button>
-			<button class="iconbtn" id="btn-sessions" title="${t("chat.resumeSessionBtn")}">${ICON_HISTORY}</button>
+			<button class="iconbtn" id="btn-sessions" title="${t("chat.resumeSessionBtn")}">${ICON_SESSIONS}</button>
 			<button class="iconbtn" id="btn-usage" title="${t("chat.usageBtn")}">${ICON_USAGE}</button>
 			<button class="iconbtn" id="btn-settings" title="${t("chat.settingsBtn")}">${ICON_GEAR}</button>
 		</div>

@@ -102,20 +102,80 @@ export function updateModeColor(): void {
 	updateModeChipTitle();
 }
 
-/** Hover tooltip on the mode chip: the mode's live model (+ thinking level).
- *  Also refreshed from dispatch on MODEL/THINKING statuses, so an override
- *  (popover model switch, effort slider) shows without reopening the popover. */
-export function updateModeChipTitle(): void {
-	const parts = [ui.mode];
-	if (ui.model && ui.model !== "?") parts.push(ui.model);
-	if (ui.thinking && ui.thinking !== "?" && ui.thinking !== "off") parts.push(ui.thinking);
-	els().pickerMode.title = parts.join(" · ");
+// ── Mode chip hover tooltip ──────────────────────────────────────────────────
+// Custom card instead of a native `title` attribute: the OS tooltip has a long
+// show delay, skips entirely after a recent click, and can't be styled — which
+// read as "sometimes it just doesn't appear". Content is built from ui.* at
+// hover time (always current) and live-refreshed if a status lands while open.
+
+let modeTipEl: HTMLElement | null = null;
+let modeTipTimer: ReturnType<typeof setTimeout> | undefined;
+
+function buildModeTipContent(tip: HTMLElement): void {
+	tip.innerHTML = "";
+	tip.style.setProperty("--mode-color", MODE_COLORS[ui.mode] ?? "var(--vscode-foreground)");
+	const modeRow = document.createElement("div");
+	modeRow.className = "mode-tip-mode";
+	modeRow.textContent = ui.mode;
+	tip.appendChild(modeRow);
+	const row = (label: string, value: string): void => {
+		const r = document.createElement("div");
+		r.className = "mode-tip-row";
+		const l = document.createElement("span");
+		l.className = "mode-tip-label";
+		l.textContent = label;
+		const v = document.createElement("span");
+		v.className = "mode-tip-value";
+		v.textContent = value;
+		r.append(l, v);
+		tip.appendChild(r);
+	};
+	row(t("chat.tab.model"), ui.model && ui.model !== "?" ? ui.model : "—");
+	if (ui.thinking && ui.thinking !== "?") row(t("chat.picker.effort"), ui.thinking);
 }
 
-/** Wire the mode picker click handler. Call once at boot. */
+function positionModeTip(tip: HTMLElement): void {
+	const rect = els().pickerMode.getBoundingClientRect();
+	const margin = 8;
+	const w = tip.getBoundingClientRect().width;
+	let left = rect.right - w; // right-align to the chip
+	if (left + w > window.innerWidth - margin) left = window.innerWidth - w - margin;
+	if (left < margin) left = margin;
+	tip.style.left = `${left}px`;
+	tip.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+}
+
+function showModeTip(): void {
+	if (currentPopoverAnchor) return; // popover open — its panel already shows all this
+	hideModeTip();
+	const tip = document.createElement("div");
+	tip.className = "mode-tip";
+	buildModeTipContent(tip);
+	els().popoverRoot.appendChild(tip); // reuse the popover layer (z-index)
+	modeTipEl = tip;
+	positionModeTip(tip);
+}
+
+function hideModeTip(): void {
+	clearTimeout(modeTipTimer);
+	modeTipTimer = undefined;
+	modeTipEl?.remove();
+	modeTipEl = null;
+}
+
+/** Live-refresh the open tooltip when a MODE/MODEL/THINKING status lands
+ *  (called from dispatch + updateModeColor). No-op while not hovering. */
+export function updateModeChipTitle(): void {
+	if (!modeTipEl) return;
+	buildModeTipContent(modeTipEl);
+	positionModeTip(modeTipEl);
+}
+
+/** Wire the mode picker click + hover-tooltip handlers. Call once at boot. */
 export function wirePickers(): void {
 	const e = els();
 	e.pickerMode.addEventListener("click", () => {
+		hideModeTip(); // the popover supersedes the hover card
 		// Pull the model list eagerly so the Model tab is populated when opened.
 		if (ui.availableModels.length === 0) post({ kind: FROM_WEBVIEW.REQUEST_MODELS });
 		const panel = buildPanel();
@@ -127,6 +187,12 @@ export function wirePickers(): void {
 			activePanelRerender = null;
 		}
 	});
+	// Small enter-delay so brushing past the chip doesn't flash the card.
+	e.pickerMode.addEventListener("mouseenter", () => {
+		clearTimeout(modeTipTimer);
+		modeTipTimer = setTimeout(showModeTip, 150);
+	});
+	e.pickerMode.addEventListener("mouseleave", hideModeTip);
 }
 
 // ── Tabbed Mode/Model panel ──────────────────────────────────────────────────

@@ -59,9 +59,6 @@ html, body {
 	justify-content: center;
 	font-size: 14px;
 }
-/* Three block-element bars form the usage "chart" — smaller type + tracking
- * so the triple fits the 26px button. */
-#btn-usage { font-size: 10px; letter-spacing: 1px; }
 
 .iconbtn:hover {
 	background: var(--vscode-toolbar-hoverBackground);
@@ -1299,6 +1296,42 @@ body.mod-down .bash-cmd-link:hover {
 	max-height: 60vh;
 	overflow-y: auto;
 	min-width: 240px;
+}
+
+/* Mode-chip hover tooltip (custom card — the native title attribute has an
+ * OS-controlled delay and silently skips after clicks, so it felt broken). */
+.mode-tip {
+	position: fixed;
+	z-index: 120;
+	pointer-events: none;
+	background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+	padding: 7px 10px 8px;
+	font-size: 11.5px;
+	min-width: 150px;
+	max-width: 280px;
+}
+.mode-tip-mode {
+	font-weight: 600;
+	color: var(--mode-color, var(--vscode-foreground));
+	margin-bottom: 3px;
+}
+.mode-tip-row {
+	display: flex;
+	gap: 8px;
+	margin-top: 2px;
+	align-items: baseline;
+}
+.mode-tip-label {
+	color: var(--vscode-descriptionForeground);
+	min-width: 44px;
+	flex-shrink: 0;
+}
+.mode-tip-value {
+	font-family: var(--vscode-editor-font-family);
+	word-break: break-all;
 }
 
 .popover-item {
