@@ -7,6 +7,38 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.11] — 2026-07-13
+
+Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.9.
+
+### ✨ Highlights
+- **Review mode closes the loop: plan → code → review.** Implementation sessions can now hand their work to a dedicated review mode that verifies the result against the plan — reading the changed files, checking the plan's pinned contracts, and actually running the plan's validation commands — then reports PASS or a findings list. A failed review can launch a fix round with one call, re-entering the loop.
+- **Mid-turn steering.** Type while the model is working: your message is queued and delivered at the next tool boundary, so you can redirect the agent without aborting.
+- **Reasoning & response insights.** The thinking header animates while the model reasons and settles to "Thought for N.Ns"; every response ends with a copy button and a stats toggle (tokens, time-to-first-token, generation speed, total time) that survive reloads.
+
+### Added
+- **Review mode + implementation→review handoff.** The mode picker gains a 5th `review` mode (eye icon, green). When a plan-handoff implementation session completes (`finalize_implementation`), a dialog asks what to do next — hand off to review, continue implementing, or not now. On review, the chat switches back to the parent plan session, enters review mode, and asks it to verify the implementation: read the changed files, check the plan's pinned contracts, run the plan's validation commands, then report PASS or a findings list and stop — the user decides whether to launch a fix round (review can call `finalize_plan` directly, re-entering the code→review loop). Once the review reply lands, the session automatically returns to the mode it was in before the handoff (a manual `/mode review` stays sticky). Sessions without a recorded parent review in place. The `finalize_implementation` tool call renders a summary card (changes / validation results / deviations) like the plan preview.
+- **Mid-turn steering.** The prompt no longer locks while the model is working: type and press Enter to queue a message that Pi delivers at the next tool boundary, letting you redirect the agent without aborting. Queued messages render dimmed (dashed outline) until delivered; the send button still doubles as Stop. Slash commands, the Tab mode-cycle, and the mode popover stay blocked mid-turn (a mode/model change wouldn't apply to the already-running loop while the permission layer would flip immediately).
+- **Animated thinking header + reasoning time.** The reasoning block gets a sparkle icon that pulses while the model reasons, a label that animates ("Thinking." → ".." → "…") and settles to "Thought for N.Ns", and a chevron pinned to the right that rotates on open/close.
+- **Per-message actions: copy + stats.** Each assistant message ends with a right-aligned icon row — a copy-response button (with copied feedback) and a stats toggle that expands to a breakdown: prompt tokens (with cached share), generated tokens, thinking time, time-to-first-token, generation speed (tok/s), and total time. Token counts use abbreviated units (3.1k tokens). Tokens come from Pi's usage report; timings are measured client-side and persisted into the session transcript itself, so the display survives reloads and travels with the session file. Sessions recorded before this feature replay without timings.
+- **Input-wait notifications.** When Pi is waiting on a dialog answer (finalize dialogs, ask_user, confirmations) and the chat is not on screen, a toast ("Hmm-code is waiting for your input" with an Open Chat button) and an activity-bar badge on the Hmm-code icon appear; both clear once you answer or open the chat.
+- **Claude subscription usage check.** The settings Auth tab's Claude Pro/Max row gains a "Check usage" button showing the session (5h) and weekly windows as percent bars with reset times, plus extra-usage credits when enabled.
+- **Plan & report retention setting.** New "Plan & report retention" field in the settings panel (General tab): plan files and implementation reports older than N days are deleted automatically at session start (default 30, 0 = keep forever).
+- **Default mode setting.** New "Default mode" select in the settings panel (General tab): the mode a NEW session starts in (default `code`; writes `modes.json:defaultMode`). Existing sessions still reopen in their last-used mode.
+- **Localized dialogs.** The finalize-plan / finalize-implementation choice dialogs, their input prompts, and the mode-switch confirmation now follow the UI language (Korean when `hmm-code.language` is Korean).
+
+### Changed
+- **Plan-handoff sessions are titled by what they build.** Implementation child sessions used to get near-identical auto-titles (their first message is always the same handoff boilerplate); the auto-titler now feeds the plan's own Summary section to the title model instead, so each child gets a distinct, meaningful name.
+- **Auto-approve on session start moved into the settings panel** (General tab, stored in `modes.json:autoApproveDefault`); the `hmm-code.autoApproveDefault` VS Code setting is gone.
+- The thinking block sits on a slightly lighter background so it reads as its own surface inside the bubble.
+
+### Fixed
+- **Failed interactive tool calls now show the actual error.** A schema-rejected `finalize_plan` / `ask_user` call used to render a bare "?" in its result line; it now shows the validation error text so you can see what the model got wrong (these errors are self-recovered on the model's retry).
+- **Diff view horizontal scroll.** Red/green row backgrounds no longer cut off at the old viewport edge when scrolling long lines sideways, and the file-path header stays pinned while scrolling.
+
+### Removed
+- **OpenAI Codex subscription login** (and its usage check) — removed from the settings Auth tab. API-key auth is unaffected.
+
 ## [0.1.10] — 2026-07-03
 
 Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.8.
