@@ -7,6 +7,15 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.12] — 2026-07-13
+
+Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.10.
+
+### ✨ Highlights
+- **Subscription usage at a glance — and Codex is back.** A new ％ button in the topbar opens a plan-usage modal for every connected subscription: Claude Pro/Max (session 5h / weekly / extra credits) and ChatGPT Codex (5h / weekly, plan name) as gauge bars with reset times. The ChatGPT Plus/Pro (Codex) browser login returns to the settings Auth tab.
+- **Pi runtime 0.80.6.** Brings the Claude Sonnet 5 and GPT-5.6 model catalogs, the new `max` thinking level (exposed on the Effort slider for models that support it), provider fixes, and security updates — up from 0.79.1.
+- **Cleaner chrome.** Monochrome topbar glyphs (＋ ☰ ％ ⚙︎) that follow the editor theme, styled hover cards on every topbar button, and a mode-chip hover card showing the live model + effort without opening the popover.
+
 ### Added
 - **Topbar subscription-usage button.** Sits between the session and settings buttons; opens a modal showing plan usage for every connected subscription — Claude Pro/Max (session 5h / weekly / extra-usage credits) and ChatGPT Codex (5h / weekly, plan name) — as the same gauge bars the token modal uses, with reset times. Fetched fresh on every open; read-only.
 - **Mode chip hover card.** Hovering the composer's mode button shows a styled card — mode name in the mode color, plus live Model and Effort rows — so the active model is visible without opening the popover. (A custom card, not the native tooltip: the OS one has a long delay and skips after clicks, which made it look broken.)
