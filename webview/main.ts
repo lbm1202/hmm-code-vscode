@@ -1,8 +1,9 @@
 // Webview entry. Mount the DOM, wire pickers + prompt + dispatch, and
 // register the topbar buttons. Everything else lives in focused modules.
 
-import { els, initDom, setEmptyVisibility } from "./dom";
+import { attachHoverTip, els, initDom, setEmptyVisibility } from "./dom";
 import { wireDispatch } from "./dispatch";
+import { t } from "./i18n";
 import { updateModeColor, wirePickers } from "./pickers";
 import { wirePrompt } from "./prompt";
 import { FROM_WEBVIEW } from "./protocol";
@@ -25,6 +26,14 @@ updateModeColor();
 
 // ── Topbar buttons ───────────────────────────────────────────────────────────
 const e = els();
+
+// Styled hover tips (native titles removed from the markup). While a turn is
+// in flight the session buttons are `disabled` and receive no mouse events —
+// prompt.ts sets a native title with the block reason for that state.
+attachHoverTip(e.btnNew, () => t("chat.newSessionBtn"));
+attachHoverTip(e.btnSessions, () => t("chat.resumeSessionBtn"));
+attachHoverTip(e.btnUsage, () => t("chat.usageBtn"));
+attachHoverTip(e.btnSettings, () => t("chat.settingsBtn"));
 
 e.btnNew.addEventListener("click", () =>
 	post({ kind: FROM_WEBVIEW.COMMAND, command: { type: "new_session" } }),

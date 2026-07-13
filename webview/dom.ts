@@ -34,10 +34,10 @@ const APP_HTML = `
 	<div class="topbar">
 		<div class="topbar-title">Hmm-code</div>
 		<div class="topbar-actions">
-			<button class="iconbtn" id="btn-new-session" title="${t("chat.newSessionBtn")}">${ICON_PLUS}</button>
-			<button class="iconbtn" id="btn-sessions" title="${t("chat.resumeSessionBtn")}">${ICON_SESSIONS}</button>
-			<button class="iconbtn" id="btn-usage" title="${t("chat.usageBtn")}">${ICON_USAGE}</button>
-			<button class="iconbtn" id="btn-settings" title="${t("chat.settingsBtn")}">${ICON_GEAR}</button>
+			<button class="iconbtn" id="btn-new-session">${ICON_PLUS}</button>
+			<button class="iconbtn" id="btn-sessions">${ICON_SESSIONS}</button>
+			<button class="iconbtn" id="btn-usage">${ICON_USAGE}</button>
+			<button class="iconbtn" id="btn-settings">${ICON_GEAR}</button>
 		</div>
 	</div>
 	<div class="todo-panel hidden" id="todo-panel"></div>
@@ -132,6 +132,50 @@ function mountDom(root: HTMLElement): DomRefs {
 		btnReset: document.getElementById("btn-reset")!,
 		btnCompact: document.getElementById("btn-compact")!,
 	};
+}
+
+// ── Generic hover tooltip ────────────────────────────────────────────────────
+// Styled replacement for the native title attribute (OS delay + click
+// suppression made titles feel broken). One tip at a time; the text callback
+// runs at show time so labels can reflect live state. Note: a `disabled`
+// button receives no mouse events — for those, set a native title while
+// disabled instead (see prompt.ts:updatePromptDisabled).
+
+let hoverTipEl: HTMLElement | null = null;
+let hoverTipTimer: ReturnType<typeof setTimeout> | undefined;
+
+function hideHoverTip(): void {
+	clearTimeout(hoverTipTimer);
+	hoverTipTimer = undefined;
+	hoverTipEl?.remove();
+	hoverTipEl = null;
+}
+
+/** Attach a styled hover tooltip below `el`. */
+export function attachHoverTip(el: HTMLElement, text: () => string): void {
+	el.addEventListener("mouseenter", () => {
+		clearTimeout(hoverTipTimer);
+		hoverTipTimer = setTimeout(() => {
+			hideHoverTip();
+			const label = text();
+			if (!label) return;
+			const tip = document.createElement("div");
+			tip.className = "hover-tip";
+			tip.textContent = label;
+			els().popoverRoot.appendChild(tip);
+			hoverTipEl = tip;
+			const rect = el.getBoundingClientRect();
+			const margin = 8;
+			const w = tip.getBoundingClientRect().width;
+			let left = rect.left + rect.width / 2 - w / 2;
+			if (left + w > window.innerWidth - margin) left = window.innerWidth - w - margin;
+			if (left < margin) left = margin;
+			tip.style.left = `${left}px`;
+			tip.style.top = `${rect.bottom + 6}px`;
+		}, 150);
+	});
+	el.addEventListener("mouseleave", hideHoverTip);
+	el.addEventListener("click", hideHoverTip);
 }
 
 let _els: DomRefs;

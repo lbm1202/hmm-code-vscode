@@ -130,7 +130,11 @@ function buildModeTipContent(tip: HTMLElement): void {
 		r.append(l, v);
 		tip.appendChild(r);
 	};
-	row(t("chat.tab.model"), ui.model && ui.model !== "?" ? ui.model : "—");
+	// Pi's model label is an alias when one exists, else "provider/id" — show
+	// just the id part; the provider is noise here (visible in the popover).
+	const raw = ui.model && ui.model !== "?" ? ui.model : "—";
+	const slash = raw.indexOf("/");
+	row(t("chat.tab.model"), slash > 0 ? raw.slice(slash + 1) : raw);
 	if (ui.thinking && ui.thinking !== "?") row(t("chat.picker.effort"), ui.thinking);
 }
 

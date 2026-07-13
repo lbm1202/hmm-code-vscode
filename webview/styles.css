@@ -1298,6 +1298,20 @@ body.mod-down .bash-cmd-link:hover {
 	min-width: 240px;
 }
 
+/* Generic styled hover tooltip (topbar buttons — replaces native titles). */
+.hover-tip {
+	position: fixed;
+	z-index: 120;
+	pointer-events: none;
+	background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+	padding: 4px 9px;
+	font-size: 11.5px;
+	white-space: nowrap;
+}
+
 /* Mode-chip hover tooltip (custom card — the native title attribute has an
  * OS-controlled delay and silently skips after clicks, so it felt broken). */
 .mode-tip {

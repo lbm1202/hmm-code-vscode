@@ -158,9 +158,12 @@ export function updatePromptDisabled(): void {
 	(e.btnSessions as HTMLButtonElement).disabled = blockSession;
 	e.btnNew.classList.toggle("disabled", blockSession);
 	e.btnSessions.classList.toggle("disabled", blockSession);
+	// Native title ONLY while blocked: a disabled button gets no mouse events,
+	// so the styled hover tip (main.ts) can't fire there — the OS tooltip can.
+	// Cleared when enabled so it doesn't double up with the styled tip.
 	const reason = blockSession ? t("chat.blockSwitchReason") : "";
-	e.btnNew.title = blockSession ? reason : t("chat.newSessionBtn");
-	e.btnSessions.title = blockSession ? reason : t("chat.resumeSessionBtn");
+	e.btnNew.title = reason;
+	e.btnSessions.title = reason;
 }
 
 /** Wire send button + prompt key handlers. Call once at boot. */
