@@ -5,7 +5,7 @@ import { buildPlanExecutionBody, buildReviewBody } from "./helpers";
 import { clearConversation, renderHistory, renderRecentList } from "./history";
 import { showModal } from "./modals";
 import { t } from "./i18n";
-import { refreshPopover, updateModeColor } from "./pickers";
+import { refreshPopover, updateModeChipTitle, updateModeColor } from "./pickers";
 import {
 	ASSISTANT_DELTA,
 	FROM_WEBVIEW,
@@ -418,6 +418,7 @@ function handleSetStatus(key: string, value: string): void {
 		const next = value || "?";
 		const changed = next !== ui.model;
 		ui.model = next;
+		updateModeChipTitle(); // hover tooltip shows the live model
 		refreshPopover(); // keep an open Model tab's selection in sync
 		// When the model changes (e.g. modes ext's state.apply runs setModel
 		// after initial get_state), re-pull state so availableThinking gets
@@ -425,6 +426,7 @@ function handleSetStatus(key: string, value: string): void {
 		if (changed) post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 	} else if (key === STATUS_KEYS.THINKING) {
 		ui.thinking = value || "?";
+		updateModeChipTitle();
 		refreshPopover(); // keep an open Effort slider in sync
 	} else if (key === STATUS_KEYS.OVERRIDDEN) {
 		runtime.isOverridden = value === "1";

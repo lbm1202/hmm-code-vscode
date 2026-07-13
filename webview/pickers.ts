@@ -99,6 +99,17 @@ export function updateModeColor(): void {
 	// already called from every mode-change site (status dispatch, Tab cycle,
 	// popover selection, boot), so the icon updates without extra wiring.
 	e.pickerModeIcon.innerHTML = MODE_ICON[ui.mode] ?? "";
+	updateModeChipTitle();
+}
+
+/** Hover tooltip on the mode chip: the mode's live model (+ thinking level).
+ *  Also refreshed from dispatch on MODEL/THINKING statuses, so an override
+ *  (popover model switch, effort slider) shows without reopening the popover. */
+export function updateModeChipTitle(): void {
+	const parts = [ui.mode];
+	if (ui.model && ui.model !== "?") parts.push(ui.model);
+	if (ui.thinking && ui.thinking !== "?" && ui.thinking !== "off") parts.push(ui.thinking);
+	els().pickerMode.title = parts.join(" · ");
 }
 
 /** Wire the mode picker click handler. Call once at boot. */

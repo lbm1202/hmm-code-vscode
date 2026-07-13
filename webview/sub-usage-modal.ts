@@ -1,4 +1,4 @@
-// Subscription plan-usage modal, opened by the topbar 📊 button. Asks the host
+// Subscription plan-usage modal, opened by the topbar usage button. Asks the host
 // for every connected subscription's usage (Claude Pro/Max, ChatGPT Codex) and
 // renders each as ctx-gauge bars — the same visual language as the token modal.
 // The request is async: the modal opens with a "checking…" body and
