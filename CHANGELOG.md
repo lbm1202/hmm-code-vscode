@@ -7,6 +7,11 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Fixed
+- **Onboarding presets actually apply on a genuinely fresh install.** Two 0.1.13 bugs made the per-mode model preset silently skip: `modes.json` doesn't exist yet on first run (the preset now creates it — mode entries merge over built-in defaults), and the catalog check ran against the pre-login model list, which is empty because Pi only lists models for authenticated providers (the flow now restarts Pi after the login and validates against the fresh post-login catalog).
+- **Onboarding card shows on the very first boot.** Pi's first-run TUI config writes fired a "wrote keybindings + settings" notice that landed as the first chat message, hiding the empty state (and the card) until the next visit. Those writes are TUI-only and are now skipped in the VS Code client.
+- **Onboarding also shows when auth disappears later.** The card no longer requires an empty session history — it appears whenever no auth source is detected (and it hasn't been dismissed), so a removed credential gets the login CTAs instead of a bare empty state.
+
 ## [0.1.13] — 2026-07-13
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.11.

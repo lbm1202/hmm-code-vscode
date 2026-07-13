@@ -65,27 +65,33 @@ export interface PresetApplied {
 	groups: { modes: string[]; model: string }[];
 }
 
+const MODE_NAMES = ["plan", "code", "review", "debug", "ask"] as const;
+
 /** After a successful login for `provider`, fill the preset model into every
  *  mode whose model is EMPTY — configured modes are never overwritten, and a
- *  preset id is only written when the live catalog actually has it. Returns
- *  what was applied (for the onboarding card), or null when nothing changed. */
+ *  preset id is only written when the live catalog actually has it (pass the
+ *  POST-login list: Pi only returns models for authenticated providers).
+ *  A truly fresh install has no modes.json at all (Pi ships only
+ *  modes.example.json) — start one from scratch; loadModes merges each mode
+ *  over its built-in defaults, so model-only entries are complete configs.
+ *  Returns what was applied (for the onboarding card), or null. */
 export function applyModePresets(
 	provider: string,
 	availableModels: { provider: string; id: string }[],
 ): PresetApplied | null {
 	const preset = MODE_PRESETS[provider];
 	if (!preset) return null;
-	const modesFile = readJsonSafe(MODES_PATH);
-	const modes = modesFile?.modes;
-	if (!modes || typeof modes !== "object") return null; // Pi hasn't written its example config yet
+	const modesFile = readJsonSafe(MODES_PATH) ?? {};
+	if (!modesFile.modes || typeof modesFile.modes !== "object") modesFile.modes = {};
+	const modes = modesFile.modes;
 
 	const inCatalog = (id: string): boolean =>
 		availableModels.some((m) => m.provider === provider && m.id === id);
 
 	const byModel = new Map<string, string[]>();
-	for (const [name, cfg] of Object.entries<any>(modes)) {
-		if (!cfg || typeof cfg !== "object") continue;
-		if (cfg.model) continue; // already configured — leave alone
+	for (const name of MODE_NAMES) {
+		const cfg = (modes[name] ??= {});
+		if (!cfg || typeof cfg !== "object" || cfg.model) continue; // configured — leave alone
 		const id = name === "plan" || name === "review" ? preset.planReview : preset.rest;
 		if (!inCatalog(id)) continue;
 		cfg.model = { provider, id };

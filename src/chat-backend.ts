@@ -523,21 +523,36 @@ export class ChatBackend {
 
 	private obLoginAbort: AbortController | undefined;
 
-	/** Show the onboarding card only for a genuinely fresh install: never
-	 *  dismissed, no auth source visible anywhere (conservative — see
-	 *  noAuthDetected), and no sessions on disk (prior sessions mean the user
-	 *  already knows the ropes). */
+	/** Show the onboarding card whenever there is no auth to chat with: never
+	 *  dismissed + no auth source visible anywhere (conservative — see
+	 *  noAuthDetected). Applies to fresh installs AND a veteran whose auth was
+	 *  removed — the login CTAs are the fastest way back either way. */
 	private postOnboardingState(): void {
 		if (this.opts.memento?.get("hmm-code.onboardingDismissed") === true) return;
 		if (!noAuthDetected()) return;
-		if (listSessions(this.workspaceCwd()).length > 0) return;
 		this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "unauthed" });
 	}
 
+	/** Wait out the post-restart Pi boot and return the fresh model list —
+	 *  [] on timeout (the preset is then skipped gracefully). */
+	private async fetchModelsAfterRestart(): Promise<{ provider: string; id: string }[]> {
+		const deadline = Date.now() + 15000;
+		while (Date.now() < deadline) {
+			try {
+				const res = await this.client?.send({ type: "get_available_models" });
+				if (res?.success) return ((res.data as { models?: ModelEntry[] })?.models ?? []);
+			} catch {
+				/* pi still booting — retry */
+			}
+			await new Promise((r) => setTimeout(r, 500));
+		}
+		return [];
+	}
+
 	/** Browser OAuth from the onboarding card. Mirrors the settings panel's
-	 *  flow (single-flight, cancellable); on success also fills the per-mode
-	 *  model presets into empty modes, then restarts Pi so the fresh auth.json
-	 *  and modes.json load. */
+	 *  flow (single-flight, cancellable); on success restarts Pi (fresh
+	 *  auth.json), fills the per-mode model presets into empty modes using the
+	 *  post-login catalog, and restarts again if the preset wrote modes.json. */
 	private async runOnboardingLogin(provider: string): Promise<void> {
 		const runner =
 			provider === "anthropic"
@@ -573,9 +588,13 @@ export class ChatBackend {
 				abort.signal,
 			);
 			writeOAuthCredential(provider, creds);
-			const preset = applyModePresets(provider, ChatBackend.cachedModels());
-			// Fresh Pi picks up the new auth.json + modes.json.
+			// Restart FIRST: Pi lists models only for authenticated providers, so
+			// the preset's catalog check needs the post-login list from the fresh
+			// process (the pre-login cache is empty on a first install).
 			this.restart();
+			const models = await this.fetchModelsAfterRestart();
+			const preset = applyModePresets(provider, models);
+			if (preset) this.restart(); // reload the modes.json the preset just wrote
 			this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "ready", provider, preset });
 		} catch (err) {
 			this.post({
