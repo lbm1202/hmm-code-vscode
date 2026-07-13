@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.15] — 2026-07-14
+
+Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.13.
+
+### Fixed
+- **Session auto-titles work again.** Since the Pi 0.80.6 bundle, every session was titled with the raw first user message: pi-ai 0.80 removed the `"off"` reasoning level, so the title generator's `reasoning: "off"` (truthy) skipped the no-thinking branch and pushed adaptive Claude title models into a code path whose request Anthropic rejects — and the failure surfaced as an error-message result rather than an exception, so the fallback was silent. Thinking-off is now expressed by omitting the option (with a small explicit token cap), and title-model failures are logged to stderr instead of being swallowed.
+
 ## [0.1.14] — 2026-07-14
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.12. Onboarding hotfix + polish, from real fresh-install testing of 0.1.13.
