@@ -26,6 +26,7 @@ import {
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
+import { renderSubUsage } from "./sub-usage-modal";
 import { showTokenModal } from "./token-modal";
 import { updateTodoPanel } from "./todo-panel";
 import { addToolCall, updateToolPartial, updateToolResult } from "./tools";
@@ -139,6 +140,7 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		);
 	},
 	[TO_WEBVIEW.USAGE]: (msg) => showTokenModal(msg.perModel ?? {}, msg.sessionCount ?? 1, msg.context),
+	[TO_WEBVIEW.SUB_USAGE]: (msg) => renderSubUsage(msg),
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
 	[TO_WEBVIEW.EXIT]: (msg) => {
 		appendSystem(`Pi exited (code=${msg.code ?? "?"}, signal=${msg.signal ?? "?"})`);

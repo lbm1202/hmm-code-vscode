@@ -26,6 +26,7 @@ const APP_HTML = `
 		<div class="topbar-actions">
 			<button class="iconbtn" id="btn-new-session" title="${t("chat.newSessionBtn")}">＋</button>
 			<button class="iconbtn" id="btn-sessions" title="${t("chat.resumeSessionBtn")}">🕘</button>
+			<button class="iconbtn" id="btn-usage" title="${t("chat.usageBtn")}">📊</button>
 			<button class="iconbtn" id="btn-settings" title="${t("chat.settingsBtn")}">⚙</button>
 		</div>
 	</div>
@@ -85,6 +86,7 @@ export interface DomRefs {
 	ctxValue: HTMLElement;
 	btnNew: HTMLElement;
 	btnSessions: HTMLElement;
+	btnUsage: HTMLElement;
 	btnSettings: HTMLElement;
 	btnReset: HTMLElement;
 	btnCompact: HTMLElement;
@@ -115,6 +117,7 @@ function mountDom(root: HTMLElement): DomRefs {
 		ctxValue: document.getElementById("ctx-value")!,
 		btnNew: document.getElementById("btn-new-session")!,
 		btnSessions: document.getElementById("btn-sessions")!,
+		btnUsage: document.getElementById("btn-usage")!,
 		btnSettings: document.getElementById("btn-settings")!,
 		btnReset: document.getElementById("btn-reset")!,
 		btnCompact: document.getElementById("btn-compact")!,

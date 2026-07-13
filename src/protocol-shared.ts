@@ -35,6 +35,9 @@ export const TO_WEBVIEW = {
 	/** Per-model token usage for the current session subtree (own + children),
 	 *  shown in the ctx-pill modal. */
 	USAGE: "usage",
+	/** Subscription (Claude Pro/Max, ChatGPT Codex) plan-usage snapshot for the
+	 *  topbar usage popover. */
+	SUB_USAGE: "sub-usage",
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
@@ -57,6 +60,9 @@ export const FROM_WEBVIEW = {
 	REQUEST_COMMANDS: "request-commands",
 	/** Ask the host for the current session subtree's per-model token usage. */
 	REQUEST_USAGE: "request-usage",
+	/** Ask the host for subscription plan usage (reads auth.json, hits the
+	 *  provider usage endpoints). Answered with SUB_USAGE. */
+	REQUEST_SUB_USAGE: "request-sub-usage",
 	LIST_SESSIONS: "list-sessions",
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",

@@ -26,6 +26,7 @@ import {
 import type { RpcEvent, RpcExtensionUiRequest, RpcExtensionUiResponse } from "./rpc-types";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { applyAllowlist, findAlias } from "./model-utils";
+import { collectSubscriptionUsage, type SubUsageEntry } from "./sub-usage";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -120,6 +121,7 @@ export type ToWebview =
 			sessionCount: number;
 			context?: { tokens: number; contextWindow: number; percent: number };
 	  }
+	| { kind: typeof TO_WEBVIEW.SUB_USAGE; token?: number; entries: SubUsageEntry[] }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -129,6 +131,7 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.UI_RESPONSE; response: RpcExtensionUiResponse }
 	| { kind: typeof FROM_WEBVIEW.COMMAND; command: { type: string; [k: string]: unknown } }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_STATE }
+	| { kind: typeof FROM_WEBVIEW.REQUEST_SUB_USAGE; token?: number }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MODELS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MESSAGES }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_CONTEXT }
@@ -650,6 +653,13 @@ export class ChatBackend {
 				}
 				return;
 			}
+			case FROM_WEBVIEW.REQUEST_SUB_USAGE:
+				// Topbar usage button: plan usage for every connected subscription.
+				// collectSubscriptionUsage never rejects (per-provider catch). The
+				// echoed token lets the modal drop replies that arrive after it
+				// closed or reopened.
+				this.post({ kind: TO_WEBVIEW.SUB_USAGE, token: raw.token, entries: await collectSubscriptionUsage() });
+				return;
 			case FROM_WEBVIEW.LIST_SESSIONS:
 				await this.refreshSessions();
 				return;

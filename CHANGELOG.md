@@ -8,6 +8,8 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 ## [Unreleased]
 
 ### Added
+- **Topbar subscription-usage button (📊).** Sits between the session and settings buttons; opens a modal showing plan usage for every connected subscription — Claude Pro/Max (session 5h / weekly / extra-usage credits) and ChatGPT Codex (5h / weekly, plan name) — as the same gauge bars the token modal uses, with reset times. Fetched fresh on every open; read-only.
+- **OpenAI Codex subscription login restored.** The settings Auth tab regains the ChatGPT Plus/Pro row (browser OAuth login, cancel, per-plan usage check) that 0.1.11 removed. Credentials land in `auth.json[openai-codex]` in the shape Pi's AuthStorage refreshes natively.
 - **`max` thinking level.** The Effort slider, settings-panel thinking dropdowns, and mode configs accept the new top level for models that declare it (adaptive Claude models, GPT-5.6). Shown only when the model's `thinkingLevelMap` explicitly maps it — same gating as `xhigh`.
 
 ### Changed

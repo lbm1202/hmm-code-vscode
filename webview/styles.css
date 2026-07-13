@@ -1249,6 +1249,16 @@ body.mod-down .bash-cmd-link:hover {
 .ctx-gauge-fill.warn { background: var(--vscode-charts-orange, #e0a030); }
 .ctx-gauge-fill.danger { background: var(--vscode-charts-red, #d64646); }
 
+/* Subscription-usage modal (opened from the topbar 📊 button). */
+.sub-usage-modal { min-width: 300px; }
+.sub-usage-body { margin-top: 4px; }
+.sub-usage-head {
+	font-size: 12px;
+	font-weight: 600;
+	margin: 12px 0 2px;
+}
+.sub-usage-body > .sub-usage-head:first-child { margin-top: 4px; }
+
 .sendbtn {
 	width: 32px;
 	height: 28px;

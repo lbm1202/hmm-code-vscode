@@ -9,6 +9,7 @@ import { FROM_WEBVIEW } from "./protocol";
 import { showSessionPicker } from "./session-picker";
 import { wireSlashMenu } from "./slash";
 import { post, runtime, ui } from "./state";
+import { openSubUsageModal } from "./sub-usage-modal";
 import { wireTodoPanel } from "./todo-panel";
 
 const app = document.getElementById("app");
@@ -35,6 +36,12 @@ e.btnSessions.addEventListener("click", () => {
 	// SESSIONS response re-renders the open picker in place (see dispatch).
 	showSessionPicker(ui.sessions, { loading: true });
 	post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
+});
+
+// Subscription plan usage (Claude Pro/Max, ChatGPT Codex) — opens a modal
+// that asks the host to hit the provider usage endpoints.
+e.btnUsage.addEventListener("click", () => {
+	openSubUsageModal();
 });
 
 // Open the standalone settings panel in a new editor tab. Host listens on
