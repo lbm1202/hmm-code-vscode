@@ -18,6 +18,8 @@ import { dirname, join } from "node:path";
 import { ChatBackend } from "./chat-backend";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { fetchAnthropicUsage } from "./anthropic-usage";
+import { codexOAuthLogin } from "./oauth-codex";
+import { fetchCodexUsage } from "./codex-usage";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
@@ -31,7 +33,7 @@ const SETTINGS_PATH = join(PI_DIR, "settings.json");
 const MODE_NAMES = ["plan", "code", "review", "debug", "ask"] as const;
 // OAuth-only providers — auth.json entries need a browser redirect flow that
 // belongs in the pi-ai/oauth package. Wired inline via the auth-section login
-// buttons (currently Anthropic Claude Pro/Max).
+// buttons (Anthropic Claude Pro/Max + OpenAI Codex).
 const OAUTH_PROVIDERS: { id: string; name: string }[] = [];
 // Common OpenAI-compatible API types Pi understands.
 const API_TYPES = [
@@ -380,6 +382,31 @@ export class SettingsPanel {
 				} catch (err) {
 					panel.webview.postMessage({
 						kind: "anthropic-usage-result",
+						error: (err as Error).message,
+					});
+				}
+				return;
+			}
+			case "codex-login": {
+				await SettingsPanel.runOAuthLogin(panel, {
+					statusKind: "codex-status",
+					providerId: "openai-codex",
+					label: "openai-codex (ChatGPT Plus/Pro)",
+					run: codexOAuthLogin,
+				});
+				return;
+			}
+			case "codex-login-cancel": {
+				SettingsPanel._oauthLoginAbort?.abort?.();
+				return;
+			}
+			case "codex-usage": {
+				try {
+					const usage = await fetchCodexUsage();
+					panel.webview.postMessage({ kind: "codex-usage-result", usage });
+				} catch (err) {
+					panel.webview.postMessage({
+						kind: "codex-usage-result",
 						error: (err as Error).message,
 					});
 				}
@@ -1036,6 +1063,14 @@ export class SettingsPanel {
 					<span id="anthropic-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
 				</div>
 				<div id="anthropic-usage" class="oauth-usage hidden"></div>
+				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+					<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
+					<button id="codex-login-btn">${t("settings.auth.codexLogin")}</button>
+					<button class="ghost hidden" id="codex-cancel-btn">${t("settings.cancel")}</button>
+					<button class="ghost hidden" id="codex-usage-btn">${t("settings.usage.check")}</button>
+					<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
+				</div>
+				<div id="codex-usage" class="oauth-usage hidden"></div>
 			</div>
 		</div>
 

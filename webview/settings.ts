@@ -6,6 +6,7 @@ import {
 } from "./settings-disk";
 import { buildProviderIndex, providerOptionsHtml, modelOptionsHtml, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
 import { renderAnthropicUsage } from "./settings-anthropic";
+import { renderCodexUsage } from "./settings-codex";
 
 
 // Build a {provider: [id, ...]} index from live availableModels (cached from
@@ -860,10 +861,11 @@ function render(s: any) {
 // add an OAuth login). Leaves a button alone while its login flow is mid-air
 // (cancel button visible).
 const OAUTH_BTN_PROVIDERS = [
-	{ statusKind: 'anthropic-status', providerId: 'anthropic' },
+	{ statusKind: 'anthropic-status', providerId: 'anthropic', usageBtnId: 'anthropic-usage-btn', usageOutId: 'anthropic-usage' },
+	{ statusKind: 'codex-status', providerId: 'openai-codex', usageBtnId: 'codex-usage-btn', usageOutId: 'codex-usage' },
 ];
 function updateOAuthButtons() {
-	for (const { statusKind, providerId } of OAUTH_BTN_PROVIDERS) {
+	for (const { statusKind, providerId, usageBtnId, usageOutId } of OAUTH_BTN_PROVIDERS) {
 		const ui = oauthUis[statusKind];
 		if (!ui) continue;
 		// Effective auth = on disk AND not staged for removal, so disconnecting
@@ -872,14 +874,14 @@ function updateOAuthButtons() {
 		const cred = diskAuth()[providerId];
 		const authed = !!(cred && cred.type === 'oauth') && !S.authRemovesDraft.has(providerId);
 		const inFlight = !ui.cancel.classList.contains('hidden');
-		const usageBtn = providerId === 'anthropic' ? el('anthropic-usage-btn') : null;
+		const usageBtn = el(usageBtnId);
 		if (authed) {
 			// Hide the login button entirely (disconnect happens from the auth
 			// table) and show the persistent "✓ Authenticated" badge.
 			ui.btn.classList.add('hidden');
 			ui.status.textContent = t('settings.oauth.authed');
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
-			if (usageBtn) usageBtn.classList.remove('hidden'); // Claude: allow usage check
+			if (usageBtn) usageBtn.classList.remove('hidden'); // authed: allow usage check
 		} else if (!inFlight) {
 			ui.btn.classList.remove('hidden');
 			ui.btn.disabled = false;
@@ -887,7 +889,7 @@ function updateOAuthButtons() {
 			ui.status.textContent = '';
 			ui.status.style.color = '';
 			if (usageBtn) usageBtn.classList.add('hidden');
-			const usageOut = el('anthropic-usage');
+			const usageOut = el(usageOutId);
 			if (usageOut) usageOut.classList.add('hidden');
 		}
 	}
@@ -911,6 +913,7 @@ function wireOAuth(statusKind: any, btnId: any, cancelId: any, statusId: any, lo
 	oauthUis[statusKind] = { btn, cancel, status };
 }
 wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'anthropic-status', 'anthropic-login', 'anthropic-login-cancel');
+wireOAuth('codex-status', 'codex-login-btn', 'codex-cancel-btn', 'codex-status', 'codex-login', 'codex-login-cancel');
 
 // Add auth (API key)
 el('add-auth-btn').addEventListener('click', () => {
@@ -992,7 +995,8 @@ window.addEventListener('message', (ev) => {
 	else if (msg.kind === 'error') showToast(msg.message || 'Error', true);
 	else if (msg.kind === 'saved') showToast(t('settings.toast.saved', { files: (msg.files || []).join(', ') }));
 	else if (msg.kind === 'anthropic-usage-result') renderAnthropicUsage(msg);
-	else if (msg.kind === 'anthropic-status') {
+	else if (msg.kind === 'codex-usage-result') renderCodexUsage(msg);
+	else if (msg.kind === 'anthropic-status' || msg.kind === 'codex-status') {
 		const ui = oauthUis[msg.kind];
 		if (!ui) return;
 		const s = msg.state;
