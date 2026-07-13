@@ -113,11 +113,11 @@ th {
 	padding: 12px 14px;
 	margin-bottom: 8px;
 	display: grid;
-	grid-template-columns: 60px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 130px);
+	grid-template-columns: 60px minmax(0, 2fr) minmax(0, 130px);
 	gap: 10px;
 	align-items: center;
 }
-.autotitle-card { grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr); }
+.autotitle-card { grid-template-columns: 140px minmax(0, 1fr); }
 .mode-card.dirty {
 	border-color: var(--vscode-focusBorder);
 	background: color-mix(in srgb, var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)) 6%, transparent);

@@ -961,8 +961,7 @@ export class SettingsPanel {
 			<div class="desc">${t("settings.autoTitle.desc")}</div>
 			<div class="mode-card autotitle-card" id="autotitle-card">
 				<div class="mode-name" style="color: var(--vscode-foreground);">${t("settings.autoTitle.label")}</div>
-				<select id="autotitle-provider"></select>
-				<select id="autotitle-id"></select>
+				<select id="autotitle-model"></select>
 			</div>
 		</div>
 
@@ -1010,8 +1009,7 @@ export class SettingsPanel {
 			<div class="desc" style="margin-top: 14px;">${t("settings.compactModel.desc")}</div>
 			<div class="mode-card autotitle-card" id="compactmodel-card">
 				<div class="mode-name" style="color: var(--vscode-foreground);">${t("settings.compactModel.label")}</div>
-				<select id="compactmodel-provider"></select>
-				<select id="compactmodel-id"></select>
+				<select id="compactmodel-model"></select>
 			</div>
 		</div>
 

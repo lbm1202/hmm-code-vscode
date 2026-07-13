@@ -9,7 +9,7 @@ export function buildProviderIndex(applyAllowlist = true) {
 	// applyAllowlist=true (default): respect the user's allowlist filter so
 	// the mode/autoTitle dropdowns mirror what the chat picker shows. A mode
 	// that's already configured to a now-hidden model keeps its selection —
-	// modelOptionsHtml re-injects the currentValue if it's missing.
+	// combinedModelOptionsHtml re-injects the current key if it's missing.
 	// applyAllowlist=false: used by the allowlist UI itself, which must list
 	// every model so the user can toggle them.
 	const map = new Map();
@@ -31,36 +31,41 @@ export function buildProviderIndex(applyAllowlist = true) {
 	return map;
 }
 
-export function providerOptionsHtml(currentValue: any, providerIndex: any) {
-	const opts = [...providerIndex.keys()].sort();
-	// Ensure the current draft value is selectable even if Pi doesn't know
-	// about it yet (e.g. user typed a provider name that hasn't been
-	// registered or the get_available_models response hasn't arrived).
-	if (currentValue && !providerIndex.has(currentValue)) opts.unshift(currentValue);
-	const parts = ['<option value="">(default)</option>'];
-	for (const p of opts) {
-		const sel = p === currentValue ? ' selected' : '';
-		parts.push('<option value="' + esc(p) + '"' + sel + '>' + esc(p) + '</option>');
-	}
-	return parts.join('');
+// Single-select model picker: every model grouped by provider (<optgroup>),
+// so picking a model implies its provider — no separate provider dropdown.
+// Option values encode "provider<US>id" (US = U+001F: ids can contain "/").
+export const MODEL_KEY_SEP = "\u001f";
+
+export function splitModelKey(v: any): { provider: string; id: string } {
+	const s = String(v || "");
+	const i = s.indexOf(MODEL_KEY_SEP);
+	return i < 0 ? { provider: "", id: "" } : { provider: s.slice(0, i), id: s.slice(i + 1) };
 }
 
-export function modelOptionsHtml(currentValue: any, provider: any, providerIndex: any) {
-	const entries = (provider && providerIndex.get(provider)) || [];
-	const present = entries.slice();
-	if (currentValue && !present.some((e: any) => e.id === currentValue)) {
-		present.unshift({ id: currentValue });
-	}
+export function combinedModelOptionsHtml(curProvider: any, curId: any, providerIndex: any) {
+	const curKey = curProvider && curId ? curProvider + MODEL_KEY_SEP + curId : "";
+	let curSeen = false;
 	const parts = ['<option value="">(default)</option>'];
-	for (const e of present) {
-		const sel = e.id === currentValue ? ' selected' : '';
-		// Label: alias if available, else id. Title attribute always shows raw
-		// id so hovering disambiguates aliases that map to similar names.
-		const label = e.alias || e.id;
-		const title = e.alias ? e.alias + ' (' + e.id + ')' : e.id;
-		parts.push('<option value="' + esc(e.id) + '" title="' + esc(title) + '"' + sel + '>' + esc(label) + '</option>');
+	for (const p of [...providerIndex.keys()].sort()) {
+		const entries = providerIndex.get(p) || [];
+		if (entries.length === 0) continue;
+		const opts = [];
+		for (const e of entries) {
+			const key = p + MODEL_KEY_SEP + e.id;
+			const sel = key === curKey ? " selected" : "";
+			if (sel) curSeen = true;
+			const label = e.alias || e.id;
+			const title = (e.alias ? e.alias + " (" + e.id + ")" : e.id) + " — " + p;
+			opts.push('<option value="' + esc(key) + '" title="' + esc(title) + '"' + sel + ">" + esc(label) + "</option>");
+		}
+		parts.push('<optgroup label="' + esc(p) + '">' + opts.join("") + "</optgroup>");
 	}
-	return parts.join('');
+	// Keep an unknown current selection selectable (model list not yet loaded,
+	// allowlist-hidden, or a provider Pi doesn't know) — mirrors modelOptionsHtml.
+	if (curKey && !curSeen) {
+		parts.splice(1, 0, '<option value="' + esc(curKey) + '" selected>' + esc(curId + " — " + curProvider) + "</option>");
+	}
+	return parts.join("");
 }
 
 const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];

@@ -4,7 +4,7 @@ import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS
 import {
 	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskAutoApproveDefault, diskTodoPanel, diskAutoContinue, diskRetentionOverride, diskDefaultMode, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
 } from "./settings-disk";
-import { buildProviderIndex, providerOptionsHtml, modelOptionsHtml, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
+import { buildProviderIndex, combinedModelOptionsHtml, splitModelKey, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
 import { renderAnthropicUsage } from "./settings-anthropic";
 import { renderCodexUsage } from "./settings-codex";
 
@@ -25,8 +25,7 @@ function renderModes() {
 		card.dataset.mode = name;
 		card.innerHTML =
 			'<div class="mode-name ' + name + '">' + name + '</div>' +
-			'<select data-mode="' + name + '" data-field="provider">' + providerOptionsHtml(draft.provider, providerIndex) + '</select>' +
-			'<select data-mode="' + name + '" data-field="id">' + modelOptionsHtml(draft.id, draft.provider, providerIndex) + '</select>' +
+			'<select data-mode="' + name + '" data-field="model">' + combinedModelOptionsHtml(draft.provider, draft.id, providerIndex) + '</select>' +
 			'<select data-mode="' + name + '" data-field="thinking">' + modeThinkingOptionsHtml(draft.provider, draft.id, draft.thinking) + '</select>';
 		root.appendChild(card);
 		// thinking <select> uses `selected` attributes (model-aware), so no
@@ -37,15 +36,15 @@ function renderModes() {
 			const name = el.getAttribute('data-mode');
 			const field = el.getAttribute('data-field');
 			if (!name || !field || !S.modesDraft[name]) return;
-			S.modesDraft[name][field] = el.value;
-			// Changing provider invalidates the model selection; changing the
-			// model changes which thinking options apply — re-render either way.
-			if (field === 'provider') {
-				S.modesDraft[name].id = '';
-				renderModes();
-			} else if (field === 'id') {
+			if (field === 'model') {
+				// One select carries provider+id — picking a model implies its
+				// provider. The thinking options depend on the model → re-render.
+				const { provider, id } = splitModelKey(el.value);
+				S.modesDraft[name].provider = provider;
+				S.modesDraft[name].id = id;
 				renderModes();
 			} else {
+				S.modesDraft[name][field] = el.value;
 				const card = el.closest('.mode-card');
 				if (card) card.classList.toggle('dirty', modeDirty(name));
 			}
@@ -621,18 +620,12 @@ function renderAutoTitle() {
 	if (!card) return;
 	card.classList.toggle('dirty', autoTitleDirty());
 	const providerIndex = buildProviderIndex();
-	const provSel = el('autotitle-provider');
-	const idSel = el('autotitle-id');
-	provSel.innerHTML = providerOptionsHtml(S.autoTitleDraft.provider, providerIndex);
-	idSel.innerHTML = modelOptionsHtml(S.autoTitleDraft.id, S.autoTitleDraft.provider, providerIndex);
-	provSel.onchange = () => {
-		S.autoTitleDraft.provider = provSel.value;
-		S.autoTitleDraft.id = '';
-		renderAutoTitle();
-		updateSaveBar();
-	};
-	idSel.onchange = () => {
-		S.autoTitleDraft.id = idSel.value;
+	const sel = el('autotitle-model');
+	sel.innerHTML = combinedModelOptionsHtml(S.autoTitleDraft.provider, S.autoTitleDraft.id, providerIndex);
+	sel.onchange = () => {
+		const { provider, id } = splitModelKey(sel.value);
+		S.autoTitleDraft.provider = provider;
+		S.autoTitleDraft.id = id;
 		card.classList.toggle('dirty', autoTitleDirty());
 		updateSaveBar();
 	};
@@ -643,18 +636,12 @@ function renderCompactModel() {
 	if (!card) return;
 	card.classList.toggle('dirty', compactModelDirty());
 	const providerIndex = buildProviderIndex();
-	const provSel = el('compactmodel-provider');
-	const idSel = el('compactmodel-id');
-	provSel.innerHTML = providerOptionsHtml(S.compactModelDraft.provider, providerIndex);
-	idSel.innerHTML = modelOptionsHtml(S.compactModelDraft.id, S.compactModelDraft.provider, providerIndex);
-	provSel.onchange = () => {
-		S.compactModelDraft.provider = provSel.value;
-		S.compactModelDraft.id = '';
-		renderCompactModel();
-		updateSaveBar();
-	};
-	idSel.onchange = () => {
-		S.compactModelDraft.id = idSel.value;
+	const sel = el('compactmodel-model');
+	sel.innerHTML = combinedModelOptionsHtml(S.compactModelDraft.provider, S.compactModelDraft.id, providerIndex);
+	sel.onchange = () => {
+		const { provider, id } = splitModelKey(sel.value);
+		S.compactModelDraft.provider = provider;
+		S.compactModelDraft.id = id;
 		card.classList.toggle('dirty', compactModelDirty());
 		updateSaveBar();
 	};

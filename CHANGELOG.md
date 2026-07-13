@@ -7,6 +7,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Changed
+- **Model pickers in the settings panel are a single dropdown now.** The Modes tab (and the auto-title / compaction model overrides) drop the separate provider select — every model is listed in one dropdown grouped by provider, and picking a model sets its provider implicitly. Previously the model list stayed empty until a provider was chosen.
+
 ## [0.1.12] — 2026-07-13
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.10.
