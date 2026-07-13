@@ -147,7 +147,7 @@ export const expandedSessions = new Set<string>();
  *   - Reasoning-disabled → ["off"]
  *   - Binary-thinking provider (qwen-chat-template, zai) → off + lowest non-off
  *   - Otherwise → Pi's standard supportedThinkingLevels (include unmapped;
- *     exclude null-mapped; xhigh requires explicit mapping).
+ *     exclude null-mapped; xhigh/max require explicit mapping).
  */
 export function supportedThinkingLevels(model: any): string[] {
 	if (!model?.reasoning) return ["off"];
@@ -155,7 +155,7 @@ export function supportedThinkingLevels(model: any): string[] {
 	const standard = THINKING_LEVELS.filter((level) => {
 		const mapped = (map as any)[level];
 		if (mapped === null) return false;
-		if (level === "xhigh") return mapped !== undefined;
+		if (level === "xhigh" || level === "max") return mapped !== undefined;
 		return true;
 	});
 	if (isBinaryThinking(model)) {

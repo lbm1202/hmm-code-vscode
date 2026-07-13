@@ -27,7 +27,7 @@ export const qa = (root: any, sel: string): any[] => Array.from(root.querySelect
 // order in protocol.ts:MODE_NAMES (code-first, drives the Tab cycle).
 // Independent on purpose — don't unify them.
 export const MODE_NAMES = ["plan", "code", "review", "debug", "ask"];
-export const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
+export const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh", "max"];
 export const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
 export const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '</option>').join('');
 // All mutable panel state in one object so it can be shared across modules

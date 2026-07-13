@@ -41,7 +41,7 @@ export const ASSISTANT_DELTA = {
 export const MODE_NAMES = ["code", "plan", "debug", "ask", "review"] as const;
 export type ModeName = (typeof MODE_NAMES)[number];
 
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
 /** Models whose thinking surface is binary (on/off) at the protocol level. */

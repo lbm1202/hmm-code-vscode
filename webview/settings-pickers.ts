@@ -88,7 +88,7 @@ export function modeThinkingOptionsHtml(provider: any, id: any, selected: any) {
 		if (lvl === '') continue;
 		const mapped = map[lvl];
 		if (mapped === null) continue;
-		if (lvl === 'xhigh' && mapped === undefined) continue;
+		if ((lvl === 'xhigh' || lvl === 'max') && mapped === undefined) continue;
 		html += opt(lvl, lvl, sel === lvl);
 	}
 	return html;

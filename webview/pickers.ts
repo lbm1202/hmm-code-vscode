@@ -346,6 +346,7 @@ const EFFORT_DISPLAY: Record<string, string> = {
 	medium: "Medium",
 	high: "High",
 	xhigh: "Extra high",
+	max: "Max",
 };
 
 // Effort slider geometry (px): a rail of width SPAN with KNOB_R padding.

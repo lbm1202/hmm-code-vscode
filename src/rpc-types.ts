@@ -21,7 +21,7 @@ export interface RpcCmdGetState extends RpcCommandBase { type: "get_state" }
 export interface RpcCmdSetModel extends RpcCommandBase { type: "set_model"; provider: string; modelId: string }
 export interface RpcCmdSetThinking extends RpcCommandBase {
 	type: "set_thinking_level";
-	level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+	level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 export interface RpcCmdCompact extends RpcCommandBase { type: "compact" }
 /** Toggle Pi's BUILT-IN auto-compaction. We disable it (enabled:false) at
