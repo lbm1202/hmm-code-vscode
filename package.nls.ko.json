@@ -11,6 +11,5 @@
   "config.language.desc": "Hmm-code UI 표시 언어. \"auto\"는 VS Code 표시 언어를 따르며, 그 외에는 영어로 표시됩니다. 변경 시 창 새로고침을 안내합니다.",
   "config.language.auto": "VS Code 표시 언어 따름",
   "config.language.en": "English",
-  "config.language.ko": "한국어",
-  "config.autoApproveDefault.desc": "새 채팅 세션을 권한 자동승인 ON 상태로 시작합니다. 켜면 평소 권한을 묻는 도구 동작이 해당 세션 동안 자동 승인됩니다. 기본값은 꺼짐."
+  "config.language.ko": "한국어"
 }

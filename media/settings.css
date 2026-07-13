@@ -37,29 +37,6 @@ h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px 0; }
 .tab-panel.hidden { display: none; }
 .hidden { display: none !important; }
 
-/* Codex usage readout (auth tab) */
-.codex-usage {
-	margin-top: 8px;
-	font-size: 11px;
-	color: var(--vscode-descriptionForeground);
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	max-width: 420px;
-}
-.codex-usage-head { color: var(--vscode-foreground); }
-.codex-usage-row { display: flex; align-items: center; gap: 8px; }
-.cu-label { min-width: 56px; }
-.cu-bar {
-	flex: 1;
-	height: 6px;
-	border-radius: 3px;
-	background: var(--vscode-panel-border);
-	overflow: hidden;
-}
-.cu-bar-fill { display: block; height: 100%; background: var(--vscode-charts-blue, var(--vscode-focusBorder)); }
-.cu-pct { min-width: 34px; text-align: right; }
-.cu-reset { color: var(--vscode-descriptionForeground); }
 .section {
 	background: var(--vscode-editorWidget-background);
 	border: 1px solid var(--vscode-panel-border);
@@ -196,6 +173,7 @@ th {
 .mode-name { font-weight: 600; font-size: 13px; }
 .mode-name.plan { color: rgb(120, 170, 255); }
 .mode-name.code { color: var(--vscode-foreground); }
+.mode-name.review { color: rgb(95, 220, 160); }
 .mode-name.debug { color: rgb(200, 140, 240); }
 .mode-name.ask { color: rgb(255, 180, 100); }
 .provider-card {
@@ -520,3 +498,37 @@ th {
 	.model-grid > :nth-child(1), .model-grid > :nth-child(3),
 	.model-row-card > :nth-child(1), .model-row-card > :nth-child(3) { display: none; }
 }
+
+/* Subscription usage display (Claude plan usage — session/weekly % bars). */
+.oauth-usage {
+	margin-top: 8px;
+	font-size: 11px;
+}
+.oauth-usage.hidden { display: none; }
+.oauth-usage-head {
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 4px;
+}
+.oauth-usage-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 3px;
+}
+.oauth-usage-row .cu-label { min-width: 88px; }
+.oauth-usage-row .cu-bar {
+	flex: 1 1 auto;
+	height: 6px;
+	min-width: 60px;
+	max-width: 200px;
+	border-radius: 3px;
+	background: var(--vscode-editorWidget-border, rgba(128,128,128,0.3));
+	overflow: hidden;
+}
+.oauth-usage-row .cu-bar-fill {
+	display: block;
+	height: 100%;
+	background: var(--vscode-charts-blue, var(--vscode-progressBar-background));
+}
+.oauth-usage-row .cu-pct { min-width: 34px; text-align: right; }
+.oauth-usage-row .cu-reset { color: var(--vscode-descriptionForeground); }

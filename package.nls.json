@@ -11,6 +11,5 @@
   "config.language.desc": "UI display language for Hmm-code. \"auto\" follows VS Code's display language; otherwise falls back to English. Changing this prompts a window reload.",
   "config.language.auto": "Follow VS Code's display language",
   "config.language.en": "English",
-  "config.language.ko": "Korean (한국어)",
-  "config.autoApproveDefault.desc": "Start new chat sessions with permission auto-approve turned ON. When enabled, tool actions that would normally prompt for permission are auto-approved for the session. Off by default."
+  "config.language.ko": "Korean (한국어)"
 }

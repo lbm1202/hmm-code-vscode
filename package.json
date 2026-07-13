@@ -122,11 +122,6 @@
           ],
           "default": "auto",
           "description": "%config.language.desc%"
-        },
-        "hmm-code.autoApproveDefault": {
-          "type": "boolean",
-          "default": false,
-          "description": "%config.autoApproveDefault.desc%"
         }
       }
     }

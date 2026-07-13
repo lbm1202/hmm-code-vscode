@@ -101,6 +101,12 @@ export function diskIncludeOldToolOutputs() {
 export function includeOldToolOutputsDirty() {
 	return S.includeOldToolOutputsDraft !== diskIncludeOldToolOutputs();
 }
+export function diskAutoApproveDefault() {
+	return !!(S.diskState && S.diskState.autoApproveDefault === true);
+}
+export function autoApproveDefaultDirty() {
+	return S.autoApproveDefaultDraft !== diskAutoApproveDefault();
+}
 export function diskTodoPanel() {
 	// Default ON: anything but an explicit `false` means enabled.
 	return !(S.diskState && S.diskState.todoPanel === false);
@@ -114,6 +120,22 @@ export function diskAutoContinue() {
 }
 export function autoContinueDirty() {
 	return S.autoContinueDraft !== diskAutoContinue();
+}
+export function diskRetentionOverride() {
+	return (S.diskState && typeof S.diskState.artifactRetentionDays === 'number') ? S.diskState.artifactRetentionDays : null;
+}
+export function retentionDirty() {
+	// Treat "equal to default (30)" as no override; 0 = keep forever.
+	const n = parseInt(S.retentionDraft, 10);
+	const draftOverride = (!Number.isFinite(n) || n < 0 || n === 30) ? null : n;
+	return draftOverride !== diskRetentionOverride();
+}
+export function diskDefaultMode() {
+	// Host sends the effective value (validated, fallback "code").
+	return (S.diskState && typeof S.diskState.defaultMode === 'string') ? S.diskState.defaultMode : 'code';
+}
+export function defaultModeDirty() {
+	return S.defaultModeDraft !== diskDefaultMode();
 }
 export function diskAutoTitlePrompt() {
 	const v = S.diskState && S.diskState.modes && S.diskState.modes.autoTitlePrompt;
@@ -150,8 +172,11 @@ export function isDirty() {
 	if (compactDirty()) return true;
 	if (dynamicCompactionDirty()) return true;
 	if (includeOldToolOutputsDirty()) return true;
+	if (autoApproveDefaultDirty()) return true;
 	if (todoPanelDirty()) return true;
 	if (autoContinueDirty()) return true;
+	if (retentionDirty()) return true;
+	if (defaultModeDirty()) return true;
 	if (autoTitlePromptDirty()) return true;
 	if (compactInstructionsDirty()) return true;
 	return false;

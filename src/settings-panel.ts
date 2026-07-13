@@ -2,9 +2,9 @@
 //
 // Inline editing (no chat dispatch):
 //   - modes.json  → per-mode model + thinking, modelAliases
-//   - auth.json   → API-key credentials (add/remove). OAuth providers
-//                   (anthropic, github-copilot, openai-codex) need the
-//                   pi-ai/oauth browser flow — shown with terminal guidance.
+//   - auth.json   → API-key credentials (add/remove). Subscription OAuth
+//                   providers (currently anthropic Claude Pro/Max) need the
+//                   pi-ai/oauth browser flow — driven by an inline login button.
 //   - models.json → custom OpenAI-compatible providers + model definitions
 //
 // Single save bar at the bottom commits all dirty sections in one shot
@@ -16,9 +16,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "n
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { ChatBackend } from "./chat-backend";
-import { codexOAuthLogin } from "./oauth-codex";
-import { fetchCodexUsage } from "./codex-usage";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
+import { fetchAnthropicUsage } from "./anthropic-usage";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
@@ -29,13 +28,11 @@ const MODELS_PATH = join(PI_DIR, "models.json");
 const AUTH_PATH = join(PI_DIR, "auth.json");
 const SETTINGS_PATH = join(PI_DIR, "settings.json");
 
-const MODE_NAMES = ["plan", "code", "debug", "ask"] as const;
+const MODE_NAMES = ["plan", "code", "review", "debug", "ask"] as const;
 // OAuth-only providers — auth.json entries need a browser redirect flow that
-// belongs in the pi-ai/oauth package. Anthropic/GitHub-Copilot also work but
-// the user only cares about Codex subscription auth here.
-const OAUTH_PROVIDERS: { id: string; name: string }[] = [
-	{ id: "openai-codex", name: "ChatGPT Plus/Pro (Codex Subscription)" },
-];
+// belongs in the pi-ai/oauth package. Wired inline via the auth-section login
+// buttons (currently Anthropic Claude Pro/Max).
+const OAUTH_PROVIDERS: { id: string; name: string }[] = [];
 // Common OpenAI-compatible API types Pi understands.
 const API_TYPES = [
 	"openai-completions",
@@ -46,7 +43,7 @@ const API_TYPES = [
 export class SettingsPanel {
 	public static readonly viewType = VIEW_TYPE;
 	private static instance: vscode.WebviewPanel | undefined;
-	/** In-flight OAuth login (codex/anthropic) — process-global single-flight,
+	/** In-flight OAuth login (anthropic) — process-global single-flight,
 	 *  aborted on panel dispose so the callback server can't leak. */
 	private static _oauthLoginAbort: AbortController | undefined;
 	/** Extension install root — set on attach so static readState can locate the
@@ -201,10 +198,22 @@ export class SettingsPanel {
 					: true,
 			includeOldToolOutputs:
 				modes && typeof modes === "object" && modes.includeOldToolOutputs === true,
+			autoApproveDefault:
+				modes && typeof modes === "object" && modes.autoApproveDefault === true,
 			todoPanel: !(modes && typeof modes === "object" && modes.todoPanel === false),
 			autoContinueAfterCompact: !(
 				modes && typeof modes === "object" && modes.autoContinueAfterCompact === false
 			),
+			artifactRetentionDays:
+				modes && typeof modes === "object" && typeof modes.artifactRetentionDays === "number"
+					? modes.artifactRetentionDays
+					: null,
+			defaultMode:
+				modes &&
+				typeof modes === "object" &&
+				(MODE_NAMES as readonly string[]).includes(modes.defaultMode)
+					? modes.defaultMode
+					: "code",
 		};
 	}
 
@@ -351,15 +360,6 @@ export class SettingsPanel {
 
 	private static async handleMessage(panel: vscode.WebviewPanel, msg: any): Promise<void> {
 		switch (msg?.kind) {
-			case "codex-login": {
-				await SettingsPanel.runOAuthLogin(panel, {
-					statusKind: "codex-status",
-					providerId: "openai-codex",
-					label: "openai-codex",
-					run: codexOAuthLogin,
-				});
-				return;
-			}
 			case "anthropic-login": {
 				await SettingsPanel.runOAuthLogin(panel, {
 					statusKind: "anthropic-status",
@@ -369,9 +369,20 @@ export class SettingsPanel {
 				});
 				return;
 			}
-			case "codex-login-cancel":
 			case "anthropic-login-cancel": {
 				SettingsPanel._oauthLoginAbort?.abort?.();
+				return;
+			}
+			case "anthropic-usage": {
+				try {
+					const usage = await fetchAnthropicUsage();
+					panel.webview.postMessage({ kind: "anthropic-usage-result", usage });
+				} catch (err) {
+					panel.webview.postMessage({
+						kind: "anthropic-usage-result",
+						error: (err as Error).message,
+					});
+				}
 				return;
 			}
 			case "save": {
@@ -396,8 +407,11 @@ export class SettingsPanel {
 						msg.autoTitlePrompt,
 						msg.compactInstructions,
 						msg.includeOldToolOutputs,
+						msg.autoApproveDefault,
 						msg.todoPanel,
 						msg.autoContinueAfterCompact,
+						msg.artifactRetentionDays,
+						msg.defaultMode,
 					);
 					if (!out.includes("modes.json")) out.push("modes.json");
 				}
@@ -545,18 +559,6 @@ export class SettingsPanel {
 				}
 				return;
 			}
-			case "codex-usage": {
-				try {
-					const usage = await fetchCodexUsage();
-					panel.webview.postMessage({ kind: "codex-usage-result", usage });
-				} catch (err) {
-					panel.webview.postMessage({
-						kind: "codex-usage-result",
-						error: (err as Error).message,
-					});
-				}
-				return;
-			}
 			case "set-language": {
 				const value = String(msg.value ?? "auto");
 				const allowed = ["auto", "en", "ko"];
@@ -613,8 +615,11 @@ export class SettingsPanel {
 		autoTitlePrompt?: string | null,
 		compactInstructions?: string | null,
 		includeOldToolOutputs?: boolean,
+		autoApproveDefault?: boolean,
 		todoPanel?: boolean,
 		autoContinueAfterCompact?: boolean,
+		artifactRetentionDays?: number | null,
+		defaultMode?: string | null,
 	): void {
 		let raw: any = SettingsPanel.readJsonSafe(MODES_PATH) ?? {};
 		// Dynamic compaction (default on). Store only when explicitly off so
@@ -629,6 +634,12 @@ export class SettingsPanel {
 			if (includeOldToolOutputs === true) raw.includeOldToolOutputs = true;
 			else delete raw.includeOldToolOutputs;
 		}
+		// Auto-approve on session start (default off). Store only when explicitly on
+		// so modes.json stays clean at the default.
+		if (autoApproveDefault !== undefined) {
+			if (autoApproveDefault === true) raw.autoApproveDefault = true;
+			else delete raw.autoApproveDefault;
+		}
 		// Pinned todo panel (default ON). Store only when explicitly off so
 		// modes.json stays clean at the default.
 		if (todoPanel !== undefined) {
@@ -639,6 +650,33 @@ export class SettingsPanel {
 		if (autoContinueAfterCompact !== undefined) {
 			if (autoContinueAfterCompact === false) raw.autoContinueAfterCompact = false;
 			else delete raw.autoContinueAfterCompact;
+		}
+		// Default mode for NEW sessions (resumed sessions restore their own).
+		// Store only when it differs from the built-in "code" default.
+		if (defaultMode !== undefined) {
+			if (
+				typeof defaultMode === "string" &&
+				(MODE_NAMES as readonly string[]).includes(defaultMode) &&
+				defaultMode !== "code"
+			) {
+				raw.defaultMode = defaultMode;
+			} else {
+				delete raw.defaultMode;
+			}
+		}
+		// Plan/report artifact retention days (default 30; 0 = keep forever).
+		// Store only when it differs from the default so modes.json stays clean.
+		if (artifactRetentionDays !== undefined) {
+			if (
+				typeof artifactRetentionDays === "number" &&
+				Number.isFinite(artifactRetentionDays) &&
+				artifactRetentionDays >= 0 &&
+				artifactRetentionDays !== 30
+			) {
+				raw.artifactRetentionDays = Math.round(artifactRetentionDays);
+			} else {
+				delete raw.artifactRetentionDays;
+			}
 		}
 		// Auto-title system-prompt override + compaction additional-focus.
 		// Empty/whitespace → delete the field so the built-in default applies.
@@ -872,6 +910,26 @@ export class SettingsPanel {
 		</div>
 
 		<div class="section">
+			<h2>${t("settings.defaultMode.heading")}</h2>
+			<div class="desc">${t("settings.defaultMode.desc")}</div>
+			<select id="default-mode">
+				${MODE_NAMES.map((m) => `<option value="${m}">${m}</option>`).join("")}
+			</select>
+		</div>
+
+		<div class="section">
+			<h2>${t("settings.autoApprove.heading")}</h2>
+			<div class="desc">${t("settings.autoApprove.desc")}</div>
+			<label class="toggle-row" for="auto-approve-default" style="margin-top: 6px;">
+				<span class="switch">
+					<input type="checkbox" id="auto-approve-default" />
+					<span class="switch-track"><span class="switch-thumb"></span></span>
+				</span>
+				<span>${t("settings.autoApprove.label")}</span>
+			</label>
+		</div>
+
+		<div class="section">
 			<h2>${t("settings.autoTitle.heading")}</h2>
 			<div class="desc">${t("settings.autoTitle.desc")}</div>
 			<div class="mode-card autotitle-card" id="autotitle-card">
@@ -929,6 +987,15 @@ export class SettingsPanel {
 				<select id="compactmodel-id"></select>
 			</div>
 		</div>
+
+		<div class="section">
+			<h2>${t("settings.retention.heading")}</h2>
+			<div class="desc">${t("settings.retention.desc")}</div>
+			<div class="row" style="margin-top: 8px;">
+				<input type="number" id="artifact-retention" min="0" max="3650" step="1" style="width: 90px; flex: none;" />
+				<span class="field-hint">${t("settings.retention.daysHint")}</span>
+			</div>
+		</div>
 	</section>
 
 	<section class="tab-panel" data-tab="auth">
@@ -962,19 +1029,13 @@ export class SettingsPanel {
 			<div class="note" style="margin-top: 12px;">
 				<strong>${t("settings.auth.oauthTitle")}</strong>
 				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-					<span style="font-size: 11px; min-width: 88px;">ChatGPT Plus/Pro</span>
-					<button id="codex-login-btn">${t("settings.auth.codexLogin")}</button>
-					<button class="ghost hidden" id="codex-cancel-btn">${t("settings.cancel")}</button>
-					<button class="ghost hidden" id="codex-usage-btn">${t("settings.usage.check")}</button>
-					<span id="codex-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
-				</div>
-				<div id="codex-usage" class="codex-usage hidden"></div>
-				<div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
 					<span style="font-size: 11px; min-width: 88px;">Claude Pro/Max</span>
 					<button id="anthropic-login-btn">${t("settings.auth.claudeLogin")}</button>
 					<button class="ghost hidden" id="anthropic-cancel-btn">${t("settings.cancel")}</button>
+					<button class="ghost hidden" id="anthropic-usage-btn">${t("settings.usage.check")}</button>
 					<span id="anthropic-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);"></span>
 				</div>
+				<div id="anthropic-usage" class="oauth-usage hidden"></div>
 			</div>
 		</div>
 

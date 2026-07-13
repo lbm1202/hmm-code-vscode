@@ -2,10 +2,10 @@
 // settings-state.ts; disk readers + dirty checks in settings-disk.ts.
 import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS, API_TYPES, API_TYPE_HTML, S } from "./settings-state";
 import {
-	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskTodoPanel, diskAutoContinue, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
+	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskAutoApproveDefault, diskTodoPanel, diskAutoContinue, diskRetentionOverride, diskDefaultMode, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
 } from "./settings-disk";
-import { requestCodexUsage, renderCodexUsage } from "./settings-codex";
 import { buildProviderIndex, providerOptionsHtml, modelOptionsHtml, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
+import { renderAnthropicUsage } from "./settings-anthropic";
 
 
 // Build a {provider: [id, ...]} index from live availableModels (cached from
@@ -783,6 +783,11 @@ function renderCompact() {
 		tio.checked = S.includeOldToolOutputsDraft;
 		tio.onchange = () => { S.includeOldToolOutputsDraft = tio.checked; updateSaveBar(); };
 	}
+	const aad = el('auto-approve-default');
+	if (aad) {
+		aad.checked = S.autoApproveDefaultDraft;
+		aad.onchange = () => { S.autoApproveDefaultDraft = aad.checked; updateSaveBar(); };
+	}
 	const tpt = el('todo-panel-toggle');
 	if (tpt) {
 		tpt.checked = S.todoPanelDraft;
@@ -792,6 +797,16 @@ function renderCompact() {
 	if (acc) {
 		acc.checked = S.autoContinueDraft;
 		acc.onchange = () => { S.autoContinueDraft = acc.checked; updateSaveBar(); };
+	}
+	const ret = el('artifact-retention');
+	if (ret) {
+		ret.value = S.retentionDraft;
+		ret.oninput = () => { S.retentionDraft = ret.value; updateSaveBar(); };
+	}
+	const dm = el('default-mode');
+	if (dm) {
+		dm.value = S.defaultModeDraft;
+		dm.onchange = () => { S.defaultModeDraft = dm.value; updateSaveBar(); };
 	}
 	if (!input) return;
 	input.value = S.compactDraft;
@@ -820,8 +835,11 @@ function render(s: any) {
 	S.compactDraft = String(diskCompactOverride() != null ? diskCompactOverride() : defaultCompact());
 	S.dynamicCompactionDraft = diskDynamicCompaction();
 	S.includeOldToolOutputsDraft = diskIncludeOldToolOutputs();
+	S.autoApproveDefaultDraft = diskAutoApproveDefault();
 	S.todoPanelDraft = diskTodoPanel();
 	S.autoContinueDraft = diskAutoContinue();
+	S.retentionDraft = String(diskRetentionOverride() != null ? diskRetentionOverride() : 30);
+	S.defaultModeDraft = diskDefaultMode();
 	S.autoTitlePromptDraft = diskAutoTitlePrompt() || defaultAutoTitle();
 	S.compactInstructionsDraft = diskCompactInstructions();
 
@@ -842,11 +860,9 @@ function render(s: any) {
 // add an OAuth login). Leaves a button alone while its login flow is mid-air
 // (cancel button visible).
 const OAUTH_BTN_PROVIDERS = [
-	{ statusKind: 'codex-status', providerId: 'openai-codex' },
 	{ statusKind: 'anthropic-status', providerId: 'anthropic' },
 ];
 function updateOAuthButtons() {
-	let codexAuthed = false;
 	for (const { statusKind, providerId } of OAUTH_BTN_PROVIDERS) {
 		const ui = oauthUis[statusKind];
 		if (!ui) continue;
@@ -855,38 +871,30 @@ function updateOAuthButtons() {
 		// immediately instead of waiting for save + reload.
 		const cred = diskAuth()[providerId];
 		const authed = !!(cred && cred.type === 'oauth') && !S.authRemovesDraft.has(providerId);
-		if (providerId === 'openai-codex') codexAuthed = authed;
 		const inFlight = !ui.cancel.classList.contains('hidden');
+		const usageBtn = providerId === 'anthropic' ? el('anthropic-usage-btn') : null;
 		if (authed) {
 			// Hide the login button entirely (disconnect happens from the auth
 			// table) and show the persistent "✓ Authenticated" badge.
 			ui.btn.classList.add('hidden');
 			ui.status.textContent = t('settings.oauth.authed');
 			ui.status.style.color = 'var(--vscode-charts-green, var(--vscode-foreground))';
+			if (usageBtn) usageBtn.classList.remove('hidden'); // Claude: allow usage check
 		} else if (!inFlight) {
 			ui.btn.classList.remove('hidden');
 			ui.btn.disabled = false;
 			// Clear the "✓ authed" badge so a staged disconnect reflects at once.
 			ui.status.textContent = '';
 			ui.status.style.color = '';
+			if (usageBtn) usageBtn.classList.add('hidden');
+			const usageOut = el('anthropic-usage');
+			if (usageOut) usageOut.classList.add('hidden');
 		}
-	}
-	// Codex usage button + one-shot auto-fetch, gated on Codex being authed.
-	const usageBtn = el('codex-usage-btn');
-	const usageOut = el('codex-usage');
-	if (usageBtn) usageBtn.classList.toggle('hidden', !codexAuthed);
-	if (!codexAuthed) {
-		S.codexUsageFetched = false;
-		if (usageOut) { usageOut.classList.add('hidden'); usageOut.textContent = ''; }
-	} else if (!S.codexUsageFetched) {
-		S.codexUsageFetched = true;
-		requestCodexUsage();
 	}
 }
 
-// Codex OAuth inline
-// OAuth login buttons (Codex, Claude) share identical wiring; keyed by their
-// status message kind so the status handler can find the right elements.
+// OAuth login buttons share identical wiring; keyed by their status message
+// kind so the status handler can find the right elements.
 const oauthUis: Record<string, any> = {};
 function wireOAuth(statusKind: any, btnId: any, cancelId: any, statusId: any, loginKind: any, cancelKind: any) {
 	const btn = el(btnId);
@@ -902,7 +910,6 @@ function wireOAuth(statusKind: any, btnId: any, cancelId: any, statusId: any, lo
 	cancel.addEventListener('click', () => post({ kind: cancelKind }));
 	oauthUis[statusKind] = { btn, cancel, status };
 }
-wireOAuth('codex-status', 'codex-login-btn', 'codex-cancel-btn', 'codex-status', 'codex-login', 'codex-login-cancel');
 wireOAuth('anthropic-status', 'anthropic-login-btn', 'anthropic-cancel-btn', 'anthropic-status', 'anthropic-login', 'anthropic-login-cancel');
 
 // Add auth (API key)
@@ -966,8 +973,11 @@ el('save-btn').addEventListener('click', () => {
 		autoCompactThreshold: (() => { const n = parseInt(S.compactDraft, 10); return Number.isFinite(n) ? n : null; })(),
 		dynamicCompaction: S.dynamicCompactionDraft,
 		includeOldToolOutputs: S.includeOldToolOutputsDraft,
+		autoApproveDefault: S.autoApproveDefaultDraft,
 		todoPanel: S.todoPanelDraft,
 		autoContinueAfterCompact: S.autoContinueDraft,
+		artifactRetentionDays: (() => { const n = parseInt(S.retentionDraft, 10); return Number.isFinite(n) && n >= 0 ? n : null; })(),
+		defaultMode: S.defaultModeDraft,
 		autoTitlePrompt: autoTitleOverrideFromDraft(),
 		compactInstructions: S.compactInstructionsDraft,
 	};
@@ -981,8 +991,8 @@ window.addEventListener('message', (ev) => {
 	if (msg.kind === 'state') render(msg.state);
 	else if (msg.kind === 'error') showToast(msg.message || 'Error', true);
 	else if (msg.kind === 'saved') showToast(t('settings.toast.saved', { files: (msg.files || []).join(', ') }));
-	else if (msg.kind === 'codex-usage-result') renderCodexUsage(msg);
-	else if (msg.kind === 'codex-status' || msg.kind === 'anthropic-status') {
+	else if (msg.kind === 'anthropic-usage-result') renderAnthropicUsage(msg);
+	else if (msg.kind === 'anthropic-status') {
 		const ui = oauthUis[msg.kind];
 		if (!ui) return;
 		const s = msg.state;

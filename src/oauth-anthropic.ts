@@ -187,8 +187,8 @@ async function exchangeCodeForTokens(code: string, state: string, verifier: stri
 }
 
 /**
- * Run the full Anthropic (Claude Pro/Max) OAuth flow. Same shape as
- * codexOAuthLogin so the settings panel can drive both identically.
+ * Run the full Anthropic (Claude Pro/Max) OAuth flow. Exposes the callback
+ * shape the settings panel's generic OAuth driver expects.
  *
  *   1. Local HTTP server on 127.0.0.1:53692 for the redirect.
  *   2. Caller opens the authorize URL in the browser (via onAuth).

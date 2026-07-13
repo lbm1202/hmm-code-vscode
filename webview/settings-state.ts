@@ -22,11 +22,11 @@ export const el = (id: string): any => document.getElementById(id);
 export const q = (root: any, sel: string): any => root.querySelector(sel);
 export const qa = (root: any, sel: string): any[] => Array.from(root.querySelectorAll(sel));
 
-// Settings-panel display order — plan-first (the plan → code → debug → ask
-// workflow order). Intentionally DIFFERENT from the chat-side order in
-// protocol.ts:MODE_NAMES (code-first, drives the Tab cycle). Independent on
-// purpose — don't unify them.
-export const MODE_NAMES = ["plan", "code", "debug", "ask"];
+// Settings-panel display order — plan-first (the plan → code → review →
+// debug → ask workflow order). Intentionally DIFFERENT from the chat-side
+// order in protocol.ts:MODE_NAMES (code-first, drives the Tab cycle).
+// Independent on purpose — don't unify them.
+export const MODE_NAMES = ["plan", "code", "review", "debug", "ask"];
 export const THINKING_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"];
 export const API_TYPES = ["openai-completions", "openai-responses", "anthropic-messages"];
 export const API_TYPE_HTML = API_TYPES.map((t) => '<option value="' + t + '">' + t + '</option>').join('');
@@ -44,11 +44,13 @@ export const S = {
 	compactDraft: '',               // auto-compact threshold (effective value)
 	dynamicCompactionDraft: true,   // dynamic compaction toggle (default on)
 	includeOldToolOutputsDraft: false, // include old tool outputs (default off → prune)
+	autoApproveDefaultDraft: false,    // auto-approve on session start (default off)
 	todoPanelDraft: true,              // pinned todo panel (default on)
 	autoContinueDraft: true,           // auto-continue after compaction (default on)
+	retentionDraft: '',                // plan/report artifact retention days (effective value; 0 = keep forever)
+	defaultModeDraft: 'code',          // default mode for NEW sessions (effective value)
 	autoTitlePromptDraft: '',       // auto-title prompt override ('' = default)
 	compactInstructionsDraft: '',   // compaction additional-focus ('' = none)
-	codexUsageFetched: false,       // one-shot guard for the usage auto-fetch
 };
 // Per-provider model id allowlist draft. Empty obj or empty list per provider
 // = no filter for that provider. Sent to host as modelAllowlist on save.
