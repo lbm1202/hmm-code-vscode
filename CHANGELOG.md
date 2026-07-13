@@ -7,6 +7,15 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.13] — 2026-07-13
+
+Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.11.
+
+### ✨ Highlights
+- **First-run onboarding.** A fresh install with no authentication now greets you with a getting-started card: log into Claude Pro/Max or ChatGPT (Codex) right from the chat (or jump to Settings for an API key), get recommended per-mode default models filled in automatically, and start from clickable example prompts.
+- **Usage checks heal themselves.** An expired subscription token no longer surfaces as "HTTP 401 — run a chat turn or re-login": the extension has Pi refresh the token (no LLM call) and fetches usage as usual.
+- **One-dropdown model picking.** The settings panel's mode/auto-title/compaction model pickers are a single searchable dropdown grouped by provider — picking a model sets its provider implicitly.
+
 ### Added
 - **First-run onboarding card.** On a fresh install with no authentication anywhere (empty `auth.json`, no API-key environment variables, no custom providers — detection is conservative and never blocks chat), the empty state shows a getting-started card: Claude Pro/Max and ChatGPT (Codex) browser logins run right from the card (with progress + cancel), an API-key button opens Settings, and a short how-it-works list covers modes, mid-turn steering, and where usage/settings live. After a successful login the card flips to a ready state: it fills recommended per-mode default models into **empty** modes only (Claude: plan/review → Opus, code/debug/ask → Sonnet; Codex: GPT-5.6/5.5 — validated against the live catalog, never overwriting configured modes), shows what it applied with a link to change it, and offers clickable starter prompts. Hidden permanently after "Don't show again", once any session exists, or whenever auth is detected.
 
