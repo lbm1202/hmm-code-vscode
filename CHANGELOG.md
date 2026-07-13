@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- **`max` thinking level.** The Effort slider, settings-panel thinking dropdowns, and mode configs accept the new top level for models that declare it (adaptive Claude models, GPT-5.6). Shown only when the model's `thinkingLevelMap` explicitly maps it — same gating as `xhigh`.
+
+### Changed
+- **Bundled Pi runtime updated 0.79.1 → 0.80.6.** Notable upstream changes: Claude Sonnet 5 + GPT-5.6 model catalogs, `max` thinking level, per-message reasoning-token usage reporting, compaction fixes (post-compaction token budgeting, custom-entry ordering during streaming, split-turn summary serialization), `get_entries`/`get_tree` RPC commands, and security updates to vulnerable transitive dependencies (undici, protobufjs).
+- Dependency updates: dompurify 3.4.10 → 3.4.12, shiki 4.2.0 → 4.3.1, marked 18.0.5 → 18.0.6.
+
 ## [0.1.11] — 2026-07-13
 
 Bundles Pi runtime 0.79.1 + hmm-code-pi 0.1.9.

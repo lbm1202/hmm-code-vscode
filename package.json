@@ -1,148 +1,148 @@
 {
-  "name": "hmm-code",
-  "displayName": "Hmm-code",
-  "description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/debug/ask modes.",
-  "version": "0.1.11",
-  "publisher": "lbm1202",
-  "private": true,
-  "license": "MIT",
-  "author": "lbm1202",
-  "icon": "media/icon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lbm1202/hmm-code-vscode"
-  },
-  "bugs": {
-    "url": "https://github.com/lbm1202/hmm-code-vscode/issues"
-  },
-  "homepage": "https://github.com/lbm1202/hmm-code-vscode#readme",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "AI",
-    "Chat",
-    "Other"
-  ],
-  "keywords": [
-    "pi",
-    "coding agent",
-    "ai",
-    "agent",
-    "chat",
-    "llm",
-    "plan mode",
-    "claude",
-    "openai"
-  ],
-  "galleryBanner": {
-    "color": "#173e5c",
-    "theme": "dark"
-  },
-  "activationEvents": [
-    "onWebviewPanel:hmm-code.chatPanel",
-    "onWebviewPanel:hmm-code.settingsPanel"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "hmm-code.open",
-        "title": "%cmd.open%"
-      },
-      {
-        "command": "hmm-code.openInPanel",
-        "title": "%cmd.openInPanel%",
-        "icon": {
-          "light": "media/icon-32.png",
-          "dark": "media/icon-32.png"
-        }
-      },
-      {
-        "command": "hmm-code.openSettings",
-        "title": "%cmd.openSettings%"
-      },
-      {
-        "command": "hmm-code.cycleMode",
-        "title": "%cmd.cycleMode%"
-      },
-      {
-        "command": "hmm-code.toggleThinking",
-        "title": "%cmd.toggleThinking%"
-      },
-      {
-        "command": "hmm-code.resetDefaults",
-        "title": "%cmd.resetDefaults%"
-      },
-      {
-        "command": "hmm-code.abort",
-        "title": "%cmd.abort%"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "hmm-code.openInPanel",
-          "group": "navigation@9999"
-        }
-      ]
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "hmm-code",
-          "title": "Hmm-code",
-          "icon": "media/icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "hmm-code": [
-        {
-          "type": "webview",
-          "id": "hmm-code.chat",
-          "name": "%view.chat.name%"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "%config.title%",
-      "properties": {
-        "hmm-code.language": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "en",
-            "ko"
-          ],
-          "enumDescriptions": [
-            "%config.language.auto%",
-            "%config.language.en%",
-            "%config.language.ko%"
-          ],
-          "default": "auto",
-          "description": "%config.language.desc%"
-        }
-      }
-    }
-  },
-  "scripts": {
-    "build": "node esbuild.config.mjs",
-    "watch": "node esbuild.config.mjs --watch",
-    "compile": "tsc --noEmit",
-    "package": "vsce package",
-    "test": "node --test test/*.test.ts"
-  },
-  "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.79.1",
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
-    "esbuild": "^0.24.0",
-    "typescript": "^5.6.0"
-  },
-  "dependencies": {
-    "dompurify": "^3.4.10",
-    "marked": "^18.0.5",
-    "shiki": "^4.2.0"
-  }
+	"name": "hmm-code",
+	"displayName": "Hmm-code",
+	"description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/debug/ask modes.",
+	"version": "0.1.11",
+	"publisher": "lbm1202",
+	"private": true,
+	"license": "MIT",
+	"author": "lbm1202",
+	"icon": "media/icon.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lbm1202/hmm-code-vscode"
+	},
+	"bugs": {
+		"url": "https://github.com/lbm1202/hmm-code-vscode/issues"
+	},
+	"homepage": "https://github.com/lbm1202/hmm-code-vscode#readme",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"AI",
+		"Chat",
+		"Other"
+	],
+	"keywords": [
+		"pi",
+		"coding agent",
+		"ai",
+		"agent",
+		"chat",
+		"llm",
+		"plan mode",
+		"claude",
+		"openai"
+	],
+	"galleryBanner": {
+		"color": "#173e5c",
+		"theme": "dark"
+	},
+	"activationEvents": [
+		"onWebviewPanel:hmm-code.chatPanel",
+		"onWebviewPanel:hmm-code.settingsPanel"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "hmm-code.open",
+				"title": "%cmd.open%"
+			},
+			{
+				"command": "hmm-code.openInPanel",
+				"title": "%cmd.openInPanel%",
+				"icon": {
+					"light": "media/icon-32.png",
+					"dark": "media/icon-32.png"
+				}
+			},
+			{
+				"command": "hmm-code.openSettings",
+				"title": "%cmd.openSettings%"
+			},
+			{
+				"command": "hmm-code.cycleMode",
+				"title": "%cmd.cycleMode%"
+			},
+			{
+				"command": "hmm-code.toggleThinking",
+				"title": "%cmd.toggleThinking%"
+			},
+			{
+				"command": "hmm-code.resetDefaults",
+				"title": "%cmd.resetDefaults%"
+			},
+			{
+				"command": "hmm-code.abort",
+				"title": "%cmd.abort%"
+			}
+		],
+		"menus": {
+			"editor/title": [
+				{
+					"command": "hmm-code.openInPanel",
+					"group": "navigation@9999"
+				}
+			]
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "hmm-code",
+					"title": "Hmm-code",
+					"icon": "media/icon.svg"
+				}
+			]
+		},
+		"views": {
+			"hmm-code": [
+				{
+					"type": "webview",
+					"id": "hmm-code.chat",
+					"name": "%view.chat.name%"
+				}
+			]
+		},
+		"configuration": {
+			"title": "%config.title%",
+			"properties": {
+				"hmm-code.language": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"en",
+						"ko"
+					],
+					"enumDescriptions": [
+						"%config.language.auto%",
+						"%config.language.en%",
+						"%config.language.ko%"
+					],
+					"default": "auto",
+					"description": "%config.language.desc%"
+				}
+			}
+		}
+	},
+	"scripts": {
+		"build": "node esbuild.config.mjs",
+		"watch": "node esbuild.config.mjs --watch",
+		"compile": "tsc --noEmit",
+		"package": "vsce package",
+		"test": "node --test test/*.test.ts"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.80.6",
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.85.0",
+		"esbuild": "^0.24.0",
+		"typescript": "^5.6.0"
+	},
+	"dependencies": {
+		"dompurify": "^3.4.10",
+		"marked": "^18.0.5",
+		"shiki": "^4.2.0"
+	}
 }
