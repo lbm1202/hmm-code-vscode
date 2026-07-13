@@ -13,6 +13,7 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 ### Changed
 - **Bundled Pi runtime updated 0.79.1 → 0.80.6.** Notable upstream changes: Claude Sonnet 5 + GPT-5.6 model catalogs, `max` thinking level, per-message reasoning-token usage reporting, compaction fixes (post-compaction token budgeting, custom-entry ordering during streaming, split-turn summary serialization), `get_entries`/`get_tree` RPC commands, and security updates to vulnerable transitive dependencies (undici, protobufjs).
 - Dependency updates: dompurify 3.4.10 → 3.4.12, shiki 4.2.0 → 4.3.1, marked 18.0.5 → 18.0.6.
+- Build tooling: esbuild 0.24.2 → 0.28.1 (clears the GHSA-67mh-4wv8-2f99 dev-server advisory; identical bundle output, `npm audit` now clean).
 
 ## [0.1.11] — 2026-07-13
 
