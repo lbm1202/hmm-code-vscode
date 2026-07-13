@@ -118,6 +118,14 @@ html, body {
 	border-bottom-right-radius: 3px;
 }
 
+/* Mid-turn steering message awaiting delivery at the next tool boundary
+   (dispatch.ts removes the class on queue_update / turn end). */
+.bubble-user.queued {
+	opacity: 0.55;
+	border: 1px dashed var(--vscode-button-foreground);
+	transition: opacity 0.25s ease;
+}
+
 .bubble-assistant {
 	background: var(--vscode-editorWidget-background);
 	color: var(--vscode-foreground);
@@ -222,10 +230,101 @@ html, body {
 	padding: 4px 8px;
 	font-size: 12px;
 	color: var(--vscode-descriptionForeground);
+	/* A touch lighter than the bubble: mix a little foreground into the bubble
+	   background — lightens on dark themes, gently deepens on light ones. */
+	background: color-mix(in srgb, var(--vscode-editorWidget-background) 95%, var(--vscode-foreground) 5%);
 }
 
-.msg-thinking summary { cursor: pointer; user-select: none; }
+.msg-thinking summary {
+	cursor: pointer;
+	user-select: none;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	list-style: none; /* hide the native disclosure triangle… */
+}
+.msg-thinking summary::-webkit-details-marker { display: none; } /* …and WebKit's */
+.think-icon {
+	display: inline-flex;
+	flex: none;
+	opacity: 0.8;
+}
+.think-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* Chevron pinned to the right; rotates smoothly on open/close. */
+.think-chevron {
+	display: inline-flex;
+	flex: none;
+	margin-left: auto;
+	opacity: 0.65;
+	transition: transform 0.2s ease;
+}
+details[open] > summary .think-chevron { transform: rotate(180deg); }
+/* Sparkle pulses while reasoning streams (thinking-live is removed on settle). */
+.msg-thinking.thinking-live .think-icon {
+	animation: think-pulse 1.2s ease-in-out infinite;
+}
+@keyframes think-pulse {
+	0%, 100% { opacity: 0.35; transform: scale(0.92); }
+	50% { opacity: 1; transform: scale(1.06); }
+}
 .thinking-body { margin-top: 6px; }
+
+/* Per-message footer: right-aligned icon actions (copy / stats toggle) with
+   the labeled stats breakdown expanding below the icon row. */
+.msg-footer {
+	margin-top: 8px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+.msg-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 2px;
+}
+.msg-action-btn {
+	display: inline-flex;
+	align-items: center;
+	/* Faint resting fill (a touch lighter than the bubble) so the rounded
+	   button shape reads without hover; hover deepens it. */
+	background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.55;
+	cursor: pointer;
+	padding: 3px 5px;
+	border-radius: 4px;
+	transition: opacity 0.15s ease, background 0.15s ease;
+}
+.msg-action-btn:hover {
+	opacity: 1;
+	background: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
+}
+.msg-action-btn.active {
+	opacity: 1;
+	color: var(--vscode-foreground);
+}
+.msg-action-btn.ok {
+	opacity: 1;
+	color: var(--vscode-charts-green, #6cc86c);
+}
+.stats-body {
+	margin-top: 4px;
+	padding: 4px 8px;
+	border-left: 2px solid var(--vscode-panel-border);
+	display: grid;
+	grid-template-columns: max-content max-content;
+	column-gap: 14px;
+	row-gap: 2px;
+}
+.stats-row { display: contents; }
+.stats-label { opacity: 0.8; }
+.stats-value { font-variant-numeric: tabular-nums; }
 
 .msg-tools {
 	margin-top: 8px;
@@ -371,6 +470,10 @@ html, body {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	/* Pin to the viewport during horizontal scroll (the container scrolls;
+	   without this the header slides away leaving a bare gap on its right). */
+	position: sticky;
+	left: 0;
 }
 .edit-diff-edit-sep {
 	padding: 2px 10px;
@@ -378,6 +481,8 @@ html, body {
 	color: var(--vscode-descriptionForeground);
 	background: var(--vscode-editorWidget-background);
 	border-top: 1px dashed var(--vscode-panel-border);
+	position: sticky;
+	left: 0;
 }
 .diff-row {
 	display: block;
@@ -385,6 +490,12 @@ html, body {
 	white-space: pre;
 	min-height: 1.4em;
 	line-height: 1.4;
+	/* Blocks size to the VISIBLE width by default, so on horizontal scroll the
+	   red/green backgrounds stopped at the old right edge. max-content makes the
+	   row span the widest line; min-width keeps short rows painting full width. */
+	width: max-content;
+	min-width: 100%;
+	box-sizing: border-box;
 }
 .diff-row-old {
 	background: color-mix(in srgb, var(--vscode-diffEditor-removedLineBackground, rgba(255, 80, 80, 0.18)) 100%, transparent);

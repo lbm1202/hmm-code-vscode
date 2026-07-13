@@ -1,7 +1,7 @@
 // Conversation history rendering: replay past messages from get_messages and
 // build the "recent sessions" list on the empty state.
 
-import { appendBubble, appendCompactionSummary, appendUserBubble, els, forceScrollToBottom, setEmptyVisibility } from "./dom";
+import { appendBubble, appendCompactionSummary, appendUserBubble, buildMessageFooter, buildThinkingSummary, els, forceScrollToBottom, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
 import { t } from "./i18n";
 import { showModal } from "./modals";
@@ -10,6 +10,7 @@ import { pendingUiRequests, post, runtime, todoPanelEnabled, ui } from "./state"
 import { resetTodoPanel, updateTodoPanel } from "./todo-panel";
 import { buildToolCallBlock, updateToolResult } from "./tools";
 import { finalizeTurn } from "./turn-lifecycle";
+import type { MsgTimings } from "./types";
 
 /** Clear all messages and re-render any pending UI requests. */
 export function clearConversation(): void {
@@ -44,6 +45,9 @@ export function clearConversation(): void {
 const INITIAL_WINDOW = 60; // messages rendered on first load
 const WINDOW_CHUNK = 60; // additional messages per "load earlier" click
 let historyBuffer: any[] = [];
+/** Webview-measured timings for the buffered transcript, keyed by message
+ *  timestamp (from the host's stats store; empty for pre-stats sessions). */
+let statsBuffer: Record<string, MsgTimings> = {};
 let windowStart = 0;
 
 /** Nearest user-message index at or before `idx` (a clean turn boundary). */
@@ -105,10 +109,11 @@ function loadEarlier(): void {
 	box.scrollTop = oldT + (box.scrollHeight - oldH);
 }
 
-export function renderHistory(messages: any[]): void {
+export function renderHistory(messages: any[], stats?: Record<string, MsgTimings>): void {
 	if (!Array.isArray(messages) || messages.length === 0) return;
 	clearConversation();
 	historyBuffer = messages;
+	statsBuffer = stats ?? {};
 	windowStart = messages.length > INITIAL_WINDOW ? snapToTurnStart(messages.length - INITIAL_WINDOW) : 0;
 	if (windowStart > 0) els().messages.appendChild(makeLoadMoreButton());
 	for (let i = windowStart; i < messages.length; i++) renderOneMessage(messages[i]);
@@ -132,6 +137,9 @@ export function renderHistory(messages: any[]): void {
 function renderAssistantHistory(m: any): void {
 	const parts = Array.isArray(m.content) ? m.content : [];
 	if (parts.length === 0) return;
+	// Webview-measured timings persisted at stream time (may be absent for
+	// sessions recorded before the stats feature, or other clients' turns).
+	const tm = statsBuffer[String(m.timestamp ?? "")];
 	const bubble = appendBubble("assistant");
 	let textBuf = "";
 	let thinkingBuf = "";
@@ -160,8 +168,13 @@ function renderAssistantHistory(m: any): void {
 	if (thinkingBuf) {
 		const wrap = document.createElement("details");
 		wrap.className = "msg-thinking";
-		const summary = document.createElement("summary");
-		summary.textContent = "Thinking…";
+		// Stored timings restore the live "Thought for Ns" label; sessions
+		// recorded without stats fall back to the static label.
+		const { summary } = buildThinkingSummary(
+			tm && tm.thinkMs > 50
+				? t("chat.thoughtFor", { s: (tm.thinkMs / 1000).toFixed(1) })
+				: t("chat.thinking") + "…",
+		);
 		const body = document.createElement("div");
 		body.className = "thinking-body";
 		body.innerHTML = md(thinkingBuf);
@@ -176,6 +189,16 @@ function renderAssistantHistory(m: any): void {
 		const toolsEl = bubble.querySelector(".msg-tools");
 		if (toolsEl) bubble.insertBefore(textEl, toolsEl);
 		else bubble.appendChild(textEl);
+	}
+	// Same guard as the live path: no footer on tool-only bubbles. Copy is
+	// always available for text; the stats toggle needs stored timings.
+	if (textBuf.trim() || thinkingBuf) {
+		const footer = buildMessageFooter({
+			copyText: textBuf.trim() || undefined,
+			usage: m.usage,
+			timings: tm,
+		});
+		if (footer) bubble.appendChild(footer);
 	}
 }
 

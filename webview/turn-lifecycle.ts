@@ -10,11 +10,12 @@
 // streamText/streamThinking append the delta to a chunks array and schedule a
 // rAF-debounced render — at most one md(joinedText) per frame.
 
-import { appendBubble, els, scrollToBottomIfPinned, setEmptyVisibility } from "./dom";
+import { appendBubble, buildMessageFooter, buildThinkingSummary, els, scrollToBottomIfPinned, setEmptyVisibility } from "./dom";
 import { md } from "./helpers";
 import { t } from "./i18n";
-import { runtime } from "./state";
-import type { BubbleState, StatusState } from "./types";
+import { FROM_WEBVIEW } from "./protocol";
+import { post, runtime } from "./state";
+import type { BubbleState, MsgTimings, StatusState } from "./types";
 import { updateSendButton } from "./prompt";
 
 export function ensureStatus(): StatusState {
@@ -90,12 +91,18 @@ export function ensureBubble(): BubbleState {
 		thinking: "",
 		pendingRender: null,
 		pendingThinkingRender: null,
+		requestStartAt: runtime.requestMarkAt || Date.now(),
+		firstDeltaAt: Date.now(),
+		thinkingStartAt: null,
+		thinkingEndAt: null,
+		thinkingSummaryEl: null,
+		thinkingAnim: null,
 	};
 	pinStatusToEnd();
 	return runtime.bubble;
 }
 
-export function finalizeBubble(): void {
+export function finalizeBubble(message?: any): void {
 	// Flush any pending markdown render so the final state is committed.
 	const b = runtime.bubble;
 	if (b) {
@@ -109,8 +116,57 @@ export function finalizeBubble(): void {
 			b.pendingThinkingRender = null;
 			renderThinkingNow(b);
 		}
+		settleThinking();
+		attachStats(b, message);
 	}
 	runtime.bubble = null;
+}
+
+/** Stop the "Thinking…" dots animation and stamp the final "Thought for N.Ns"
+ *  label. Called when thinking gives way to text/tool output and when the
+ *  message ends. Safe to call repeatedly (no-op once settled). */
+export function settleThinking(): void {
+	const b = runtime.bubble;
+	if (!b || !b.thinkingSummaryEl || b.thinkingAnim === null) return;
+	clearInterval(b.thinkingAnim);
+	b.thinkingAnim = null;
+	const secs =
+		b.thinkingStartAt !== null
+			? ((b.thinkingEndAt ?? Date.now()) - b.thinkingStartAt) / 1000
+			: 0;
+	b.thinkingSummaryEl.textContent = t("chat.thoughtFor", { s: secs.toFixed(1) });
+	b.thinkingSummaryEl.closest("details")?.classList.remove("thinking-live");
+}
+
+/** Per-message footer (copy button + stats toggle) appended at the end of the
+ *  bubble; timings are measured from the event stream and persisted for replay. */
+function attachStats(b: BubbleState, message?: any): void {
+	if (!b.text.trim() && !b.thinking.trim()) return; // tool-only / empty bubble
+	const now = Date.now();
+	const tm: MsgTimings = {
+		ttftMs: Math.max(0, b.firstDeltaAt - b.requestStartAt),
+		genMs: Math.max(0, now - b.firstDeltaAt),
+		totalMs: Math.max(0, now - b.requestStartAt),
+		thinkMs:
+			b.thinkingStartAt !== null ? Math.max(0, (b.thinkingEndAt ?? now) - b.thinkingStartAt) : 0,
+	};
+	const footer = buildMessageFooter({
+		copyText: b.text.trim() || undefined,
+		usage: message?.usage,
+		timings: tm,
+	});
+	if (footer) b.bubble.appendChild(footer);
+
+	// Persist INTO the session transcript: Pi's internal /stats-record command
+	// appends a webview-stats custom entry (clean dispatch, no LLM turn), so
+	// the display survives reloads and travels with the session file.
+	const key = message?.timestamp != null ? String(message.timestamp) : "";
+	if (key) {
+		post({
+			kind: FROM_WEBVIEW.SLASH,
+			text: `/stats-record ${JSON.stringify({ key, stats: tm })}`,
+		});
+	}
 }
 
 export function finalizeTurn(): void {
@@ -128,6 +184,8 @@ export function finalizeTurn(): void {
 /** PERF: append to chunked text + schedule one render per frame. */
 export function streamText(delta: string): void {
 	const b = ensureBubble();
+	// Visible text starting = the reasoning phase is over for this message.
+	if (b.thinkingAnim !== null) settleThinking();
 	b.text += delta;
 	scheduleTextRender(b);
 	pinStatusToEnd();
@@ -138,17 +196,27 @@ export function streamThinking(delta: string): void {
 	if (!delta) return;
 	const b = ensureBubble();
 	b.thinking += delta;
+	if (b.thinkingStartAt === null) b.thinkingStartAt = Date.now();
+	b.thinkingEndAt = Date.now();
 	setStatusPhase(t("chat.status.thinking"));
 	if (!b.thinkingEl) {
 		const wrap = document.createElement("details");
-		wrap.className = "msg-thinking";
-		const summary = document.createElement("summary");
-		summary.textContent = "Thinking…";
+		// thinking-live drives the icon pulse; removed when reasoning settles.
+		wrap.className = "msg-thinking thinking-live";
+		const { summary, label } = buildThinkingSummary(t("chat.thinking"));
 		const body = document.createElement("div");
 		body.className = "thinking-body";
 		wrap.append(summary, body);
 		b.bubble.insertBefore(wrap, b.textEl);
 		b.thinkingEl = body;
+		b.thinkingSummaryEl = label; // label span — the icon/chevron stay put
+		// Animated "Thinking." → ".." → "..." while reasoning streams; replaced
+		// with "Thought for N.Ns" by settleThinking().
+		let dots = 0;
+		b.thinkingAnim = window.setInterval(() => {
+			dots = (dots % 3) + 1;
+			label.textContent = t("chat.thinking") + ".".repeat(dots);
+		}, 400);
 	}
 	scheduleThinkingRender(b);
 	pinStatusToEnd();

@@ -40,8 +40,12 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.EXIT; code: number | null; signal: string | null }
 	| { kind: typeof TO_WEBVIEW.STATE; state: any }
 	| { kind: typeof TO_WEBVIEW.SESSIONS; sessions: SessionEntry[] }
+	| {
+			kind: typeof TO_WEBVIEW.MESSAGES;
+			messages: unknown[];
+			stats?: Record<string, MsgTimings>;
+	  }
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
-	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: any[] }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
 	| {
 			kind: typeof TO_WEBVIEW.USAGE;
@@ -53,6 +57,7 @@ export type ToWebview =
 
 export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.PROMPT; text: string }
+	| { kind: typeof FROM_WEBVIEW.STEER; text: string }
 	| { kind: typeof FROM_WEBVIEW.ABORT }
 	| { kind: typeof FROM_WEBVIEW.UI_RESPONSE; response: UiResponse }
 	| { kind: typeof FROM_WEBVIEW.COMMAND; command: { type: string; [k: string]: unknown } }
@@ -75,6 +80,15 @@ export type StatusState = {
 	timer: number;
 };
 
+/** Webview-measured per-message timings. Persisted into the session transcript
+ *  (webview-stats custom entry via /stats-record) and restored on replay. */
+export interface MsgTimings {
+	ttftMs: number;
+	genMs: number;
+	totalMs: number;
+	thinkMs: number;
+}
+
 export type BubbleState = {
 	bubble: HTMLElement;
 	textEl: HTMLElement;
@@ -86,4 +100,15 @@ export type BubbleState = {
 	pendingRender: number | null;
 	/** rAF id pending a thinking re-render. */
 	pendingThinkingRender: number | null;
+	/** When the API request behind this message started (runtime.requestMarkAt
+	 *  captured at bubble creation) — basis for ttft/total in the stats line. */
+	requestStartAt: number;
+	/** First streamed delta for this message (bubble creation time). */
+	firstDeltaAt: number;
+	/** First/last thinking delta timestamps (null = no thinking yet). */
+	thinkingStartAt: number | null;
+	thinkingEndAt: number | null;
+	/** The thinking <summary> element + its dots-animation interval id. */
+	thinkingSummaryEl: HTMLElement | null;
+	thinkingAnim: number | null;
 };

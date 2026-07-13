@@ -1,7 +1,7 @@
 // Host → webview message router + Pi event handler + ui-hint handler.
 
 import { appendCompactionSummary, appendSystem, els, setEmptyVisibility } from "./dom";
-import { buildPlanExecutionBody } from "./helpers";
+import { buildPlanExecutionBody, buildReviewBody } from "./helpers";
 import { clearConversation, renderHistory, renderRecentList } from "./history";
 import { showModal } from "./modals";
 import { t } from "./i18n";
@@ -36,6 +36,7 @@ import {
 	finalizeTurn,
 	pinStatusToEnd,
 	setStatusPhase,
+	settleThinking,
 	streamText,
 	streamThinking,
 } from "./turn-lifecycle";
@@ -129,9 +130,13 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		}
 		refreshPopover(); // populate an open Model tab once the list arrives
 	},
-	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages),
+	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages, msg.stats),
 	[TO_WEBVIEW.COMMANDS]: (msg) => {
-		runtime.slashCommands = msg.commands ?? [];
+		// stats-record is the webview's own machine-dispatched bridge (stats →
+		// session entry) — hide it from the user-facing autocomplete.
+		runtime.slashCommands = (msg.commands ?? []).filter(
+			(c: { name: string }) => c.name !== "stats-record",
+		);
 	},
 	[TO_WEBVIEW.USAGE]: (msg) => showTokenModal(msg.perModel ?? {}, msg.sessionCount ?? 1, msg.context),
 	[TO_WEBVIEW.STDERR]: (msg) => appendSystem(msg.text),
@@ -178,6 +183,9 @@ function handlePiEvent(ev: any): void {
 			} else if (e.type === ASSISTANT_DELTA.THINKING) {
 				streamThinking(String(e.delta ?? ""));
 			} else if (e.type === ASSISTANT_DELTA.TOOLCALL_END) {
+				// A tool call after reasoning also ends the thinking phase (some
+				// messages go thinking → tool with no visible text in between).
+				settleThinking();
 				const tc = e.toolCall ?? {};
 				addToolCall(
 					String(tc.name ?? "?"),
@@ -197,15 +205,34 @@ function handlePiEvent(ev: any): void {
 				appendSystem("⚠️ " + formatTurnError(m.errorMessage));
 			}
 			// Bubble is per-message. Status stays alive across messages so the
-			// "tool running" indicator remains visible during tool gaps.
-			finalizeBubble();
+			// "tool running" indicator remains visible during tool gaps. The
+			// message carries usage (tokens) for the per-message stats toggle.
+			finalizeBubble(m);
+			// The next API round (if any) starts after this point.
+			runtime.requestMarkAt = Date.now();
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
+			return;
+		}
+		case PI_EVENT.QUEUE_UPDATE: {
+			// A steering/follow-up message left the queue → it was delivered into
+			// the conversation; un-dim its bubble. (Texts still listed stay dimmed.)
+			const still = new Set<string>([
+				...((ev.steering as string[]) ?? []),
+				...((ev.followUp as string[]) ?? []),
+			]);
+			runtime.steerQueue = runtime.steerQueue.filter((q) => {
+				if (still.has(q.text)) return true;
+				q.el.classList.remove("queued");
+				q.el.removeAttribute("title");
+				return false;
+			});
 			return;
 		}
 		case PI_EVENT.SESSION_START:
 		case PI_EVENT.SESSION_SWITCH:
 		case PI_EVENT.SESSION_LOADED: {
 			clearConversation();
+			runtime.steerQueue = []; // bubbles are gone with the conversation
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 			post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
@@ -231,6 +258,13 @@ function handlePiEvent(ev: any): void {
 				runtime.pendingPlanHandoff = null;
 				runPlanHandoff(path, targetMode);
 			}
+			// Review handoff: finalize_implementation signaled completion and we
+			// switched back to the parent plan session — enter review mode there.
+			if (runtime.pendingReviewHandoff) {
+				const { reportPath } = runtime.pendingReviewHandoff;
+				runtime.pendingReviewHandoff = null;
+				void runReviewHandoff(reportPath, false);
+			}
 			return;
 		}
 		case PI_EVENT.TOOL_EXEC_START: {
@@ -248,11 +282,21 @@ function handlePiEvent(ev: any): void {
 			updateToolResult(String(ev.toolCallId ?? "?"), ok, ev.output ?? ev.result ?? ev.error);
 			setStatusPhase(t("chat.status.waiting"));
 			pinStatusToEnd();
+			// The follow-up API request starts right after the tool finishes —
+			// baseline for the next message's ttft.
+			runtime.requestMarkAt = Date.now();
 			return;
 		}
 		case PI_EVENT.AGENT_START:
 		case PI_EVENT.TURN_START:
 			runtime.turnInFlight = true;
+			// First API request of the turn starts now. A fresh (<5s) mark from
+			// doSend is MORE accurate (set before the RPC round-trip) — keep it;
+			// anything older is a stale leftover (auto-dispatched turns —
+			// handoffs, auto-continue — never pass through doSend).
+			if (Date.now() - runtime.requestMarkAt > 5_000) {
+				runtime.requestMarkAt = Date.now();
+			}
 			updateSendButton();
 			// Hide the compact button immediately while the model works (a turn can
 			// span multiple tool rounds; Pi can't compact until it ends).
@@ -264,6 +308,13 @@ function handlePiEvent(ev: any): void {
 		case PI_EVENT.AGENT_END:
 		case PI_EVENT.TURN_END:
 			runtime.turnInFlight = false;
+			// Any steering bubble still dimmed here was either delivered without
+			// a queue_update or dropped by an abort — stop showing it as pending.
+			for (const q of runtime.steerQueue) {
+				q.el.classList.remove("queued");
+				q.el.removeAttribute("title");
+			}
+			runtime.steerQueue = [];
 			finalizeTurn();
 			post({ kind: FROM_WEBVIEW.REQUEST_STATE });
 			post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
@@ -400,6 +451,29 @@ function handleSetStatus(key: string, value: string): void {
 			kind: FROM_WEBVIEW.COMMAND,
 			command: { type: "new_session", parentSession: runtime.currentSessionFile },
 		});
+	} else if (key === STATUS_KEYS.REVIEW_HANDOFF) {
+		// value format: "<reportPath>|<parentSessionPath or empty>". Pi resolves
+		// the parent from the child session's header (recorded at plan handoff),
+		// so this survives webview reloads between handoff and completion.
+		const sep = value.lastIndexOf("|");
+		const reportPath = sep >= 0 ? value.slice(0, sep) : value;
+		const parentPath = sep >= 0 ? value.slice(sep + 1) : "";
+		if (parentPath && parentPath !== runtime.currentSessionFile) {
+			appendSystem(`Implementation report → ${reportPath}. Reviewing in the plan session…`);
+			runtime.pendingReviewHandoff = { reportPath };
+			// Same guard as auto-resume: don't let interim STATE messages persist
+			// a transient session while the switch is in flight.
+			runtime.pendingSwitchTarget = parentPath;
+			post({
+				kind: FROM_WEBVIEW.COMMAND,
+				command: { type: "switch_session", sessionPath: parentPath },
+			});
+		} else {
+			// No recorded parent (standalone code session, deleted parent) —
+			// review in place in this session.
+			appendSystem(`Implementation report → ${reportPath}. Switching to review…`);
+			void runReviewHandoff(reportPath, true);
+		}
 	} else if (key === STATUS_KEYS.TODOS) {
 		// Full task list pushed by Pi's todo_write. When the pinned panel is on,
 		// drive it from here (the in-stream block then collapses to one line; see
@@ -509,6 +583,27 @@ async function runPlanHandoff(path: string, targetMode: string): Promise<void> {
 	}
 	const body = buildPlanExecutionBody(path, targetMode);
 	appendSystem(`Implementing plan from ${path}`);
+	ensureTurn();
+	post({ kind: FROM_WEBVIEW.PROMPT, text: body });
+}
+
+/** Async sequence for the implementation→review handoff: switch to review mode
+ *  (in the parent plan session after the session switch settles, or in place
+ *  when there is no parent), then fire the review prompt referencing the
+ *  implementation report. Mirrors runPlanHandoff's condition-based waits. */
+async function runReviewHandoff(reportPath: string, sameSession: boolean): Promise<void> {
+	await delay(300);
+	if (ui.mode !== "review") {
+		// /review-begin (not /mode review): Pi remembers the prior mode and
+		// auto-returns to it once the review reply's turn ends.
+		post({ kind: FROM_WEBVIEW.PROMPT, text: "/review-begin" });
+		await waitFor(() => ui.mode === "review", 2000);
+		if (ui.mode !== "review") {
+			appendSystem(`Warning: mode did not settle to "review" within 2s; sending review request anyway.`);
+		}
+	}
+	const body = buildReviewBody(reportPath, sameSession);
+	appendSystem(`Reviewing implementation from ${reportPath}`);
 	ensureTurn();
 	post({ kind: FROM_WEBVIEW.PROMPT, text: body });
 }

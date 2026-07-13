@@ -3,6 +3,7 @@
 // are the single source of truth for DOM access in the rest of the webview.
 
 import { t } from "./i18n";
+import type { MsgTimings } from "./types";
 
 // Inline SVG logo (avoids CSP / webview-asset URI plumbing for static art).
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 64" aria-hidden="true">
@@ -258,8 +259,15 @@ export function buildImageBadge(opts: {
 export function appendUserBubble(
 	text: string,
 	images?: { data: string; mimeType: string; name?: string }[],
-): void {
+	opts?: { queued?: boolean },
+): HTMLElement {
 	const div = appendBubble("user");
+	if (opts?.queued) {
+		// Mid-turn steering: dimmed until Pi delivers it at the next tool
+		// boundary (dispatch.ts removes the class on queue_update).
+		div.classList.add("queued");
+		div.title = t("chat.queuedTitle");
+	}
 	// User messages render as plain text with pre-wrap. Avoid markdown <p> wrapping
 	// which adds extra spacing around short messages.
 	if (images && images.length) {
@@ -285,12 +293,174 @@ export function appendUserBubble(
 	}
 	// Sending a message is an explicit action — always jump to it and re-pin.
 	forceScrollToBottom();
+	return div;
 }
 
 export function appendSystem(text: string): void {
 	if (!text) return;
 	const div = appendBubble("system");
 	div.textContent = text;
+}
+
+/** Abbreviated token count: 845 → "845", 3_120 → "3.1k", 1_240_000 → "1.2m".
+ *  Trailing ".0" is dropped (2.0k → "2k"). */
+export function fmtTokens(n: number): string {
+	const fmt = (v: number, suffix: string) => {
+		const s = v.toFixed(1).replace(/\.0$/, "");
+		return `${s}${suffix}`;
+	};
+	if (n >= 1_000_000) return fmt(n / 1_000_000, "m");
+	if (n >= 1_000) return fmt(n / 1_000, "k");
+	return String(n);
+}
+
+const COPY_SVG =
+	'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_SVG =
+	'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const STATS_SVG =
+	'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
+
+function writeClipboard(text: string): void {
+	try {
+		if (navigator.clipboard?.writeText) {
+			void navigator.clipboard.writeText(text);
+			return;
+		}
+	} catch {
+		/* fall through to the textarea path */
+	}
+	const ta = document.createElement("textarea");
+	ta.value = text;
+	ta.style.position = "fixed";
+	ta.style.opacity = "0";
+	document.body.appendChild(ta);
+	ta.select();
+	try {
+		document.execCommand("copy");
+	} catch {
+		/* clipboard unavailable — nothing else to try */
+	}
+	ta.remove();
+}
+
+function iconButton(svg: string, title: string): HTMLButtonElement {
+	const btn = document.createElement("button");
+	btn.className = "msg-action-btn";
+	btn.type = "button";
+	btn.innerHTML = svg;
+	btn.title = title;
+	return btn;
+}
+
+/** Bottom action row for an assistant message: right-aligned icon buttons —
+ *  copy-response and (when timings exist) a stats toggle that expands the
+ *  labeled breakdown grid below the icons. Shared by the live stream
+ *  (turn-lifecycle) and history replay. Returns null when there is nothing
+ *  to show (no text to copy, no timings). */
+export function buildMessageFooter(opts: {
+	copyText?: string;
+	usage?: { input?: number; output?: number; cacheRead?: number };
+	timings?: MsgTimings;
+}): HTMLElement | null {
+	const { copyText, usage, timings } = opts;
+	if (!copyText && !timings) return null;
+
+	const footer = document.createElement("div");
+	footer.className = "msg-footer";
+	const actions = document.createElement("div");
+	actions.className = "msg-actions";
+	footer.appendChild(actions);
+
+	if (copyText) {
+		const btn = iconButton(COPY_SVG, t("chat.copy"));
+		btn.addEventListener("click", () => {
+			writeClipboard(copyText);
+			btn.innerHTML = CHECK_SVG;
+			btn.title = t("chat.copied");
+			btn.classList.add("ok");
+			setTimeout(() => {
+				btn.innerHTML = COPY_SVG;
+				btn.title = t("chat.copy");
+				btn.classList.remove("ok");
+			}, 1200);
+		});
+		actions.appendChild(btn);
+	}
+
+	if (timings) {
+		const out = usage?.output ?? 0;
+		const promptTokens = (usage?.input ?? 0) + (usage?.cacheRead ?? 0);
+		const thinkS = timings.thinkMs / 1000;
+
+		const rows: [string, string][] = [];
+		if (promptTokens > 0) {
+			const cached = usage?.cacheRead ?? 0;
+			rows.push([
+				t("chat.stats.prompt"),
+				`${fmtTokens(promptTokens)} tokens${cached > 0 ? ` (${fmtTokens(cached)} ${t("chat.stats.cached")})` : ""}`,
+			]);
+		}
+		if (out > 0) rows.push([t("chat.stats.generated"), `${fmtTokens(out)} tokens`]);
+		if (thinkS > 0.05) rows.push([t("chat.stats.thinking"), `${thinkS.toFixed(1)}s`]);
+		rows.push([t("chat.stats.ttft"), `${(timings.ttftMs / 1000).toFixed(2)}s`]);
+		if (out > 0 && timings.genMs > 200) {
+			rows.push([t("chat.stats.genSpeed"), `${(out / (timings.genMs / 1000)).toFixed(1)} tok/s`]);
+		}
+		rows.push([t("chat.stats.total"), `${(timings.totalMs / 1000).toFixed(1)}s`]);
+
+		const body = document.createElement("div");
+		body.className = "stats-body hidden";
+		for (const [label, value] of rows) {
+			const row = document.createElement("div");
+			row.className = "stats-row";
+			const l = document.createElement("span");
+			l.className = "stats-label";
+			l.textContent = label;
+			const v = document.createElement("span");
+			v.className = "stats-value";
+			v.textContent = value;
+			row.append(l, v);
+			body.appendChild(row);
+		}
+		footer.appendChild(body);
+
+		const summary = `${(timings.totalMs / 1000).toFixed(1)}s${out > 0 ? ` · ${fmtTokens(out)} tokens` : ""}`;
+		const btn = iconButton(STATS_SVG, summary);
+		btn.addEventListener("click", () => {
+			const open = !body.classList.toggle("hidden");
+			btn.classList.toggle("active", open);
+		});
+		actions.appendChild(btn);
+	}
+
+	return footer;
+}
+
+/** Header row for the thinking <details> block: sparkle icon on the left, the
+ *  live label ("Thinking…" / "Thought for Ns") in the middle, and a chevron
+ *  pinned to the right that rotates on open/close (CSS transition). Shared by
+ *  the live stream (turn-lifecycle) and history replay so both look identical.
+ *  Callers update ONLY the returned label element — replacing the summary's
+ *  textContent would wipe the icon/chevron. */
+export function buildThinkingSummary(initialLabel: string): {
+	summary: HTMLElement;
+	label: HTMLElement;
+} {
+	const summary = document.createElement("summary");
+	const icon = document.createElement("span");
+	icon.className = "think-icon";
+	icon.innerHTML =
+		'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>';
+	const label = document.createElement("span");
+	label.className = "think-label";
+	label.textContent = initialLabel;
+	const chevron = document.createElement("span");
+	chevron.className = "think-chevron";
+	chevron.innerHTML =
+		'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+	summary.append(icon, label, chevron);
+	return { summary, label };
 }
 
 /** Append the collapsed "context compacted — view summary" block. Used both at

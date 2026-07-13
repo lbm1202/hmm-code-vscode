@@ -11,7 +11,7 @@ import {
 	getAttachmentsForSend,
 	wireAttachments,
 } from "./attachments";
-import { appendUserBubble, els } from "./dom";
+import { appendSystem, appendUserBubble, els } from "./dom";
 import { t } from "./i18n";
 import { updateModeColor } from "./pickers";
 import { FROM_WEBVIEW, MODE_NAMES } from "./protocol";
@@ -72,13 +72,33 @@ function insertNewlineAtCaret(ta: HTMLTextAreaElement): void {
 }
 
 export function doSend(): void {
-	if (runtime.turnInFlight || runtime.compacting || runtime.pendingQuestionCount > 0) return; // blocked
+	if (runtime.compacting || runtime.pendingQuestionCount > 0) return; // blocked
 	const e = els();
 	const text = e.prompt.value.trim();
 	const images = getAttachmentsForSend();
 	const bubbleImages = getAttachmentsForBubble(); // capture names before clear
 	if (!text && images.length === 0) return;
 	hideSlashMenu();
+
+	// Mid-turn: steer — Pi queues the message and delivers it at the next tool
+	// boundary (steering interjection). The bubble renders dimmed
+	// until queue_update reports it delivered. Slash commands stay blocked
+	// mid-turn: a mode/model change wouldn't apply to the already-captured
+	// loop config, and Pi's steer() rejects extension commands anyway.
+	if (runtime.turnInFlight) {
+		if (images.length === 0 && text.startsWith("/")) {
+			appendSystem(t("chat.noSlashMidTurn"));
+			return;
+		}
+		const bubble = appendUserBubble(text, bubbleImages, { queued: true });
+		runtime.steerQueue.push({ text, el: bubble });
+		e.prompt.value = "";
+		autosizePrompt();
+		clearAttachments();
+		post({ kind: FROM_WEBVIEW.STEER, text, images });
+		return;
+	}
+
 	// A recognized extension command (e.g. /mode, /reset, /compact) runs a
 	// handler with no LLM turn. Route it straight to Pi without echoing a user
 	// bubble or arming the optimistic spinner — otherwise the spinner would
@@ -97,6 +117,7 @@ export function doSend(): void {
 	autosizePrompt(); // collapse back to a single line
 	clearAttachments();
 	runtime.turnInFlight = true;
+	runtime.requestMarkAt = Date.now(); // ttft baseline for the first message
 	ensureTurn(); // creates the standalone status row right away
 	post({ kind: FROM_WEBVIEW.PROMPT, text, images });
 	updateSendButton();
@@ -112,11 +133,12 @@ export function updateSendButton(): void {
 	updatePromptDisabled();
 }
 
-/** Block prompt input while turnInFlight or pendingQuestionCount > 0.
- *  Send button stays enabled — it doubles as Abort when turnInFlight. */
+/** Block prompt input while compacting or a question modal is pending. A turn
+ *  in flight NO LONGER blocks typing — Enter then steers (queues a mid-turn
+ *  interjection); the send button still doubles as Abort. */
 export function updatePromptDisabled(): void {
 	const e = els();
-	const blocked = runtime.turnInFlight || runtime.compacting || runtime.pendingQuestionCount > 0;
+	const blocked = runtime.compacting || runtime.pendingQuestionCount > 0;
 	e.prompt.disabled = blocked;
 	e.prompt.classList.toggle("disabled", blocked);
 	e.prompt.setAttribute(
@@ -124,10 +146,10 @@ export function updatePromptDisabled(): void {
 		blocked
 			? runtime.compacting
 				? t("chat.compacting")
-				: runtime.turnInFlight
-					? t("chat.modelWorking")
-					: t("chat.waitingInput")
-			: DEFAULT_PLACEHOLDER,
+				: t("chat.waitingInput")
+			: runtime.turnInFlight
+				? t("chat.steerPlaceholder")
+				: DEFAULT_PLACEHOLDER,
 	);
 	// Block session-switching while a turn is mid-flight or compacting: switching
 	// mid-stream makes Pi drop the in-progress response / compaction.
@@ -196,8 +218,12 @@ export function wirePrompt(): void {
 			return; // NO preventDefault → keep the native newline
 		}
 		if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
-			const dir = ev.shiftKey ? -1 : 1;
 			ev.preventDefault();
+			// No mode cycling mid-turn: the running loop captured its config at
+			// start, so a switch wouldn't apply to it (same reason slash commands
+			// are blocked while steering is available).
+			if (runtime.turnInFlight || runtime.compacting) return;
+			const dir = ev.shiftKey ? -1 : 1;
 			const idx = MODE_NAMES.indexOf(ui.mode as any);
 			const next = MODE_NAMES[(idx + dir + MODE_NAMES.length) % MODE_NAMES.length];
 			if (next === ui.mode) return;

@@ -109,6 +109,15 @@ export const runtime = {
 	pendingSwitchTarget: undefined as string | undefined,
 	/** finalize_plan handoff queue: plan written, awaiting new session start. */
 	pendingPlanHandoff: null as { path: string; targetMode: string } | null,
+	/** finalize_implementation handoff queue: report written, awaiting the
+	 * switch back to the parent plan session before entering review mode. */
+	pendingReviewHandoff: null as { reportPath: string } | null,
+	/** Mid-turn steering messages awaiting delivery: bubble refs kept dimmed
+	 * until Pi's queue_update no longer lists their text (= delivered). */
+	steerQueue: [] as { text: string; el: HTMLElement }[],
+	/** When the in-flight API request (roughly) started: set on send, turn
+	 * start, and after each tool execution. Basis for ttft/total stats. */
+	requestMarkAt: 0,
 	/** Most recent state.model object — used to recompute thinking levels when
 	 * the (delayed) full model list arrives. */
 	lastStateModel: null as any,
