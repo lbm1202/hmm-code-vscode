@@ -63,6 +63,7 @@ export class ChatPanel {
 			// input-wait toast (the panel counts as visible only when its tab is).
 			isVisible: () => panel.visible,
 			reveal: () => panel.reveal(),
+			memento: ctx.globalState,
 		});
 		const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME;
 		backend.start(cwd);

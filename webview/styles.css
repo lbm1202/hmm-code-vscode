@@ -908,6 +908,105 @@ body.mod-down .bash-cmd-link:hover {
 	letter-spacing: 0.6px;
 }
 
+/* ── First-run onboarding card (inside the empty state) ─────────────────── */
+#onboarding-root {
+	width: 100%;
+	max-width: 340px;
+	margin-top: 14px;
+	text-align: left;
+}
+.ob-card {
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 8px;
+	padding: 13px 13px 11px;
+	font-size: 12.5px;
+}
+.ob-title { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+.ob-desc { font-size: 12px; color: var(--vscode-descriptionForeground); margin-bottom: 11px; }
+.ob-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: left;
+	background: color-mix(in srgb, var(--vscode-editorWidget-background) 80%, var(--vscode-foreground) 6%);
+	border: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+	border-radius: 6px;
+	padding: 8px 10px;
+	font-size: 12.5px;
+	margin-bottom: 6px;
+	cursor: pointer;
+}
+.ob-btn:hover { border-color: var(--vscode-focusBorder); }
+.ob-btn.primary {
+	background: var(--vscode-button-background);
+	border-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+.ob-btn.busy { opacity: 0.55; cursor: default; }
+.ob-bi { width: 18px; text-align: center; flex-shrink: 0; }
+.ob-note { margin-left: auto; font-size: 10.5px; opacity: 0.7; }
+.ob-status { display: flex; align-items: center; gap: 7px; font-size: 11.5px; margin: 2px 0 10px; }
+.ob-status.ok { color: var(--vscode-charts-green, #8fd3a5); }
+.ob-status.busy { color: var(--vscode-descriptionForeground); }
+.ob-status.err { color: var(--vscode-errorForeground); }
+.ob-cancel { margin-left: auto; font-size: 11px; }
+.ob-spin {
+	width: 10px;
+	height: 10px;
+	border: 2px solid var(--vscode-progressBar-background, #3a9cd6);
+	border-top-color: transparent;
+	border-radius: 50%;
+	flex-shrink: 0;
+	animation: ob-sp 1s linear infinite;
+}
+@keyframes ob-sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } }
+.ob-preset {
+	border: 1px solid color-mix(in srgb, var(--vscode-charts-green, #5fdca0) 40%, var(--vscode-panel-border) 60%);
+	background: color-mix(in srgb, var(--vscode-charts-green, #5fdca0) 6%, var(--vscode-editorWidget-background) 94%);
+	border-radius: 6px;
+	padding: 8px 10px;
+	margin-bottom: 10px;
+}
+.ob-preset-h { font-size: 11px; font-weight: 600; color: var(--vscode-charts-green, #8fd3a5); margin-bottom: 5px; }
+.ob-preset-row { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; margin-bottom: 3px; }
+.ob-preset-modes { flex-shrink: 0; }
+.ob-preset-model { font-family: var(--vscode-editor-font-family); font-size: 10.5px; color: var(--vscode-descriptionForeground); word-break: break-all; }
+.ob-link { color: var(--vscode-textLink-foreground); font-size: 11px; cursor: pointer; }
+.ob-tips { margin-top: 11px; border-top: 1px solid var(--vscode-panel-border); padding-top: 9px; }
+.ob-tips-h, .ob-starter-h { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); letter-spacing: 0.03em; margin-bottom: 6px; }
+.ob-starter-h { margin-top: 2px; }
+.ob-tip { display: flex; gap: 8px; font-size: 11.5px; color: var(--vscode-foreground); opacity: 0.85; margin-bottom: 5px; align-items: baseline; }
+.ob-k {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 10.5px;
+	background: color-mix(in srgb, var(--vscode-editorWidget-background) 80%, var(--vscode-foreground) 8%);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	padding: 0 5px;
+	flex-shrink: 0;
+}
+.ob-sp {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: left;
+	background: transparent;
+	border: 1px dashed var(--vscode-panel-border);
+	color: var(--vscode-textLink-foreground);
+	border-radius: 6px;
+	padding: 6px 9px;
+	font-size: 11.5px;
+	margin-bottom: 5px;
+	cursor: pointer;
+}
+.ob-sp:hover { border-color: var(--vscode-focusBorder); background: color-mix(in srgb, var(--vscode-focusBorder) 8%, transparent); }
+.ob-foot { margin-top: 8px; }
+
 .recent-section {
 	width: 100%;
 	max-width: 360px;

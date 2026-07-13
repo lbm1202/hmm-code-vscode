@@ -7,6 +7,9 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Added
+- **First-run onboarding card.** On a fresh install with no authentication anywhere (empty `auth.json`, no API-key environment variables, no custom providers — detection is conservative and never blocks chat), the empty state shows a getting-started card: Claude Pro/Max and ChatGPT (Codex) browser logins run right from the card (with progress + cancel), an API-key button opens Settings, and a short how-it-works list covers modes, mid-turn steering, and where usage/settings live. After a successful login the card flips to a ready state: it fills recommended per-mode default models into **empty** modes only (Claude: plan/review → Opus, code/debug/ask → Sonnet; Codex: GPT-5.6/5.5 — validated against the live catalog, never overwriting configured modes), shows what it applied with a link to change it, and offers clickable starter prompts. Hidden permanently after "Don't show again", once any session exists, or whenever auth is detected.
+
 ### Fixed
 - **Usage checks no longer fail with "HTTP 401 (token expired)".** When the stored OAuth access token has expired, the usage lookup now asks the running Pi to refresh it first (an AuthStorage key-resolve — no LLM turn, no chat pollution; Pi stays the single writer of auth.json), then fetches. Applies to the topbar usage modal and both settings-panel usage buttons, for Claude and Codex.
 

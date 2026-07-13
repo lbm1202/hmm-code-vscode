@@ -38,6 +38,9 @@ export const TO_WEBVIEW = {
 	/** Subscription (Claude Pro/Max, ChatGPT Codex) plan-usage snapshot for the
 	 *  topbar usage popover. */
 	SUB_USAGE: "sub-usage",
+	/** First-run onboarding card state (empty-state card). Sent on boot and on
+	 *  every transition (login progress / success / preset applied). */
+	ONBOARDING: "onboarding",
 	STDERR: "stderr",
 	EXIT: "exit",
 } as const;
@@ -63,6 +66,12 @@ export const FROM_WEBVIEW = {
 	/** Ask the host for subscription plan usage (reads auth.json, hits the
 	 *  provider usage endpoints). Answered with SUB_USAGE. */
 	REQUEST_SUB_USAGE: "request-sub-usage",
+	/** Onboarding card: start a browser OAuth login ("anthropic" | "openai-codex"). */
+	OB_LOGIN: "ob-login",
+	/** Onboarding card: cancel the in-flight OAuth login. */
+	OB_LOGIN_CANCEL: "ob-login-cancel",
+	/** Onboarding card: "don't show again" — persisted host-side. */
+	OB_DISMISS: "ob-dismiss",
 	LIST_SESSIONS: "list-sessions",
 	DELETE_SESSION: "delete-session",
 	RENAME_SESSION: "rename-session",

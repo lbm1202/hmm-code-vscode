@@ -27,6 +27,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				view.badge = count > 0 ? { value: count, tooltip } : undefined;
 			},
 			reveal: () => void vscode.commands.executeCommand("hmm-code.chat.focus"),
+			memento: this.ctx.globalState,
 		});
 		view.onDidChangeVisibility(() => {
 			// Revealing the view shows the pending dialog — the badge served its

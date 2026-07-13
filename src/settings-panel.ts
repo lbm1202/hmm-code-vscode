@@ -21,6 +21,7 @@ import { fetchAnthropicUsage } from "./anthropic-usage";
 import { codexOAuthLogin } from "./oauth-codex";
 import { fetchCodexUsage } from "./codex-usage";
 import { ensureFreshOAuth } from "./auth-refresh";
+import { writeOAuthCredential } from "./oauth-write";
 import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { getWebviewMessages, resolveLocale, t } from "./i18n";
 
@@ -332,16 +333,7 @@ export class SettingsPanel {
 				},
 				abort.signal,
 			);
-			// Write to auth.json with the shape Pi's AuthStorage expects.
-			const raw: any = SettingsPanel.readJsonSafe(AUTH_PATH) ?? {};
-			raw[opts.providerId] = creds;
-			mkdirSync(dirname(AUTH_PATH), { recursive: true, mode: 0o700 });
-			writeFileSync(AUTH_PATH, JSON.stringify(raw, null, 2), "utf-8");
-			try {
-				chmodSync(AUTH_PATH, 0o600);
-			} catch {
-				/* non-POSIX */
-			}
+			writeOAuthCredential(opts.providerId, creds);
 			// Full pi restart so AuthStorage picks up the new oauth entry.
 			vscode.commands.executeCommand("hmm-code.restartChat");
 			panel.webview.postMessage({

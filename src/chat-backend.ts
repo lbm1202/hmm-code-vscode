@@ -28,6 +28,10 @@ import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { applyAllowlist, findAlias } from "./model-utils";
 import { collectSubscriptionUsage, type SubUsageEntry } from "./sub-usage";
 import { ensureFreshOAuth, OAUTH_USAGE_PROVIDERS } from "./auth-refresh";
+import { applyModePresets, noAuthDetected, type PresetApplied } from "./onboarding";
+import { writeOAuthCredential } from "./oauth-write";
+import { anthropicOAuthLogin } from "./oauth-anthropic";
+import { codexOAuthLogin } from "./oauth-codex";
 
 const MODES_JSON_PATH = join(homedir(), ".pi", "agent", "modes.json");
 
@@ -123,6 +127,14 @@ export type ToWebview =
 			context?: { tokens: number; contextWindow: number; percent: number };
 	  }
 	| { kind: typeof TO_WEBVIEW.SUB_USAGE; token?: number; entries: SubUsageEntry[] }
+	| {
+			kind: typeof TO_WEBVIEW.ONBOARDING;
+			state: "none" | "unauthed" | "login" | "ready";
+			provider?: string;
+			message?: string;
+			error?: string;
+			preset?: PresetApplied | null;
+	  }
 	| { kind: typeof TO_WEBVIEW.READY };
 
 export type FromWebview =
@@ -133,6 +145,9 @@ export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.COMMAND; command: { type: string; [k: string]: unknown } }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_STATE }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_SUB_USAGE; token?: number }
+	| { kind: typeof FROM_WEBVIEW.OB_LOGIN; provider: string }
+	| { kind: typeof FROM_WEBVIEW.OB_LOGIN_CANCEL }
+	| { kind: typeof FROM_WEBVIEW.OB_DISMISS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MODELS }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_MESSAGES }
 	| { kind: typeof FROM_WEBVIEW.REQUEST_CONTEXT }
@@ -159,6 +174,9 @@ export interface ChatBackendOpts {
 	onAttention?: (count: number, tooltip: string) => void;
 	/** Bring the hosting view/panel on screen (toast "Open Chat" action). */
 	reveal?: () => void;
+	/** Persistence for UI-level flags (onboarding dismissal) — the extension's
+	 *  globalState Memento. */
+	memento?: vscode.Memento;
 }
 
 /**
@@ -501,6 +519,75 @@ export class ChatBackend {
 		this.post({ kind: TO_WEBVIEW.SESSIONS, sessions: listSessions(this.workspaceCwd()) });
 	}
 
+	// ── First-run onboarding ──────────────────────────────────────────────────
+
+	private obLoginAbort: AbortController | undefined;
+
+	/** Show the onboarding card only for a genuinely fresh install: never
+	 *  dismissed, no auth source visible anywhere (conservative — see
+	 *  noAuthDetected), and no sessions on disk (prior sessions mean the user
+	 *  already knows the ropes). */
+	private postOnboardingState(): void {
+		if (this.opts.memento?.get("hmm-code.onboardingDismissed") === true) return;
+		if (!noAuthDetected()) return;
+		if (listSessions(this.workspaceCwd()).length > 0) return;
+		this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "unauthed" });
+	}
+
+	/** Browser OAuth from the onboarding card. Mirrors the settings panel's
+	 *  flow (single-flight, cancellable); on success also fills the per-mode
+	 *  model presets into empty modes, then restarts Pi so the fresh auth.json
+	 *  and modes.json load. */
+	private async runOnboardingLogin(provider: string): Promise<void> {
+		const runner =
+			provider === "anthropic"
+				? anthropicOAuthLogin
+				: provider === "openai-codex"
+					? codexOAuthLogin
+					: undefined;
+		if (!runner || this.obLoginAbort) return;
+		const abort = new AbortController();
+		this.obLoginAbort = abort;
+		this.post({
+			kind: TO_WEBVIEW.ONBOARDING,
+			state: "login",
+			provider,
+			message: t("settings.oauth.flowStart"),
+		});
+		try {
+			const creds = await runner(
+				{
+					onAuth: ({ url, instructions }) => {
+						void vscode.env.openExternal(vscode.Uri.parse(url));
+						this.post({
+							kind: TO_WEBVIEW.ONBOARDING,
+							state: "login",
+							provider,
+							message: instructions ?? t("settings.oauth.browser"),
+						});
+					},
+					onProgress: (message) => {
+						this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "login", provider, message });
+					},
+				},
+				abort.signal,
+			);
+			writeOAuthCredential(provider, creds);
+			const preset = applyModePresets(provider, ChatBackend.cachedModels());
+			// Fresh Pi picks up the new auth.json + modes.json.
+			this.restart();
+			this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "ready", provider, preset });
+		} catch (err) {
+			this.post({
+				kind: TO_WEBVIEW.ONBOARDING,
+				state: "unauthed",
+				error: (err as Error).message,
+			});
+		} finally {
+			this.obLoginAbort = undefined;
+		}
+	}
+
 	private async resyncStateAfterCommand(): Promise<void> {
 		const client = this.client;
 		if (!client) return;
@@ -779,6 +866,17 @@ export class ChatBackend {
 				// The eager READY in start() races the webview script load and is
 				// usually dropped on (re)load.
 				this.post({ kind: TO_WEBVIEW.READY });
+				this.postOnboardingState();
+				return;
+			case FROM_WEBVIEW.OB_LOGIN:
+				void this.runOnboardingLogin(typeof raw.provider === "string" ? raw.provider : "");
+				return;
+			case FROM_WEBVIEW.OB_LOGIN_CANCEL:
+				this.obLoginAbort?.abort();
+				return;
+			case FROM_WEBVIEW.OB_DISMISS:
+				void this.opts.memento?.update("hmm-code.onboardingDismissed", true);
+				this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "none" });
 				return;
 			case FROM_WEBVIEW.OPEN_FILE: {
 				// Ctrl/Cmd-click on a file path in a tool summary. Resolve
