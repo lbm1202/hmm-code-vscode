@@ -17,6 +17,7 @@ import {
 	deleteSession,
 	listSessions,
 	readSessionMessages,
+	readSessionStats,
 	renameSession,
 	subtreeUsage,
 	type ModelUsage,
@@ -63,6 +64,18 @@ function readTodoPanel(): boolean {
 	}
 }
 
+/** modes.json:autoApproveDefault (default OFF). When true, dispatch.ts sends
+ *  `/auto-approve on` on session start. Configured in the settings panel. */
+function readAutoApproveDefault(): boolean {
+	try {
+		if (!existsSync(MODES_JSON_PATH)) return false;
+		const raw = JSON.parse(readFileSync(MODES_JSON_PATH, "utf-8")) as { autoApproveDefault?: boolean };
+		return raw?.autoApproveDefault === true;
+	} catch {
+		return false;
+	}
+}
+
 /** Attach aliases to a raw Pi model list — used for the static cache that
  *  feeds the settings panel (which wants ALL models, no allowlist filter). */
 function attachAliases(raw: ModelEntry[], aliases: Record<string, string>): ModelEntry[] {
@@ -95,7 +108,11 @@ export type ToWebview =
 	| { kind: typeof TO_WEBVIEW.STATE; state: unknown }
 	| { kind: typeof TO_WEBVIEW.SESSIONS; sessions: SessionEntry[] }
 	| { kind: typeof TO_WEBVIEW.MODELS; models: ModelEntry[] }
-	| { kind: typeof TO_WEBVIEW.MESSAGES; messages: unknown[] }
+	| {
+			kind: typeof TO_WEBVIEW.MESSAGES;
+			messages: unknown[];
+			stats?: Record<string, { ttftMs: number; genMs: number; totalMs: number; thinkMs: number }>;
+	  }
 	| { kind: typeof TO_WEBVIEW.COMMANDS; commands: SlashCommand[] }
 	| {
 			kind: typeof TO_WEBVIEW.USAGE;
@@ -107,6 +124,7 @@ export type ToWebview =
 
 export type FromWebview =
 	| { kind: typeof FROM_WEBVIEW.PROMPT; text: string; images?: { type: "image"; data: string; mimeType: string }[] }
+	| { kind: typeof FROM_WEBVIEW.STEER; text: string; images?: { type: "image"; data: string; mimeType: string }[] }
 	| { kind: typeof FROM_WEBVIEW.ABORT }
 	| { kind: typeof FROM_WEBVIEW.UI_RESPONSE; response: RpcExtensionUiResponse }
 	| { kind: typeof FROM_WEBVIEW.COMMAND; command: { type: string; [k: string]: unknown } }
@@ -128,6 +146,15 @@ export type FromWebview =
 export interface ChatBackendOpts {
 	/** Fires when Pi reports a session name change (initial load or rename). */
 	onSessionName?: (name: string) => void;
+	/** Whether the hosting view/panel is currently visible to the user. When it
+	 *  isn't, input-wait moments (ui.select / confirm / input dialogs) raise a
+	 *  toast + attention badge so the user notices without the panel open. */
+	isVisible?: () => boolean;
+	/** Set (count > 0) or clear (count = 0) the attention badge on the hosting
+	 *  view. No-op for hosts without a badge surface (editor panels). */
+	onAttention?: (count: number, tooltip: string) => void;
+	/** Bring the hosting view/panel on screen (toast "Open Chat" action). */
+	reveal?: () => void;
 }
 
 /**
@@ -280,6 +307,21 @@ export class ChatBackend {
 		}
 	}
 
+	/** Toast + badge when Pi is waiting on a dialog answer (ui.select / confirm /
+	 *  input) and the hosting view is not visible. Visible view → the modal is
+	 *  already on screen; do nothing. Throttled to one toast per wait: the badge
+	 *  clears when the user answers (UI_RESPONSE) or the provider clears it on
+	 *  visibility change. */
+	private raiseAttention(): void {
+		if (!this.opts.isVisible || this.opts.isVisible()) return;
+		this.opts.onAttention?.(1, t("host.awaitingInput"));
+		void vscode.window
+			.showInformationMessage(t("host.awaitingInput"), t("host.openChat"))
+			.then((pick) => {
+				if (pick) this.opts.reveal?.();
+			});
+	}
+
 	/**
 	 * Push the active session's name to the tab title from an AUTHORITATIVE
 	 * source (get_state / a fresh session). Unlike notifySessionName, an empty
@@ -304,9 +346,10 @@ export class ChatBackend {
 			}
 			this.post({ kind: TO_WEBVIEW.EVENT, event: ev });
 		});
-		c.on("ui-request", (req: RpcExtensionUiRequest) =>
-			this.post({ kind: TO_WEBVIEW.UI_REQUEST, req }),
-		);
+		c.on("ui-request", (req: RpcExtensionUiRequest) => {
+			this.post({ kind: TO_WEBVIEW.UI_REQUEST, req });
+			this.raiseAttention();
+		});
 		c.on("ui-hint", (hint: RpcExtensionUiRequest) =>
 			this.post({ kind: TO_WEBVIEW.UI_HINT, hint }),
 		);
@@ -382,7 +425,7 @@ export class ChatBackend {
 	/** Tear down the live Pi process and spawn a fresh one. Used by the
 	 *  settings panel after auth changes — Pi's `ctx.reload()` doesn't
 	 *  refresh AuthStorage, so a full process restart is the reliable
-	 *  way to pick up auth.json edits (e.g. removing openai-codex).
+	 *  way to pick up auth.json edits (e.g. removing a stale credential).
 	 *  The webview's persisted lastSessionFile triggers auto switch_session
 	 *  on the new ready event, so the user lands back on the same chat. */
 	restart(): void {
@@ -485,11 +528,27 @@ export class ChatBackend {
 					this.post({ kind: TO_WEBVIEW.EVENT, event: { type: "turn_end" } });
 				}
 				return;
+			case FROM_WEBVIEW.STEER:
+				// Mid-turn interjection: Pi queues it and delivers at the next tool
+				// boundary. No turn-lifecycle handling here — the turn is already
+				// in flight and its events keep streaming as usual.
+				try {
+					await client.send(
+						raw.images && raw.images.length
+							? { type: "steer", message: raw.text, images: raw.images }
+							: { type: "steer", message: raw.text },
+					);
+				} catch (err) {
+					this.post({ kind: TO_WEBVIEW.STDERR, text: `steer failed: ${(err as Error).message}` });
+				}
+				return;
 			case FROM_WEBVIEW.ABORT:
 				client.sendNoReply({ type: "abort" });
 				return;
 			case FROM_WEBVIEW.UI_RESPONSE:
 				client.sendUiResponse(raw.response);
+				// The user answered the pending dialog — the attention is consumed.
+				this.opts.onAttention?.(0, "");
 				return;
 			case FROM_WEBVIEW.COMMAND: {
 				const cmd = raw.command;
@@ -747,7 +806,11 @@ export class ChatBackend {
 						const res = await client.send({ type: "get_messages" });
 						if (res.success) messages = ((res.data as { messages?: unknown[] }).messages ?? []);
 					}
-					this.post({ kind: TO_WEBVIEW.MESSAGES, messages });
+					// Webview-measured timing stats live IN the transcript (webview-stats
+					// custom entries, keyed by message timestamp) — replay restores
+					// "Thought for Ns" + the per-message stats toggle from them.
+					const stats = typeof file === "string" && file ? readSessionStats(file) : {};
+					this.post({ kind: TO_WEBVIEW.MESSAGES, messages, stats });
 				} catch (err) {
 					this.post({
 						kind: TO_WEBVIEW.STDERR,
@@ -838,9 +901,7 @@ export function renderChatHtml(
 	const infoLiteral = jsonForScript(info);
 	const i18nLiteral = jsonForScript(getWebviewMessages());
 	const cfgLiteral = jsonForScript({
-		autoApproveDefault: vscode.workspace
-			.getConfiguration("hmm-code")
-			.get<boolean>("autoApproveDefault", false),
+		autoApproveDefault: readAutoApproveDefault(),
 		todoPanel: readTodoPanel(),
 	});
 	return `<!DOCTYPE html>

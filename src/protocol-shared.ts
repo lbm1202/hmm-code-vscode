@@ -42,6 +42,10 @@ export const TO_WEBVIEW = {
 /** kind values on FromWebview (webview → host). */
 export const FROM_WEBVIEW = {
 	PROMPT: "prompt",
+	/** Mid-turn interjection: queued by Pi and delivered at the next tool
+	 *  boundary (steering). Only sent while a turn is in
+	 *  flight — idle sends use PROMPT. */
+	STEER: "steer",
 	ABORT: "abort",
 	UI_RESPONSE: "ui-response",
 	COMMAND: "command",
@@ -86,6 +90,8 @@ export const STATUS_KEYS = {
 	OVERRIDDEN: "overridden",
 	CONTEXT: "context",
 	PLAN_HANDOFF: "plan-handoff",
+	// finalize_implementation → review handoff. Value: "<reportPath>|<parentSessionPath or empty>".
+	REVIEW_HANDOFF: "review-handoff",
 	// Pi emits this from todo_write. The webview currently renders todos from
 	// the todo_write tool-call result, not this setStatus channel — mirrored
 	// here only to keep the contract complete with Pi's constants.ts.

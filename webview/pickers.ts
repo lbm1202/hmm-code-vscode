@@ -7,7 +7,7 @@
 import { els } from "./dom";
 import { t } from "./i18n";
 import { FROM_WEBVIEW, MODE_COLORS, MODE_NAMES, THINKING_LEVELS } from "./protocol";
-import { post, ui } from "./state";
+import { post, runtime, ui } from "./state";
 
 type PickerOption = {
 	label: string;
@@ -133,6 +133,9 @@ const MODE_ICON: Record<string, string> = {
 	ask: svg(
 		'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
 	),
+	review: svg(
+		'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+	),
 };
 
 function divider(): HTMLElement {
@@ -254,6 +257,11 @@ function renderModeBody(body: HTMLElement, rerender: () => void): void {
 					// Already in this mode → no-op. Sending /mode for the active mode
 					// makes Pi emit "Already in X mode", which we don't want to surface.
 					if (name === ui.mode) return;
+					// No mode switching mid-turn: the running loop captured its
+					// model/tools/prompt at start, so the switch wouldn't apply to it —
+					// while the permission layer WOULD flip immediately, leaving the
+					// loop in a mismatched hybrid. Same guard as Tab-cycle and slash.
+					if (runtime.turnInFlight || runtime.compacting) return;
 					// Optimistic: update chip label + color + checkmark together so
 					// there's no visible lag waiting for Pi's status round-trip.
 					ui.mode = name;

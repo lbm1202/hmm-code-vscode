@@ -84,7 +84,7 @@ export function buildPlanExecutionBody(path: string, targetMode: string): string
 		mode === "DEBUG"
 			? `You are now in DEBUG mode (handoff from plan). You have full bash/shell access for reproduction and investigation, but edit/write are disabled — diagnose per the plan, don't modify code.`
 			: `You are now in ${mode} mode (handoff from plan). You are no longer read-only — edit/write/bash are available.`;
-	return [
+	const lines = [
 		modeLine,
 		"",
 		`A plan was saved at ${path}. Read it first, then call todo_write with one item per plan step. Work through them one-by-one, marking in_progress before starting each and completed immediately after finishing.`,
@@ -92,5 +92,34 @@ export function buildPlanExecutionBody(path: string, targetMode: string): string
 		"Do not re-plan, expand scope, refactor adjacent code, or add features the plan did not ask for.",
 		"",
 		'If the plan has a real gap (missing step, contradicts the code, wrong path), call request_mode_switch("plan", reason, summary) instead of improvising.',
+	];
+	if (mode !== "DEBUG") {
+		lines.push(
+			"",
+			"When every step is done and the final validation pass is green, call finalize_implementation — it writes the implementation report and hands the work to review.",
+		);
+	}
+	return lines.join("\n");
+}
+
+/** Review-handoff prompt template (referencing the saved implementation report).
+ *  `sameSession` = reviewing in the implementing session itself (no parent plan
+ *  session recorded) vs. in the parent plan session after a switch back. */
+export function buildReviewBody(reportPath: string, sameSession: boolean): string {
+	const opening = sameSession
+		? "You are now in REVIEW mode. Review the implementation completed in this session against its plan."
+		: "You are now in REVIEW mode. The implementation session launched from your plan has completed and handed back for review.";
+	const planLine = sameSession
+		? "The plan is in this session's context; if compaction removed it, re-read the plan file referenced in the report header."
+		: "The plan you finalized earlier in this session is the review baseline. It should still be in context; if compaction removed it, re-read the plan file referenced in the report header.";
+	return [
+		opening,
+		"",
+		`Implementation report: ${reportPath} — read it first.`,
+		planLine,
+		"",
+		"Follow the review protocol: verify the changed files against the plan's steps and pinned seam contracts, run every entry in the plan's Validation section, and check for scope creep. End with PASS or a numbered findings list (file:line evidence, severity: blocker / should-fix / nit), then stop — do not fix anything.",
+		"",
+		'If fixes are needed, the user will say so — then call finalize_plan with the fix-list as steps (target_mode "code") to launch the next implementation round.',
 	].join("\n");
 }

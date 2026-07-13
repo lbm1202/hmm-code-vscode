@@ -59,6 +59,10 @@ export class ChatPanel {
 			onSessionName: (name) => {
 				panel.title = name && name.trim() ? name : "Hmm-code";
 			},
+			// Editor panels have no badge surface, but a hidden tab still gets the
+			// input-wait toast (the panel counts as visible only when its tab is).
+			isVisible: () => panel.visible,
+			reveal: () => panel.reveal(),
 		});
 		const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME;
 		backend.start(cwd);

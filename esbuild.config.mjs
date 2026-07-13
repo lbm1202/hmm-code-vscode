@@ -158,7 +158,7 @@ function assertContractsInSync(hmmSrc) {
 	if (existsSync(piConfig)) {
 		const cfgSrc = readFileSync(piConfig, "utf-8");
 		const missing = [];
-		for (const mode of ["plan", "code", "debug", "ask"]) {
+		for (const mode of ["plan", "code", "debug", "ask", "review"]) {
 			const m = cfgSrc.match(
 				new RegExp(`${mode}:\\s*\\{[\\s\\S]*?systemPromptAddendum:\\s*\\[([\\s\\S]*?)\\]\\.join\\(`),
 			);

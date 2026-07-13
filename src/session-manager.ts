@@ -192,7 +192,7 @@ export function sessionUsage(file: string): Record<string, ModelUsage> {
  *  already role-based); compaction entries become a `compactionSummary` marker at
  *  their chronological spot (the compaction point); metadata/custom entries
  *  (mode-state, todos, model_change, …) are skipped — they aren't conversation. */
-export function readSessionMessages(file: string): unknown[] {
+function readBranchEntries(file: string): any[] {
 	let text: string;
 	try {
 		text = readFileSync(file, "utf-8");
@@ -225,12 +225,40 @@ export function readSessionMessages(file: string): unknown[] {
 		id = typeof e.parentId === "string" ? e.parentId : undefined;
 	}
 	branch.reverse();
+	return branch;
+}
+
+export function readSessionMessages(file: string): unknown[] {
 	const out: unknown[] = [];
-	for (const e of branch) {
+	for (const e of readBranchEntries(file)) {
 		if (e.type === "message" && e.message) {
 			out.push(e.message);
 		} else if (e.type === "compaction") {
 			out.push({ role: "compactionSummary", summary: e.summary ?? "", timestamp: e.timestamp });
+		}
+	}
+	return out;
+}
+
+/** Client-measured per-message timing stats, recorded INTO the transcript as
+ *  `webview-stats` custom entries by Pi's internal /stats-record command
+ *  (dispatched by the webview after each assistant message). Keyed by message
+ *  timestamp; restores the stats toggle + "Thought for Ns" label on replay.
+ *  Sessions recorded before the feature simply yield no entries. */
+export function readSessionStats(
+	file: string,
+): Record<string, { ttftMs: number; genMs: number; totalMs: number; thinkMs: number }> {
+	const out: Record<string, { ttftMs: number; genMs: number; totalMs: number; thinkMs: number }> = {};
+	for (const e of readBranchEntries(file)) {
+		if (
+			e.type === "custom" &&
+			e.customType === "webview-stats" &&
+			e.data &&
+			typeof e.data.key === "string" &&
+			e.data.stats &&
+			typeof e.data.stats === "object"
+		) {
+			out[e.data.key] = e.data.stats;
 		}
 	}
 	return out;

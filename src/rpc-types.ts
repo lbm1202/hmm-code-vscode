@@ -14,8 +14,8 @@ export interface RpcCmdPrompt extends RpcCommandBase {
 	images?: unknown[];
 	streamingBehavior?: "steer" | "followUp";
 }
-export interface RpcCmdSteer extends RpcCommandBase { type: "steer"; message: string }
-export interface RpcCmdFollowUp extends RpcCommandBase { type: "follow_up"; message: string }
+export interface RpcCmdSteer extends RpcCommandBase { type: "steer"; message: string; images?: unknown[] }
+export interface RpcCmdFollowUp extends RpcCommandBase { type: "follow_up"; message: string; images?: unknown[] }
 export interface RpcCmdAbort extends RpcCommandBase { type: "abort" }
 export interface RpcCmdGetState extends RpcCommandBase { type: "get_state" }
 export interface RpcCmdSetModel extends RpcCommandBase { type: "set_model"; provider: string; modelId: string }

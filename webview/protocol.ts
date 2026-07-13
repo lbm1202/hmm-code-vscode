@@ -24,6 +24,8 @@ export const PI_EVENT = {
 	EXTENSION_ERROR: "extension_error",
 	COMPACTION_START: "compaction_start",
 	COMPACTION_END: "compaction_end",
+	/** Pi's steering/follow-up queue changed (message queued or delivered). */
+	QUEUE_UPDATE: "queue_update",
 } as const;
 
 export const ASSISTANT_DELTA = {
@@ -36,7 +38,7 @@ export const ASSISTANT_DELTA = {
 // Shift+Tab cycle (prompt.ts) — code-first. NOTE: the settings panel uses a
 // DIFFERENT order (plan-first, the workflow order) in settings-state.ts:MODE_NAMES.
 // These are deliberately independent — do not "sync" one to the other.
-export const MODE_NAMES = ["code", "plan", "debug", "ask"] as const;
+export const MODE_NAMES = ["code", "plan", "debug", "ask", "review"] as const;
 export type ModeName = (typeof MODE_NAMES)[number];
 
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -50,4 +52,5 @@ export const MODE_COLORS: Record<string, string> = {
 	plan: "rgb(100, 150, 255)",
 	debug: "rgb(180, 120, 220)",
 	ask: "rgb(255, 165, 80)",
+	review: "rgb(95, 220, 160)",
 };

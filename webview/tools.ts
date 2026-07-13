@@ -14,6 +14,7 @@ export const INTERACTIVE_TOOLS = new Set([
 	"ask_user",
 	"request_mode_switch",
 	"finalize_plan",
+	"finalize_implementation",
 	"todo_write",
 ]);
 
@@ -154,6 +155,9 @@ export function renderEditOrWriteBody(toolName: string, args: any): string {
 	if (toolName === "finalize_plan") {
 		return renderFinalizePlanPreview(args);
 	}
+	if (toolName === "finalize_implementation") {
+		return renderFinalizeImplementationPreview(args);
+	}
 	return "";
 }
 
@@ -212,6 +216,54 @@ function renderFinalizePlanPreview(args: any): string {
 	parts.push(
 		`<div class="plan-target">${t("tool.planHandoff", { target: `<code>${escapeHtml(target)}</code>` })}</div>`,
 	);
+	return `<div class="plan-preview">${parts.join("")}</div>`;
+}
+
+/** Render implementation summary + changes + validation results + deviations
+ *  INSIDE the finalize_implementation tool call body — the last thing the user
+ *  sees from the implementing session before the review handoff. Reuses the
+ *  plan-preview styles. */
+function renderFinalizeImplementationPreview(args: any): string {
+	const summary = String(args?.summary ?? "").trim();
+	const changes: string[] = Array.isArray(args?.changes)
+		? args.changes.map((s: any) => String(s ?? ""))
+		: [];
+	const validation: string[] = Array.isArray(args?.validation_results)
+		? args.validation_results.map((s: any) => String(s ?? ""))
+		: [];
+	const deviations: string[] = Array.isArray(args?.deviations)
+		? args.deviations.map((s: any) => String(s ?? ""))
+		: [];
+
+	if (!summary && changes.length === 0 && validation.length === 0 && deviations.length === 0) {
+		return "";
+	}
+
+	const parts: string[] = [];
+	if (summary) {
+		parts.push(`<div class="plan-summary">${escapeHtml(summary)}</div>`);
+	}
+	if (changes.length) {
+		parts.push(
+			`<div class="plan-section-label">Changes</div>` +
+				`<ul class="plan-checklist">${changes.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`,
+		);
+	}
+	if (validation.length) {
+		parts.push(
+			`<div class="plan-section-label">Validation results</div>` +
+				`<ul class="plan-checklist plan-validation">${validation
+					.map((v) => `<li>${escapeHtml(v)}</li>`)
+					.join("")}</ul>`,
+		);
+	}
+	if (deviations.length) {
+		parts.push(
+			`<div class="plan-section-label">Deviations from plan</div>` +
+				`<ul class="plan-checklist">${deviations.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>`,
+		);
+	}
+	parts.push(`<div class="plan-target">${t("tool.reviewHandoff")}</div>`);
 	return `<div class="plan-preview">${parts.join("")}</div>`;
 }
 
@@ -466,7 +518,7 @@ function interactiveSummaryArgs(toolName: string, args: any): string {
 	if (toolName === "request_mode_switch") {
 		return `→ ${args?.target_mode ?? "?"}${args?.reason ? ` · ${String(args.reason).slice(0, 50)}` : ""}`;
 	}
-	if (toolName === "finalize_plan") {
+	if (toolName === "finalize_plan" || toolName === "finalize_implementation") {
 		return String(args?.summary ?? "").slice(0, 60);
 	}
 	if (toolName === "todo_write" && Array.isArray(args?.todos)) {
@@ -701,6 +753,13 @@ export function renderTodoListHtml(todos: any[]): string {
 /** Pretty-format the result for interactive tools. Returns "" to fall through. */
 export function formatInteractiveResult(toolName: string, output: any, ok: boolean): string {
 	const details = output?.details ?? {};
+	if (!ok) {
+		// Error results (schema validation failures, mode guards) carry no
+		// details/branch — show the actual error text instead of letting a
+		// per-tool renderer fall back to a bare "?" label.
+		const msg = output?.content?.[0]?.text ?? safeStringify(output);
+		return `<span class="status-text">${escapeHtml(String(msg).slice(0, 300))}</span>`;
+	}
 	if (toolName === "ask_user") {
 		if (details?.cancelled) return `<span class="status-text">${escapeHtml(t("tool.cancelled"))}</span>`;
 		const answers: any[] = details?.answers ?? [];
@@ -755,10 +814,21 @@ export function formatInteractiveResult(toolName: string, output: any, ok: boole
 			: "";
 		return `<span class="status-text">${escapeHtml(label)}</span>${pathHtml}`;
 	}
-	if (!ok) {
-		// Generic error formatting
-		const msg = output?.content?.[0]?.text ?? safeStringify(output);
-		return `<span class="status-text">${escapeHtml(String(msg).slice(0, 200))}</span>`;
+	if (toolName === "finalize_implementation") {
+		const branch = String(details?.branch ?? "");
+		const path = details?.reportPath ?? "";
+		const labels: Record<string, string> = {
+			review_via_client: t("tool.branch.review"),
+			review_current_session: t("tool.branch.reviewHere"),
+			review_current_session_headless: t("tool.branch.reviewHere"),
+			continue: t("tool.branch.continue"),
+			deferred: t("tool.branch.deferred"),
+		};
+		const label = labels[branch] ?? branch;
+		const pathHtml = path
+			? `<br><small><span class="file-link" data-file-path="${escapeHtml(path)}" title="Ctrl/Cmd-click to open report file">${escapeHtml(path)}</span></small>`
+			: "";
+		return `<span class="status-text">${escapeHtml(label)}</span>${pathHtml}`;
 	}
 	return "";
 }

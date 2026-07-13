@@ -20,6 +20,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				view.title = name;
 				view.description = undefined;
 			},
+			isVisible: () => view.visible,
+			onAttention: (count, tooltip) => {
+				// Activity-bar badge while Pi waits for a dialog answer and the
+				// view is hidden. Cleared on answer (count 0) or on reveal below.
+				view.badge = count > 0 ? { value: count, tooltip } : undefined;
+			},
+			reveal: () => void vscode.commands.executeCommand("hmm-code.chat.focus"),
+		});
+		view.onDidChangeVisibility(() => {
+			// Revealing the view shows the pending dialog — the badge served its
+			// purpose. (The toast, if still up, is dismissed by the user.)
+			if (view.visible) view.badge = undefined;
 		});
 		const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.env.HOME;
 		this.backend.start(cwd);
