@@ -8,19 +8,16 @@
 
 import { appendSystem, els } from "./dom";
 import { t } from "./i18n";
-import { autosizePrompt } from "./prompt";
 import { FROM_WEBVIEW, MODE_COLORS } from "./protocol";
 import { post } from "./state";
 
-interface ObPreset {
-	groups: { modes: string[]; model: string }[];
-}
 interface ObMsg {
 	state: "none" | "unauthed" | "login" | "ready";
 	provider?: string;
 	message?: string;
 	error?: string;
-	preset?: ObPreset | null;
+	/** Ready state: current per-mode default model ids ("" = unset). */
+	modeModels?: Record<string, string>;
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
@@ -79,50 +76,24 @@ function loginButtons(disabled: boolean): HTMLElement[] {
 	];
 }
 
-function starterBlock(): HTMLElement {
-	const wrap = div("ob-starter");
-	for (const key of ["ob.starter1", "ob.starter2", "ob.starter3"]) {
-		const text = t(key);
-		const b = document.createElement("button");
-		b.className = "ob-sp";
-		b.textContent = text;
-		b.addEventListener("click", () => {
-			const e = els();
-			e.prompt.value = text;
-			autosizePrompt();
-			e.prompt.focus();
-		});
-		wrap.appendChild(b);
-	}
-	return wrap;
-}
-
-function presetBlock(preset: ObPreset): HTMLElement {
+/** Ready state: the ACTUAL per-mode default models from modes.json — whether
+ *  the login preset just wrote them or they were already configured. */
+function modeModelsBlock(modeModels: Record<string, string>): HTMLElement {
 	const wrap = div("ob-preset");
 	wrap.appendChild(div("ob-preset-h", t("ob.presetHead")));
-	for (const g of preset.groups) {
+	for (const [name, id] of Object.entries(modeModels)) {
 		const row = div("ob-preset-row");
-		const modes = document.createElement("span");
-		modes.className = "ob-preset-modes";
-		g.modes.forEach((m, i) => {
-			if (i > 0) modes.appendChild(document.createTextNode(" · "));
-			const s = document.createElement("span");
-			s.textContent = m;
-			s.style.color = (MODE_COLORS as Record<string, string>)[m] ?? "inherit";
-			s.style.fontWeight = "600";
-			modes.appendChild(s);
-		});
+		const mode = document.createElement("span");
+		mode.className = "ob-preset-modes";
+		mode.textContent = name;
+		mode.style.color = (MODE_COLORS as Record<string, string>)[name] ?? "inherit";
+		mode.style.fontWeight = "600";
 		const model = document.createElement("span");
-		model.className = "ob-preset-model";
-		model.textContent = g.model;
-		row.append(modes, model);
+		model.className = "ob-preset-model" + (id ? "" : " unset");
+		model.textContent = id || "—";
+		row.append(mode, model);
 		wrap.appendChild(row);
 	}
-	const edit = document.createElement("a");
-	edit.className = "ob-link";
-	edit.textContent = t("ob.presetEdit");
-	edit.addEventListener("click", () => post({ kind: FROM_WEBVIEW.OPEN_SETTINGS }));
-	wrap.appendChild(edit);
 	return wrap;
 }
 
@@ -196,19 +167,12 @@ export function renderOnboarding(msg: ObMsg): void {
 		// ready
 		const label = PROVIDER_LABEL[msg.provider ?? ""] ?? msg.provider ?? "";
 		card.appendChild(div("ob-status ok", "✓ " + t("ob.connected", { label })));
-		if (msg.preset && msg.preset.groups.length > 0) {
-			card.appendChild(presetBlock(msg.preset));
-		} else {
-			const none = div("ob-desc");
-			const a = document.createElement("a");
-			a.className = "ob-link";
-			a.textContent = t("ob.noPreset");
-			a.addEventListener("click", () => post({ kind: FROM_WEBVIEW.OPEN_SETTINGS }));
-			none.appendChild(a);
-			card.appendChild(none);
-		}
-		card.appendChild(div("ob-starter-h", t("ob.readyTitle")));
-		card.appendChild(starterBlock());
+		card.appendChild(modeModelsBlock(msg.modeModels ?? {}));
+		card.appendChild(
+			ctaButton("⚙︎", t("ob.modeSettingsBtn"), t("ob.settingsNote"), () =>
+				post({ kind: FROM_WEBVIEW.OPEN_SETTINGS }),
+			),
+		);
 		card.appendChild(dismissFoot());
 	}
 

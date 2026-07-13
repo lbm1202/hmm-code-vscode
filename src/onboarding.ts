@@ -67,6 +67,20 @@ export interface PresetApplied {
 
 const MODE_NAMES = ["plan", "code", "review", "debug", "ask"] as const;
 
+/** Current per-mode default model ids from modes.json ("" when a mode has no
+ *  model configured). Shown on the onboarding card's ready state so the user
+ *  sees exactly what each mode will run — whether the preset just wrote it or
+ *  it was already configured. */
+export function readModeModels(): Record<string, string> {
+	const modes = readJsonSafe(MODES_PATH)?.modes ?? {};
+	const out: Record<string, string> = {};
+	for (const name of MODE_NAMES) {
+		const m = modes[name]?.model;
+		out[name] = m && typeof m === "object" && typeof m.id === "string" ? m.id : "";
+	}
+	return out;
+}
+
 /** After a successful login for `provider`, fill the preset model into every
  *  mode whose model is EMPTY — configured modes are never overwritten, and a
  *  preset id is only written when the live catalog actually has it (pass the

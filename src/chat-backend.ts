@@ -28,7 +28,7 @@ import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { applyAllowlist, findAlias } from "./model-utils";
 import { collectSubscriptionUsage, type SubUsageEntry } from "./sub-usage";
 import { ensureFreshOAuth, OAUTH_USAGE_PROVIDERS } from "./auth-refresh";
-import { applyModePresets, noAuthDetected, type PresetApplied } from "./onboarding";
+import { applyModePresets, noAuthDetected, readModeModels } from "./onboarding";
 import { writeOAuthCredential } from "./oauth-write";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { codexOAuthLogin } from "./oauth-codex";
@@ -133,7 +133,8 @@ export type ToWebview =
 			provider?: string;
 			message?: string;
 			error?: string;
-			preset?: PresetApplied | null;
+			/** Ready state: current per-mode default model ids ("" = unset). */
+			modeModels?: Record<string, string>;
 	  }
 	| { kind: typeof TO_WEBVIEW.READY };
 
@@ -595,7 +596,12 @@ export class ChatBackend {
 			const models = await this.fetchModelsAfterRestart();
 			const preset = applyModePresets(provider, models);
 			if (preset) this.restart(); // reload the modes.json the preset just wrote
-			this.post({ kind: TO_WEBVIEW.ONBOARDING, state: "ready", provider, preset });
+			this.post({
+				kind: TO_WEBVIEW.ONBOARDING,
+				state: "ready",
+				provider,
+				modeModels: readModeModels(),
+			});
 		} catch (err) {
 			this.post({
 				kind: TO_WEBVIEW.ONBOARDING,

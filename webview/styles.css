@@ -977,9 +977,9 @@ body.mod-down .bash-cmd-link:hover {
 .ob-preset-modes { flex-shrink: 0; }
 .ob-preset-model { font-family: var(--vscode-editor-font-family); font-size: 10.5px; color: var(--vscode-descriptionForeground); word-break: break-all; }
 .ob-link { color: var(--vscode-textLink-foreground); font-size: 11px; cursor: pointer; }
+.ob-preset-model.unset { opacity: 0.5; }
 .ob-tips { margin-top: 11px; border-top: 1px solid var(--vscode-panel-border); padding-top: 9px; }
-.ob-tips-h, .ob-starter-h { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); letter-spacing: 0.03em; margin-bottom: 6px; }
-.ob-starter-h { margin-top: 2px; }
+.ob-tips-h { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); letter-spacing: 0.03em; margin-bottom: 6px; }
 .ob-tip { display: flex; gap: 8px; font-size: 11.5px; color: var(--vscode-foreground); opacity: 0.85; margin-bottom: 5px; align-items: baseline; }
 .ob-k {
 	font-family: var(--vscode-editor-font-family);
@@ -990,21 +990,6 @@ body.mod-down .bash-cmd-link:hover {
 	padding: 0 5px;
 	flex-shrink: 0;
 }
-.ob-sp {
-	display: block;
-	width: 100%;
-	box-sizing: border-box;
-	text-align: left;
-	background: transparent;
-	border: 1px dashed var(--vscode-panel-border);
-	color: var(--vscode-textLink-foreground);
-	border-radius: 6px;
-	padding: 6px 9px;
-	font-size: 11.5px;
-	margin-bottom: 5px;
-	cursor: pointer;
-}
-.ob-sp:hover { border-color: var(--vscode-focusBorder); background: color-mix(in srgb, var(--vscode-focusBorder) 8%, transparent); }
 .ob-foot { margin-top: 8px; }
 
 .recent-section {
