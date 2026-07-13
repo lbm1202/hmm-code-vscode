@@ -26,7 +26,7 @@ import {
 	ui,
 } from "./state";
 import { showSessionPicker } from "./session-picker";
-import { renderOnboarding } from "./onboarding";
+import { obNotifyIfHidden, renderOnboarding } from "./onboarding";
 import { renderSubUsage } from "./sub-usage-modal";
 import { showTokenModal } from "./token-modal";
 import { updateTodoPanel } from "./todo-panel";
@@ -132,7 +132,10 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		}
 		refreshPopover(); // populate an open Model tab once the list arrives
 	},
-	[TO_WEBVIEW.MESSAGES]: (msg) => renderHistory(msg.messages, msg.stats),
+	[TO_WEBVIEW.MESSAGES]: (msg) => {
+		renderHistory(msg.messages, msg.stats);
+		obNotifyIfHidden(); // unauthed + resumed transcript → card is off-screen; point at ＋
+	},
 	[TO_WEBVIEW.COMMANDS]: (msg) => {
 		// stats-record / auth-refresh are machine-dispatched bridges (stats →
 		// session entry, OAuth token refresh) — hide them from the user-facing

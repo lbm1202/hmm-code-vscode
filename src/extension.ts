@@ -94,6 +94,14 @@ export function activate(ctx: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("hmm-code.abort", () => {
 			provider.abort();
 		}),
+		// Clears the "don't show again" flag so the onboarding card can appear
+		// again (it still requires no-auth detection). Mainly for support/testing.
+		vscode.commands.registerCommand("hmm-code.resetOnboarding", async () => {
+			await ctx.globalState.update("hmm-code.onboardingDismissed", undefined);
+			void vscode.window.showInformationMessage(
+				"Hmm-code: onboarding reset — reload the window to re-evaluate.",
+			);
+		}),
 	);
 }
 

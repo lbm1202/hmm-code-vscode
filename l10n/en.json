@@ -53,6 +53,7 @@
   "ob.starter2": "Switch to plan mode and draft a refactoring plan",
   "ob.starter3": "Review the code I just changed",
   "ob.dismiss": "Don't show again",
+  "ob.hiddenNotice": "No model auth is connected — open a new session (＋) to see the login card.",
   "chat.recentSessions": "Recent sessions",
   "chat.promptPlaceholder": "Type a message… (Enter to send, Shift+Enter for newline, Tab to switch mode)",
   "chat.resetTitle": "Reset model/thinking to mode defaults",

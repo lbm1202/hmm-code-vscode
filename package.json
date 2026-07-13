@@ -77,6 +77,10 @@
 			{
 				"command": "hmm-code.abort",
 				"title": "%cmd.abort%"
+			},
+			{
+				"command": "hmm-code.resetOnboarding",
+				"title": "%cmd.resetOnboarding%"
 			}
 		],
 		"menus": {

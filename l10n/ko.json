@@ -53,6 +53,7 @@
   "ob.starter2": "plan 모드로 전환해서 리팩토링 계획을 세워줘",
   "ob.starter3": "방금 수정한 코드 리뷰해줘",
   "ob.dismiss": "다시 보지 않기",
+  "ob.hiddenNotice": "모델 인증이 없습니다 — 새 세션(＋)을 열면 로그인 카드가 보입니다.",
   "chat.recentSessions": "최근 세션",
   "chat.promptPlaceholder": "메시지를 입력하세요… (Enter로 전송, Shift+Enter 줄바꿈, Tab 모드 전환)",
   "chat.resetTitle": "모드 기본값으로 모델/추론 재설정",

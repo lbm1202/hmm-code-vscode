@@ -6,7 +6,7 @@
 //   login    → CTAs disabled, spinner status line, cancel
 //   ready    → connected badge + applied presets + starter prompts + dismiss
 
-import { els } from "./dom";
+import { appendSystem, els } from "./dom";
 import { t } from "./i18n";
 import { autosizePrompt } from "./prompt";
 import { FROM_WEBVIEW, MODE_COLORS } from "./protocol";
@@ -143,7 +143,23 @@ function root(): HTMLElement | null {
 	return document.getElementById("onboarding-root");
 }
 
+// The card lives inside the empty state, which hides whenever the (auto-
+// resumed) session has messages — so an unauthed veteran would never see it.
+// dispatch calls this after history renders: drop a one-line pointer into the
+// chat instead. Once per unauthed episode.
+let currentState: ObMsg["state"] = "none";
+let hiddenNoticed = false;
+
+export function obNotifyIfHidden(): void {
+	if (currentState !== "unauthed" || hiddenNoticed) return;
+	if (!els().messages.hasChildNodes()) return; // empty state visible — card is on screen
+	hiddenNoticed = true;
+	appendSystem(t("ob.hiddenNotice"));
+}
+
 export function renderOnboarding(msg: ObMsg): void {
+	currentState = msg.state;
+	if (msg.state !== "unauthed") hiddenNoticed = false;
 	const el = root();
 	if (!el) return;
 	if (msg.state === "none") {
@@ -151,6 +167,7 @@ export function renderOnboarding(msg: ObMsg): void {
 		el.innerHTML = "";
 		return;
 	}
+	obNotifyIfHidden();
 	el.classList.remove("hidden");
 	el.innerHTML = "";
 	const card = div("ob-card");
