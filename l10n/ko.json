@@ -47,6 +47,7 @@
   "ob.connected": "{label} 연결됨",
   "ob.presetHead": "모드별 기본 모델",
   "ob.modeSettingsBtn": "모드별 모델 설정",
+  "ob.customProvider": "커스텀 공급자 설정",
   "ob.dismiss": "다시 보지 않기",
   "ob.hiddenNotice": "모델 인증이 없습니다 — 새 세션(＋)을 열면 로그인 카드가 보입니다.",
   "chat.recentSessions": "최근 세션",

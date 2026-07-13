@@ -28,7 +28,7 @@ import { buildCsp, jsonForScript, makeNonce } from "./webview-html";
 import { applyAllowlist, findAlias } from "./model-utils";
 import { collectSubscriptionUsage, type SubUsageEntry } from "./sub-usage";
 import { ensureFreshOAuth, OAUTH_USAGE_PROVIDERS } from "./auth-refresh";
-import { applyModePresets, noAuthDetected, readModeModels } from "./onboarding";
+import { applyModePresets, connectedOAuthProviders, noAuthDetected, readModeModels } from "./onboarding";
 import { writeOAuthCredential } from "./oauth-write";
 import { anthropicOAuthLogin } from "./oauth-anthropic";
 import { codexOAuthLogin } from "./oauth-codex";
@@ -135,6 +135,9 @@ export type ToWebview =
 			error?: string;
 			/** Ready state: current per-mode default model ids ("" = unset). */
 			modeModels?: Record<string, string>;
+			/** Ready state: OAuth subscriptions already connected — the card
+			 *  offers login buttons for the missing ones. */
+			connected?: string[];
 	  }
 	| { kind: typeof TO_WEBVIEW.READY };
 
@@ -601,6 +604,7 @@ export class ChatBackend {
 				state: "ready",
 				provider,
 				modeModels: readModeModels(),
+				connected: connectedOAuthProviders(),
 			});
 		} catch (err) {
 			this.post({

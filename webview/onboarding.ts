@@ -18,6 +18,8 @@ interface ObMsg {
 	error?: string;
 	/** Ready state: current per-mode default model ids ("" = unset). */
 	modeModels?: Record<string, string>;
+	/** Ready state: OAuth subscriptions already connected. */
+	connected?: string[];
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
@@ -170,6 +172,27 @@ export function renderOnboarding(msg: ObMsg): void {
 		card.appendChild(modeModelsBlock(msg.modeModels ?? {}));
 		card.appendChild(
 			ctaButton("⚙︎", t("ob.modeSettingsBtn"), t("ob.settingsNote"), () =>
+				post({ kind: FROM_WEBVIEW.OPEN_SETTINGS }),
+			),
+		);
+		// Next steps: the subscription(s) not connected yet + custom providers.
+		const connected = new Set(msg.connected ?? []);
+		if (!connected.has("anthropic")) {
+			card.appendChild(
+				ctaButton("◆", t("ob.loginClaude"), t("ob.browserNote"), () =>
+					post({ kind: FROM_WEBVIEW.OB_LOGIN, provider: "anthropic" }),
+				),
+			);
+		}
+		if (!connected.has("openai-codex")) {
+			card.appendChild(
+				ctaButton("◇", t("ob.loginCodex"), t("ob.browserNote"), () =>
+					post({ kind: FROM_WEBVIEW.OB_LOGIN, provider: "openai-codex" }),
+				),
+			);
+		}
+		card.appendChild(
+			ctaButton("⚿", t("ob.customProvider"), t("ob.settingsNote"), () =>
 				post({ kind: FROM_WEBVIEW.OPEN_SETTINGS }),
 			),
 		);

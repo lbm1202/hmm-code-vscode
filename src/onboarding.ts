@@ -67,6 +67,13 @@ export interface PresetApplied {
 
 const MODE_NAMES = ["plan", "code", "review", "debug", "ask"] as const;
 
+/** OAuth-connected subscription providers (anthropic / openai-codex) — the
+ *  ready state offers login buttons for whichever are still missing. */
+export function connectedOAuthProviders(): string[] {
+	const auth = readJsonSafe(AUTH_PATH) ?? {};
+	return ["anthropic", "openai-codex"].filter((p) => auth[p]?.type === "oauth");
+}
+
 /** Current per-mode default model ids from modes.json ("" when a mode has no
  *  model configured). Shown on the onboarding card's ready state so the user
  *  sees exactly what each mode will run — whether the preset just wrote it or

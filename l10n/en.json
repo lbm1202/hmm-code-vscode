@@ -47,6 +47,7 @@
   "ob.connected": "{label} connected",
   "ob.presetHead": "Per-mode default models",
   "ob.modeSettingsBtn": "Configure per-mode models",
+  "ob.customProvider": "Set up a custom provider",
   "ob.dismiss": "Don't show again",
   "ob.hiddenNotice": "No model auth is connected — open a new session (＋) to see the login card.",
   "chat.recentSessions": "Recent sessions",
