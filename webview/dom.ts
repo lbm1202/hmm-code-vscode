@@ -20,16 +20,15 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 64" a
 const __info = (window as any).__HMM_INFO as { version?: string; publisher?: string } | undefined;
 const VERSION_LINE = `v${__info?.version ?? "?"} · ${__info?.publisher ?? "?"}`;
 
-// Topbar icons: Feather-style line SVGs on currentColor — monochrome, so they
-// follow the editor theme instead of rendering as color emoji (🕘/📊 did).
-const topIcon = (body: string): string =>
-	`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-const ICON_PLUS = topIcon('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>');
-const ICON_HISTORY = topIcon('<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>');
-const ICON_USAGE = topIcon('<line x1="6" y1="20" x2="6" y2="16"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/>');
-const ICON_GEAR = topIcon(
-	'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-);
+// Topbar icons: plain text symbols chosen from NON-emoji codepoints so they
+// render monochrome in the editor foreground everywhere. The previous 🕘/📊
+// are Emoji_Presentation codepoints (always color), and inline SVGs collapsed
+// in the webview — text glyphs sidestep both. U+FE0E forces text presentation
+// on ⚙ (emoji-capable but text-default; the selector pins it).
+const ICON_PLUS = "＋"; // U+FF0B fullwidth plus
+const ICON_HISTORY = "◷"; // U+25F7 circle with upper-right quadrant (clock face)
+const ICON_USAGE = "▁▄▇"; // block elements — mini bar chart
+const ICON_GEAR = "⚙︎"; // U+2699 gear, text presentation
 
 const APP_HTML = `
 	<div class="topbar">

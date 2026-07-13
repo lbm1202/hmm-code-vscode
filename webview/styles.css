@@ -59,6 +59,9 @@ html, body {
 	justify-content: center;
 	font-size: 14px;
 }
+/* Three block-element bars form the usage "chart" — smaller type + tracking
+ * so the triple fits the 26px button. */
+#btn-usage { font-size: 10px; letter-spacing: 1px; }
 
 .iconbtn:hover {
 	background: var(--vscode-toolbar-hoverBackground);
