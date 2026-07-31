@@ -81,6 +81,14 @@ export const ui = {
 export const todoPanelEnabled =
 	(window as unknown as { __HMM_CFG?: { todoPanel?: boolean } }).__HMM_CFG?.todoPanel !== false;
 
+/** Session this panel was opened ON, injected by the host when the sidebar list
+ *  opens a session in a new panel. Takes precedence over the webview's own
+ *  persisted last session at boot; absent for a plain "new session" panel and
+ *  for panels VS Code restored after a reload (those resume from persistence). */
+export const initialSessionFile: string | undefined =
+	(window as unknown as { __HMM_CFG?: { initialSession?: string } }).__HMM_CFG?.initialSession ||
+	undefined;
+
 /** Per-session UI flags. */
 export const runtime = {
 	/** Between doSend/agent_start and agent_end/turn_end. Blocks prompt input. */

@@ -169,6 +169,10 @@ export type FromWebview =
 export interface ChatBackendOpts {
 	/** Fires when Pi reports a session name change (initial load or rename). */
 	onSessionName?: (name: string) => void;
+	/** Fires when the session file this backend holds changes (new session,
+	 *  switch, fork). Sniffed from get_state — the host uses it to keep
+	 *  session→panel 1:1 and to mark open sessions in the sidebar list. */
+	onSessionFile?: (file: string) => void;
 	/** Whether the hosting view/panel is currently visible to the user. When it
 	 *  isn't, input-wait moments (ui.select / confirm / input dialogs) raise a
 	 *  toast + attention badge so the user notices without the panel open. */
@@ -185,8 +189,8 @@ export interface ChatBackendOpts {
 
 /**
  * One chat session: owns a PiClient + handles webview ↔ RPC bridging.
- * Used by both the sidebar WebviewView (ChatViewProvider) and editor-area
- * WebviewPanels (ChatPanel). Each instance spawns its own `pi --mode rpc`
+ * Instantiated per editor-area chat panel (ChatPanel) — the sidebar is a
+ * session list and runs no Pi. Each instance spawns its own `pi --mode rpc`
  * process, so opening multiple panels = multiple independent sessions.
  */
 export class ChatBackend {
@@ -371,6 +375,57 @@ export class ChatBackend {
 	 */
 	private syncSessionTitle(name: unknown): void {
 		this.opts.onSessionName?.(typeof name === "string" && name.trim() ? name : "");
+	}
+
+	/** Session file this backend's Pi currently holds (from the last get_state). */
+	private sessionFile: string | undefined;
+
+	/** Record the session file reported by get_state and notify the host on
+	 *  change. Pi reports its bootstrap session first and the real one after a
+	 *  switch, so this fires more than once per panel — hosts dedupe. */
+	private syncSessionFile(file: unknown): void {
+		if (typeof file !== "string" || !file) return;
+		if (this.sessionFile === file) return;
+		this.sessionFile = file;
+		this.opts.onSessionFile?.(file);
+	}
+
+	/** Start a fresh session on every live backend whose current session is in
+	 *  `files` — called before deleting those files so no Pi keeps writing to a
+	 *  session that's about to vanish (sidebar delete; the in-chat delete path
+	 *  handles its own backend inline). Case-folded compare: macOS/Windows
+	 *  preserve path case but fold it on disk. */
+	static async detachFromSessions(files: Set<string>): Promise<void> {
+		const folded = new Set([...files].map((f) => f.toLowerCase()));
+		for (const b of ChatBackend._live) {
+			if (!b.sessionFile || !folded.has(b.sessionFile.toLowerCase())) continue;
+			await b.startFreshSession();
+		}
+	}
+
+	/** Replace the backend's current session with a brand-new one and bring the
+	 *  webview in sync (title reset + synthesized session_start, which Pi does
+	 *  NOT push to RPC subscribers for new_session). */
+	private async startFreshSession(): Promise<void> {
+		const client = this.client;
+		if (!client) return;
+		try {
+			const res = await client.send({ type: "new_session" });
+			if (!res.success) return;
+			// A new session re-defaults Pi's built-in auto-compaction on — re-disable.
+			this.disableBuiltinAutoCompaction(client);
+			this.sessionFile = undefined;
+			this.syncSessionTitle("");
+			this.post({
+				kind: TO_WEBVIEW.EVENT,
+				event: { type: "session_start", reason: "new_session" },
+			});
+		} catch (err) {
+			this.post({
+				kind: TO_WEBVIEW.STDERR,
+				text: `new_session failed: ${(err as Error).message}`,
+			});
+		}
 	}
 
 	start(cwd: string | undefined): void {
@@ -625,6 +680,7 @@ export class ChatBackend {
 			if (stateRes.success) {
 				this.post({ kind: TO_WEBVIEW.STATE, state: stateRes.data });
 				this.syncSessionTitle((stateRes.data as any)?.sessionName);
+				this.syncSessionFile((stateRes.data as any)?.sessionFile);
 			}
 		} catch (err) {
 			console.error("[hmm-code:chat-backend] resync get_state failed:", err);
@@ -731,6 +787,7 @@ export class ChatBackend {
 					if (res.success) {
 						this.post({ kind: TO_WEBVIEW.STATE, state: res.data });
 						this.syncSessionTitle((res.data as any)?.sessionName);
+						this.syncSessionFile((res.data as any)?.sessionFile);
 					}
 				} catch (err) {
 					this.post({ kind: TO_WEBVIEW.STDERR, text: `get_state failed: ${(err as Error).message}` });
@@ -1044,6 +1101,10 @@ export function renderChatHtml(
 	webview: vscode.Webview,
 	extensionUri: vscode.Uri,
 	info: RenderInfo,
+	/** Panel-specific boot config. `initialSession` points a freshly opened panel
+	 *  at a session picked in the sidebar, taking precedence over the webview's
+	 *  own persisted last session. */
+	extras: { initialSession?: string } = {},
 ): string {
 	const nonce = makeNonce();
 	const scriptUri = webview.asWebviewUri(
@@ -1061,6 +1122,7 @@ export function renderChatHtml(
 	const cfgLiteral = jsonForScript({
 		autoApproveDefault: readAutoApproveDefault(),
 		todoPanel: readTodoPanel(),
+		initialSession: extras.initialSession,
 	});
 	return `<!DOCTYPE html>
 <html lang="${resolveLocale()}">

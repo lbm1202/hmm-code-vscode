@@ -79,6 +79,21 @@ function readSessionMeta(file: string): { name?: string; parentFile?: string } {
 	return { name, parentFile };
 }
 
+/** Parsed-metadata cache keyed by file path. readSessionMeta reads the WHOLE
+ *  JSONL (the name lives in the last session_info entry), which the sidebar
+ *  can't afford to redo for every session on every refresh — Pi appends to the
+ *  active session on each turn, and the list refreshes on file changes. A file
+ *  is re-read only when its size or mtime moved. */
+const metaCache = new Map<string, { mtimeMs: number; size: number; meta: ReturnType<typeof readSessionMeta> }>();
+
+function cachedSessionMeta(file: string, mtimeMs: number, size: number) {
+	const hit = metaCache.get(file);
+	if (hit && hit.mtimeMs === mtimeMs && hit.size === size) return hit.meta;
+	const meta = readSessionMeta(file);
+	metaCache.set(file, { mtimeMs, size, meta });
+	return meta;
+}
+
 /** List sessions for the workspace cwd, newest first. */
 export function listSessions(cwd: string): SessionEntry[] {
 	const dir = sessionsDir(cwd);
@@ -97,7 +112,7 @@ export function listSessions(cwd: string): SessionEntry[] {
 		const full = join(dir, f);
 		try {
 			const st = statSync(full);
-			const meta = readSessionMeta(full);
+			const meta = cachedSessionMeta(full, st.mtimeMs, st.size);
 			const name = sidecar[f] ?? meta.name ?? f.replace(/\.jsonl$/, "");
 			out.push({ file: full, name, mtimeMs: st.mtimeMs, parentFile: meta.parentFile });
 		} catch {

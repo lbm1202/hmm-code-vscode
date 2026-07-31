@@ -103,7 +103,7 @@ VS Code Extension Host (Node)
   ├── spawn `pi --mode rpc`      stdio JSONL framing
   │      ↑ bundled mode runs Electron's Node on out/vendor/pi/dist/cli.js
   │        with --no-extensions -e out/vendor/hmm-code-pi/index.ts
-  ├── ChatViewProvider           sidebar webview
+  ├── SessionsViewProvider       sidebar session list (no Pi process)
   ├── ChatPanel                  editor-area webview (serializer survives reload)
   ├── SettingsPanel              standalone editor tab
   └── ChatBackend                PiClient ↔ webview bridge
@@ -174,7 +174,7 @@ hmm-code-vscode/
 ├── src/
 │   ├── extension.ts          activate() — launch config + view/panel/command registration
 │   ├── pi-launcher.ts        bundled / user-override / system Pi decision
-│   ├── chat-view.ts          sidebar WebviewView provider
+│   ├── sessions-view.ts      sidebar session list — opens sessions in panels
 │   ├── chat-panel.ts         editor-area WebviewPanel + serializer
 │   ├── settings-panel.ts     standalone editor tab — modes / models / auth
 │   ├── chat-backend.ts       PiClient ↔ webview bridge

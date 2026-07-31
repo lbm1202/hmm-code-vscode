@@ -61,6 +61,20 @@ const settingsConfig = {
 	logLevel: "info",
 };
 
+// Sidebar session-list webview script. Standalone page (no chat modules) —
+// same nonce'd <script src> delivery as the chat and settings bundles.
+const sessionsConfig = {
+	entryPoints: ["webview/sessions.ts"],
+	bundle: true,
+	outfile: "out/webview/sessions.js",
+	platform: "browser",
+	target: "es2022",
+	format: "iife",
+	sourcemap: true,
+	minify,
+	logLevel: "info",
+};
+
 /** Resolve where to pick up hmm-code-pi source:
  *   1. $HMM_CODE_PI_PATH env var if set (escape hatch for custom layouts)
  *   2. ../hmm-code-pi sibling (the dev-friendly layout — edit + rebuild loop)
@@ -240,7 +254,8 @@ if (watch) {
 	const ctxB = await context(webviewConfig);
 	const ctxC = await context(webviewCssConfig);
 	const ctxD = await context(settingsConfig);
-	await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch(), ctxD.watch()]);
+	const ctxE = await context(sessionsConfig);
+	await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch(), ctxD.watch(), ctxE.watch()]);
 	console.log("[esbuild] watching… (vendor copy only on initial build — re-run `npm run build` after Pi update)");
 	vendorBundle();
 } else {
@@ -249,6 +264,7 @@ if (watch) {
 		build(webviewConfig),
 		build(webviewCssConfig),
 		build(settingsConfig),
+		build(sessionsConfig),
 	]);
 	vendorBundle();
 }

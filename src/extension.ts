@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ChatBackend } from "./chat-backend";
-import { ChatViewProvider } from "./chat-view";
+import { SessionsViewProvider } from "./sessions-view";
 import { ChatPanel } from "./chat-panel";
 import { getPiLaunchConfig } from "./pi-launcher";
 import { SettingsPanel } from "./settings-panel";
@@ -38,12 +38,13 @@ export function activate(ctx: vscode.ExtensionContext): void {
 	);
 	console.log(`[hmm-code] Pi launch source: ${launch.source} (${launch.cmd})`);
 
-	const provider = new ChatViewProvider(ctx);
+	// Sidebar = session list only (chat lives in editor panels). It holds no Pi
+	// process, so retainContextWhenHidden isn't needed: the list re-renders from
+	// disk whenever the view becomes visible again.
+	const provider = new SessionsViewProvider(ctx);
 
 	ctx.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, provider, {
-			webviewOptions: { retainContextWhenHidden: true },
-		}),
+		vscode.window.registerWebviewViewProvider(SessionsViewProvider.viewType, provider),
 	);
 
 	// Restore editor-area panels across window reloads / VS Code restarts.
@@ -82,17 +83,20 @@ export function activate(ctx: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("hmm-code.restartChat", () => {
 			ChatBackend.restartAll();
 		}),
+		// Chat-scoped commands act on the focused chat tab (or the only open one).
+		// With no chat panel open there's nothing to act on — say so instead of
+		// failing silently.
 		vscode.commands.registerCommand("hmm-code.cycleMode", () => {
-			provider.cyclePrompt("/mode");
+			withActiveChat((b) => b.prompt("/mode"));
 		}),
 		vscode.commands.registerCommand("hmm-code.toggleThinking", () => {
-			provider.cyclePrompt("/thinking-toggle");
+			withActiveChat((b) => b.prompt("/thinking-toggle"));
 		}),
 		vscode.commands.registerCommand("hmm-code.resetDefaults", () => {
-			provider.cyclePrompt("/reset");
+			withActiveChat((b) => b.prompt("/reset"));
 		}),
 		vscode.commands.registerCommand("hmm-code.abort", () => {
-			provider.abort();
+			withActiveChat((b) => b.abort());
 		}),
 		// Clears the "don't show again" flag so the onboarding card can appear
 		// again (it still requires no-auth detection). Mainly for support/testing.
@@ -105,6 +109,16 @@ export function activate(ctx: vscode.ExtensionContext): void {
 	);
 }
 
+/** Run `fn` on the focused chat panel's backend, or tell the user there's none. */
+function withActiveChat(fn: (backend: ChatBackend) => void): void {
+	const backend = ChatPanel.activeBackend();
+	if (!backend) {
+		void vscode.window.showInformationMessage(t("host.noActiveChat"));
+		return;
+	}
+	fn(backend);
+}
+
 export function deactivate(): void {
-	// No-op: ChatViewProvider tears down its PiClient in onDidDispose.
+	// No-op: each ChatPanel tears down its PiClient in onDidDispose.
 }

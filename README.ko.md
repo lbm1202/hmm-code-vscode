@@ -102,7 +102,7 @@ VS Code Extension Host (Node)
   ├── spawn `pi --mode rpc`      stdio JSONL 프레이밍
   │      ↑ 번들 모드는 Electron의 Node로 out/vendor/pi/dist/cli.js 실행
   │        --no-extensions -e out/vendor/hmm-code-pi/index.ts 와 함께
-  ├── ChatViewProvider           사이드바 webview
+  ├── SessionsViewProvider       사이드바 세션 목록 (Pi 프로세스 없음)
   ├── ChatPanel                  에디터 영역 webview (serializer가 재로드 생존)
   ├── SettingsPanel              독립 에디터 탭
   └── ChatBackend                PiClient ↔ webview 브리지
@@ -172,7 +172,7 @@ hmm-code-vscode/
 ├── src/
 │   ├── extension.ts          activate() — 런치 설정 + 뷰/패널/명령 등록
 │   ├── pi-launcher.ts        번들 / 사용자 override / 시스템 Pi 결정
-│   ├── chat-view.ts          사이드바 WebviewView 공급자
+│   ├── sessions-view.ts      사이드바 세션 목록 — 세션을 패널로 열기
 │   ├── chat-panel.ts         에디터 영역 WebviewPanel + serializer
 │   ├── settings-panel.ts     독립 에디터 탭 — 모드 / 모델 / 인증
 │   ├── chat-backend.ts       PiClient ↔ webview 브리지
