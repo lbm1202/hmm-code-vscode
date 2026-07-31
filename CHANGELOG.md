@@ -7,6 +7,24 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.16] — 2026-08-01
+
+Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.14. The sidebar is now a session browser and chat always opens as an editor tab.
+
+### ✨ Highlights
+- **The sidebar is a session list, not a chat.** It shows the sessions of the current workspace folder — search, relative times, parent/child tree — and clicking one opens it as an editor tab. Chat no longer runs in the sidebar at all.
+- **One tab per session.** Opening a session that's already in a tab reveals that tab instead of starting a second agent on the same session file.
+- **Custom providers without an API key work.** Local and self-hosted endpoints no longer disappear from the model pickers.
+
+### Changed
+- **Sidebar rebuilt as a session browser** (`Sessions` view): `＋ New session`, a search box, and rows showing the session name with a relative time (`just now` / `5m ago` / `3d ago`, a date past a week). Child sessions (plan → implementation handoffs) nest under their parent with a descendant count, rename (✎) and delete (🗑, with the same cascade warning) sit on each row, and the session a chat tab currently holds is marked with a dot. Chat panels keep their own session list and recent-sessions shortcuts.
+- The sidebar holds **no agent process** — it is plain file I/O, so an idle sidebar costs nothing. Session lists are also cached per file (size + mtime) instead of re-parsing every session on every refresh, and refreshes pause entirely while the sidebar is hidden.
+- **Command-palette actions (cycle mode, toggle thinking, reset to defaults, abort) act on the focused chat tab**, with a notice when no chat tab is open. The input-wait badge now aggregates across all open chat tabs onto the sidebar icon.
+
+### Fixed
+- **A newly opened chat tab now honours the auto-approve default.** Auto-approve is per-session state that resets on every session start, and it was only asserted when a session-start event arrived — which never happens for the session an agent boots with, so freshly opened chats came up with the setting off. It is now asserted as soon as the agent can take commands, and re-asserted after a session switch (which also resets it).
+- **Custom providers with no API key no longer vanish from the model pickers.** Their models were missing from the chat model picker, the per-mode model dropdowns and the provider filter — and were unselectable even when named directly in `modes.json`. See hmm-code-pi 0.1.14.
+
 ## [0.1.15] — 2026-07-14
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.13.
