@@ -15,6 +15,7 @@ import {
 } from "./protocol";
 import {
 	effectiveModel,
+	initialSessionFile,
 	isBinaryThinking,
 	pendingUiRequests,
 	persistedSessionFile,
@@ -61,6 +62,26 @@ const COMPACT_TIMEOUT_MS = 240_000;
  *  but a double switch_session is not, so guard it. */
 let bootResumeDone = false;
 
+/** Whether `/auto-approve on` has been asserted for the session now in front of
+ *  us. Cleared whenever that changes (READY = fresh pi; any session event), and
+ *  set on the first assert — renderState runs on every get_state, so without the
+ *  latch we'd re-send the slash several times per second. */
+let autoApproveApplied = false;
+
+/** Assert the hmm-code.autoApproveDefault opt-in for the current session.
+ *
+ *  The Pi extension force-resets `state.autoApprove` to false on EVERY
+ *  session_start it sees — startup, resume/switch, fork (hooks.ts) — so the
+ *  opt-in has to be re-asserted per session, not once per process. Two gaps this
+ *  closes: Pi emits no RPC session_start for the session it BOOTS with (a freshly
+ *  opened chat panel came up with auto-approve off), and a switch to an existing
+ *  session lands with it off too. */
+function applyAutoApproveDefault(): void {
+	if (!autoApproveDefault || autoApproveApplied) return;
+	autoApproveApplied = true;
+	post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve on" });
+}
+
 /** Show the compact button only when it's actually usable: enough context to be
  *  worth compacting (≥35% usage), the chat is idle (no turn in flight — Pi can't
  *  compact mid-turn anyway), and no compaction is already running. Reads the last
@@ -87,6 +108,10 @@ export function wireDispatch(): void {
 const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 	[TO_WEBVIEW.READY]: () => {
 		setEmptyVisibility();
+		// A READY means a freshly spawned pi (boot or restart) — its auto-approve
+		// state is back to OFF, so re-arm the assert. It fires from renderState,
+		// once Pi has proven it can take commands.
+		autoApproveApplied = false;
 		pollInitialState();
 		// Fetch full models list eagerly so we can backfill thinkingLevelMap/compat
 		// for the active model if state.model is missing those fields.
@@ -94,11 +119,13 @@ const MESSAGE_HANDLERS: Record<string, (msg: any) => void> = {
 		post({ kind: FROM_WEBVIEW.REQUEST_CONTEXT });
 		post({ kind: FROM_WEBVIEW.REQUEST_COMMANDS });
 		post({ kind: FROM_WEBVIEW.LIST_SESSIONS });
-		// Auto-resume: if VS Code restored this webview after a reload, the
-		// previous session file is in persisted state. Switch back to it so
-		// the user picks up where they left off. Pi spawns a fresh session
-		// by default; this transitions to the previous one once it's ready.
-		const last = bootResumeDone ? null : persistedSessionFile();
+		// Auto-resume, in priority order:
+		//   1. initialSession — the sidebar opened this panel ON a session;
+		//   2. persisted lastSessionFile — VS Code restored this webview after a
+		//      reload, so pick up where the user left off.
+		// Pi spawns a fresh session by default; either case transitions to the
+		// target once Pi is ready. A plain "new session" panel has neither.
+		const last = bootResumeDone ? null : (initialSessionFile ?? persistedSessionFile());
 		if (last) {
 			bootResumeDone = true;
 			// Set the guard BEFORE switching so any STATE reporting Pi's bootstrap
@@ -248,17 +275,13 @@ function handlePiEvent(ev: any): void {
 			// Backfill the slash-command list if the READY-time fetch hasn't
 			// landed yet (cold-session race) so the prompt autocomplete works.
 			if (!runtime.slashCommands.length) post({ kind: FROM_WEBVIEW.REQUEST_COMMANDS });
-			// hmm-code.autoApproveDefault: the user opted into auto-approve as a
-			// default, so (re)assert it ON whenever a session starts or loads
-			// (new session + boot-resume). SESSION_SWITCH is excluded to avoid
-			// re-enabling on every navigation between existing sessions.
-			// `/auto-approve on` is idempotent, so a redundant send is harmless.
-			if (
-				autoApproveDefault &&
-				(ev.type === PI_EVENT.SESSION_START || ev.type === PI_EVENT.SESSION_LOADED)
-			) {
-				post({ kind: FROM_WEBVIEW.SLASH, text: "/auto-approve on" });
-			}
+			// hmm-code.autoApproveDefault: re-assert the opt-in for the session
+			// we just landed on. Switches are included — Pi wipes auto-approve on
+			// every session_start (incl. resume/switch/fork), so there is no
+			// manual toggle left to preserve, and skipping switches just left the
+			// user's default silently off.
+			autoApproveApplied = false;
+			applyAutoApproveDefault();
 			// Plan handoff: if finalize_plan signaled a new-session implementation,
 			// fire the implementation prompt now that the new session is ready.
 			if (runtime.pendingPlanHandoff) {
@@ -536,6 +559,11 @@ function renderState(state: any): void {
 	refreshPopover();
 	if (typeof state.sessionFile === "string") {
 		runtime.currentSessionFile = state.sessionFile;
+		// First state of this Pi process = it can take commands now (same signal
+		// resumeLastSession waits on). Assert the auto-approve default here so a
+		// freshly opened panel honours it — Pi emits no session_start for the
+		// session it boots with, so the session_* branch alone never fires.
+		applyAutoApproveDefault();
 		// Guard against the auto-resume race: while a switch_session is in
 		// flight, Pi's bootstrap temp session may report here first and
 		// silently overwrite the user's previous session in persisted storage,
