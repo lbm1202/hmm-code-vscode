@@ -5,7 +5,7 @@
 # Hmm-code
 
 **A native VS Code UI for the [Pi coding agent](https://github.com/badlogic/pi-mono).**
-plan / code / debug / ask modes · permission layer · AGENTS.md auto-injection · self-contained `.vsix`
+plan / code / review / debug / ask modes · permission layer · AGENTS.md auto-injection · self-contained `.vsix`
 
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/lbm1202/hmm-code-vscode/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -39,7 +39,7 @@ ext install lbm1202.hmm-code
 
 Listing: <https://marketplace.visualstudio.com/items?itemName=lbm1202.hmm-code>
 
-Then click the Hmm-code icon in the Activity Bar (or run "Hmm-code: Open Chat in Sidebar" from the Command Palette).
+Then click the Hmm-code icon in the Activity Bar (or run "Hmm-code: Show Sessions" from the Command Palette) and start a session — chats open as editor tabs.
 
 ### From a release `.vsix`
 
@@ -79,8 +79,9 @@ If the sibling isn't there, the build auto-clones `hmm-code-pi` into `node_modul
 
 A disciplined, mode-driven coding agent — the workflow, not the widgets:
 
-- **Four explicit modes** — `plan` · `code` · `debug` · `ask`, each with its own model, thinking level, tools, and system prompt. Switch from the picker, or let the agent propose a switch you confirm.
-- **Plan-first by design** — every code change goes `plan → code`. `plan`/`debug`/`ask` can't edit or write; only `code` touches your files, after a plan handoff (`finalize_plan`).
+- **Five explicit modes** — `plan` · `code` · `review` · `debug` · `ask`, each with its own model, thinking level, tools, and system prompt. Switch from the picker, or let the agent propose a switch you confirm.
+- **Plan-first by design** — every code change goes `plan → code`. `plan`/`review`/`debug`/`ask` can't edit or write; only `code` touches your files, after a plan handoff (`finalize_plan`).
+- **Implementation review** — when `code` finishes work that came from a plan, `finalize_implementation` writes a report and hands off to `review`, which re-reads the actual files and runs the plan's validation commands. A failed review finalizes a fix-list plan, so the loop closes back into `code`.
 - **Permission-gated** — a layered permission system decides `allow` / `ask` / `deny` per tool call (mode defaults + `.piignore`), surfaced as confirm prompts. Session-scoped **auto-approve** when you want to move fast.
 - **Dynamic compaction** — context auto-summarizes at the turn boundary instead of cutting the agent mid-turn (toggle + 50–85% threshold; manual **Compact** button).
 - **Lean, cache-stable context** — old tool outputs are pruned to a short notice past a *sticky* recent window (the full output stays in the transcript), so long sessions stay cheap and the prompt cache doesn't thrash; after a boundary compaction the agent can auto-continue the remaining tasks.
@@ -125,7 +126,7 @@ Webview  (15 modules)
 
 Pi process (bundled)
   └── loads out/vendor/hmm-code-pi/index.ts via -e
-        ├── plan / code / debug / ask mode system
+        ├── plan / code / review / debug / ask mode system
         ├── tools: finalize_plan / request_mode_switch / ask_user / todo_write / auto-title
         ├── permissions layer (tool_call hook)
         └── AGENTS.md auto-injection (before_agent_start)
@@ -139,8 +140,8 @@ Available from the Command Palette (`Cmd+Shift+P`) — no default keybindings (V
 
 | Command | Description |
 |---|---|
-| `Hmm-code: Open Chat in Sidebar` | Focus the sidebar Chat view |
-| `Hmm-code: New Chat Panel` | Open a new conversation in an editor tab |
+| `Hmm-code: Show Sessions` | Focus the sidebar session list |
+| `Hmm-code: New Chat` | Open a new conversation in an editor tab |
 | `Hmm-code: Open Settings` | Open the settings panel as an editor tab |
 | `Hmm-code: Cycle Mode` | Equivalent to `/mode` |
 | `Hmm-code: Toggle Thinking Level` | Equivalent to `/thinking-toggle` |

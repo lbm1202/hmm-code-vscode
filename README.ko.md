@@ -5,7 +5,7 @@
 # Hmm-code
 
 **[Pi 코딩 에이전트](https://github.com/badlogic/pi-mono)를 위한 네이티브 VS Code UI.**
-plan / code / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 · 자체 완결형 `.vsix`
+plan / code / review / debug / ask 모드 · 권한 레이어 · AGENTS.md 자동 주입 · 자체 완결형 `.vsix`
 
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/lbm1202/hmm-code-vscode/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -39,7 +39,7 @@ ext install lbm1202.hmm-code
 
 마켓플레이스: <https://marketplace.visualstudio.com/items?itemName=lbm1202.hmm-code>
 
-설치 후 Activity Bar의 Hmm-code 아이콘을 클릭하거나, 명령 팔레트에서 "Hmm-code: Open Chat in Sidebar" 를 실행합니다.
+설치 후 Activity Bar의 Hmm-code 아이콘을 클릭하거나, 명령 팔레트에서 "Hmm-code: 세션 목록 열기" 를 실행합니다. 채팅은 에디터 탭으로 열립니다.
 
 ### 릴리즈 `.vsix`에서 설치
 
@@ -79,8 +79,9 @@ code --install-extension "hmm-code-$(node -p "require('./package.json').version"
 
 위젯이 아니라 워크플로우가 핵심인, 모드 기반의 규율 있는 코딩 에이전트:
 
-- **4개 명시적 모드** — `plan` · `code` · `debug` · `ask`. 각 모드가 독립된 모델 · thinking 레벨 · 도구 · 시스템 프롬프트를 가짐. 피커로 직접 전환하거나, 에이전트가 제안한 전환을 사용자가 승인.
-- **설계상 plan 우선** — 모든 코드 변경은 `plan → code`를 거침. `plan`/`debug`/`ask`는 edit·write 불가. 오직 `code`만 파일을 건드리며, 그것도 plan 핸드오프(`finalize_plan`) 이후에만.
+- **5개 명시적 모드** — `plan` · `code` · `review` · `debug` · `ask`. 각 모드가 독립된 모델 · thinking 레벨 · 도구 · 시스템 프롬프트를 가짐. 피커로 직접 전환하거나, 에이전트가 제안한 전환을 사용자가 승인.
+- **설계상 plan 우선** — 모든 코드 변경은 `plan → code`를 거침. `plan`/`review`/`debug`/`ask`는 edit·write 불가. 오직 `code`만 파일을 건드리며, 그것도 plan 핸드오프(`finalize_plan`) 이후에만.
+- **구현 리뷰** — plan에서 넘어온 작업을 `code`가 끝내면 `finalize_implementation`이 리포트를 쓰고 `review`로 넘김. review는 실제 파일을 다시 읽고 plan의 검증 명령을 직접 실행. 리뷰가 실패하면 수정 목록을 plan으로 확정해 다시 `code`로 되돌아가는 루프.
 - **권한 게이팅** — 계층형 권한 시스템이 도구 호출마다 `allow` / `ask` / `deny`를 결정(모드 기본값 + `.piignore`)하고 확인 프롬프트로 표시. 빠르게 진행하고 싶을 땐 세션 단위 **자동 승인**.
 - **다이나믹 압축** — 에이전트의 턴 도중에 끊지 않고 턴 경계에서 컨텍스트를 자동 요약(토글 + 50–85% 임계값, 수동 **Compact** 버튼).
 
@@ -123,7 +124,7 @@ Webview (14개 모듈)
 
 Pi 프로세스 (번들)
   └── -e 로 out/vendor/hmm-code-pi/index.ts 로드
-        ├── plan / code / debug / ask 모드 시스템
+        ├── plan / code / review / debug / ask 모드 시스템
         ├── 도구: finalize_plan / request_mode_switch / ask_user / todo_write / auto-title
         ├── 권한 레이어 (tool_call 훅)
         └── AGENTS.md 자동 주입 (before_agent_start)
@@ -137,8 +138,8 @@ Pi 프로세스 (번들)
 
 | 명령 | 설명 |
 |---|---|
-| `Hmm-code: Open Chat in Sidebar` | 사이드바 Chat 뷰에 포커스 |
-| `Hmm-code: New Chat Panel` | 에디터 탭에 새 대화 열기 |
+| `Hmm-code: 세션 목록 열기` | 사이드바 세션 목록에 포커스 |
+| `Hmm-code: 새 채팅` | 에디터 탭에 새 대화 열기 |
 | `Hmm-code: Open Settings` | 설정 패널을 에디터 탭으로 열기 |
 | `Hmm-code: Cycle Mode` | `/mode` 와 동일 |
 | `Hmm-code: Toggle Thinking Level` | `/thinking-toggle` 와 동일 |

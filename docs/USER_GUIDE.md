@@ -14,14 +14,20 @@ A walkthrough of every UI feature in the VS Code extension.
 
 ## 1. Opening a chat
 
-### Sidebar
-- Click the Hmm icon in the Activity Bar
-- Or run `Cmd+Shift+P` → "Hmm-code: Open Chat in Sidebar"
+Chat always opens as an **editor tab**. The sidebar is the session browser for
+the current workspace folder — see [§7](#7-sidebar-session-list).
 
-### Editor panel (new tab)
+### From the sidebar (usual way)
+- Click the Hmm icon in the Activity Bar (or `Cmd+Shift+P` → "Hmm-code: Show Sessions")
+- **＋ New session** starts an empty chat; clicking a session row opens that session
+
+### Straight to a new tab
 - Click the `H` icon (PNG logo) in the editor title bar
-- Or run `Cmd+Shift+P` → "Hmm-code: New Chat Panel"
-- Multiple panels can coexist — each tab is an independent Pi process
+- Or run `Cmd+Shift+P` → "Hmm-code: New Chat"
+
+Multiple tabs can coexist — each is an independent Pi process. A session opens in
+**one tab only**: picking a session that's already open reveals that tab instead
+of starting a second agent on the same session file.
 
 ### Panel persistence
 VS Code window reload / restart → every tab restores automatically. The session file you had open last reattaches as well (webview persisted state).
@@ -34,7 +40,7 @@ Left to right: **mode picker** · **model picker** · **thinking picker** · **�
 
 | Button | Action |
 |---|---|
-| **mode picker** | Click → 4-mode picker. Mode-colored chip (code = white, plan = blue, debug = purple, ask = orange). |
+| **mode picker** | Click → 5-mode picker. Mode-colored chip (code = white, plan = blue, review = green, debug = purple, ask = orange). |
 | **model picker** | Click → available models. Alias is shown as the primary label with the raw id as a sublabel. |
 | **thinking picker** | Click → supported thinking levels for the active model. |
 | **↺ reset** | Only visible when the current model/thinking differs from the mode default. Click → restore mode defaults. |
@@ -125,16 +131,27 @@ For repeated approvals, either toggle Auto on or add an `allow` rule under `perm
 
 ---
 
-## 7. Session picker (🕘)
+## 7. Sidebar session list
 
-Click the 🕘 button at the top → session tree modal.
+The Activity Bar view lists every session of the current workspace folder. It runs
+no agent process of its own — it is a browser over the session files on disk.
 
-- **Parent-child tree**: sessions spawned via `finalize_plan` (new-session branch) link to their parent and render as a tree.
-- **`▶ / ▼`**: expand/collapse children.
-- **Row click**: switch to that session.
-- **✏️**: rename (stored in the sidecar `.pi-modes-names.json` — Pi's session files stay immutable).
+- **＋ New session**: opens an empty chat tab.
+- **Search box**: filters by session name; results render flat (a matching child
+  isn't hidden behind a non-matching parent).
+- **Row**: session name + relative time (`just now`, `5m ago`, `3d ago`, a date past
+  a week). Click to open it in a tab.
+- **Parent-child tree**: sessions spawned via `finalize_plan` (new-session branch)
+  nest under their parent, with a descendant count; `▸ / ▾` expands and collapses.
+- **● dot**: this session is currently open in a chat tab.
+- **✎**: rename (stored in the sidecar `.pi-modes-names.json` — Pi's session files stay immutable).
 - **🗑**: delete. If the session has children, a cascade warning appears.
-  - **Deleting the active session auto-spawns a fresh one** so the UI never shows a dead session.
+  - A tab holding a deleted session (or one of its descendants) **moves to a fresh
+    session first**, so no agent keeps writing to a file that's gone.
+- **％ / ⚙︎**: subscription usage and the settings panel.
+
+The chat tab keeps its own session list (🕘) and the recent-sessions shortcuts on
+the empty state, so you can switch sessions without leaving the tab.
 
 ---
 
@@ -147,7 +164,7 @@ Five tabs:
 - **Authentication**: API keys, Codex / Claude OAuth logins, Codex usage readout.
 - **Models**: custom providers (self-hosted vLLM / Ollama) + the per-provider model filter (allowlist).
 - **Modes**: each mode's model / thinking level.
-- **Prompts**: the four mode system prompts, the auto-title prompt, and compaction focus.
+- **Prompts**: the five mode system prompts, the auto-title prompt, and compaction focus.
 
 Saving triggers an auto-reload — every open chat tab picks up the new config.
 
@@ -166,6 +183,7 @@ A fresh tab with no session shows the centered Hmm logo + a "Recent sessions" li
 | code | white |
 | plan | blue |
 | debug | purple |
+| review | green |
 | ask | orange |
 
 Used consistently across the mode picker chip, plan-handoff notifications, and the footer mode label.
@@ -175,7 +193,7 @@ Used consistently across the mode picker chip, plan-handoff notifications, and t
 ## 11. Troubleshooting
 
 ### Chat doesn't respond
-- The sidebar's top-right ↺ button (when visible) triggers `restartChat` — respawns the Pi process.
+- `Cmd+Shift+P` → "Hmm-code: Restart Chat" respawns the Pi process behind every open tab.
 - Or `Cmd+Shift+P` → "Developer: Reload Window".
 
 ### Pi doesn't pick up new extension code

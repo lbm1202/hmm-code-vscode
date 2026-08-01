@@ -1,7 +1,7 @@
 {
 	"name": "hmm-code",
 	"displayName": "Hmm-code",
-	"description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/debug/ask modes.",
+	"description": "Hmm-code — VS Code UI for the Pi coding agent with plan/code/review/debug/ask modes.",
 	"version": "0.1.16",
 	"publisher": "lbm1202",
 	"private": true,

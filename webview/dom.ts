@@ -46,7 +46,7 @@ const APP_HTML = `
 		<div class="empty-logo">${LOGO_SVG}</div>
 		<div class="empty-title">Hmm-code</div>
 		<div class="empty-version">${VERSION_LINE}</div>
-		<div class="empty-subtitle">Plan · Code · Debug · Ask</div>
+		<div class="empty-subtitle">Plan · Code · Review · Debug · Ask</div>
 		<div id="onboarding-root" class="hidden"></div>
 		<div class="recent-section">
 			<div class="recent-header">${t("chat.recentSessions")}</div>

@@ -14,7 +14,7 @@ The panel has **five tabs**: General · Authentication · Models · Modes · Pro
 
 ## Modes tab
 
-Edit the model + thinking level for each of the four modes (plan / code / debug / ask). The per-mode **system prompts** live in the **Prompts** tab.
+Edit the model + thinking level for each of the five modes (plan / code / review / debug / ask). The per-mode **system prompts** live in the **Prompts** tab.
 
 | Mode  | Provider ▾ | Model ▾ | Thinking ▾ |
 |-------|-----------|---------|------------|
@@ -69,7 +69,7 @@ When usage reaches the **threshold** (slider, 50–85%; default 70%, stored as `
 
 Every editable prompt in one place. Empty = built-in default for each.
 
-- **Mode system prompts** — the per-mode `systemPromptAddendum` (plan / code / debug / ask), appended to the base system prompt. Saving text identical to the default writes no override. (`modes.json:modes.<mode>.systemPromptAddendum`)
+- **Mode system prompts** — the per-mode `systemPromptAddendum` (plan / code / review / debug / ask), appended to the base system prompt. Saving text identical to the default writes no override. (`modes.json:modes.<mode>.systemPromptAddendum`)
 - **Auto-title prompt** — replaces the built-in title prompt; the language line (from `hmm-code.language`) is always appended regardless. (`modes.json:autoTitlePrompt`)
 - **Compaction focus** — extra instructions appended to Pi's summary prompt as `Additional focus: …` (Pi's base summary prompt can't be replaced). Empty = none. (`modes.json:compactInstructions`)
 
