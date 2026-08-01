@@ -68,7 +68,33 @@ export function combinedModelOptionsHtml(curProvider: any, curId: any, providerI
 	return parts.join("");
 }
 
-const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
+export const BINARY_THINKING_FORMATS = ['qwen-chat-template', 'qwen', 'zai'];
+
+/** Levels a model actually offers, from its thinkingLevelMap — the same rule
+ *  Pi applies (`getSupportedThinkingLevels`): a `null` entry disables a level,
+ *  xhigh/max need an explicit entry, everything else is on by default. */
+export function levelsFromMap(map: any): string[] {
+	const m = map || {};
+	return THINKING_LEVELS.filter((lvl) => {
+		if (!lvl) return false;
+		const mapped = m[lvl];
+		if (mapped === null) return false;
+		if (lvl === 'xhigh' || lvl === 'max') return mapped !== undefined;
+		return true;
+	});
+}
+
+/** Compact summary of an enabled-level set: "off–high" when it's an unbroken
+ *  run of the ladder (the common case), otherwise the levels listed. */
+export function summarizeLevels(levels: string[]): string {
+	if (levels.length === 0) return '—';
+	if (levels.length === 1) return levels[0];
+	const ladder = THINKING_LEVELS.filter(Boolean);
+	const first = ladder.indexOf(levels[0]);
+	const last = ladder.indexOf(levels[levels.length - 1]);
+	const contiguous = last - first + 1 === levels.length;
+	return contiguous ? levels[0] + '–' + levels[levels.length - 1] : levels.join(' · ');
+}
 
 export function findAvailableModel(provider: any, id: any) {
 	const list = (S.diskState && S.diskState.availableModels) || [];

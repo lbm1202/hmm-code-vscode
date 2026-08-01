@@ -313,5 +313,10 @@
 	"sessions.ago.day": "{n}d ago",
 	"host.noActiveChat": "Hmm-code: no chat tab is open. Start one from the Sessions sidebar.",
 	"sessions.noAuth": "No model provider is connected yet.",
-	"sessions.noAuthCta": "Start a chat to sign in"
+	"sessions.noAuthCta": "Start a chat to sign in",
+	"settings.models.levels": "Levels",
+	"settings.models.levelsHint": "Levels this model offers in the picker. xhigh and max are opt-in; a level you turn off is never offered.",
+	"settings.models.levelsAdvanced": "Advanced — value sent per level",
+	"settings.models.levelsAdvancedHint": "What goes on the wire for each level. Leave empty to send the level's own name; set it when your endpoint uses different words.",
+	"settings.models.levelsBinary": "This thinking format is on/off only — every enabled level above off collapses into a single \"on\"."
 }

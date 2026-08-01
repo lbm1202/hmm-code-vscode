@@ -4,7 +4,7 @@ import { vscode, post, t, el, q, qa, esc, showToast, MODE_NAMES, THINKING_LEVELS
 import {
 	diskMode, defaultPrompt, diskAuth, diskModels, modeDirty, authDirty, modelsDirty, diskAutoTitle, autoTitleDirty, diskCompactModel, compactModelDirty, diskAllowlist, allowlistDirty, diskCompactOverride, defaultCompact, compactDirty, diskDynamicCompaction, dynamicCompactionDirty, diskIncludeOldToolOutputs, includeOldToolOutputsDirty, diskAutoApproveDefault, diskTodoPanel, diskAutoContinue, diskRetentionOverride, diskDefaultMode, diskAutoTitlePrompt, defaultAutoTitle, autoTitleOverrideFromDraft, diskCompactInstructions, autoTitlePromptDirty, compactInstructionsDirty, isDirty, updateSaveBar
 } from "./settings-disk";
-import { buildProviderIndex, combinedModelOptionsHtml, splitModelKey, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml } from "./settings-pickers";
+import { buildProviderIndex, combinedModelOptionsHtml, splitModelKey, findAvailableModel, modeThinkingOptionsHtml, thinkingFormatOptionsHtml, levelsFromMap, summarizeLevels, BINARY_THINKING_FORMATS } from "./settings-pickers";
 import { renderAnthropicUsage } from "./settings-anthropic";
 import { renderCodexUsage } from "./settings-codex";
 
@@ -375,6 +375,140 @@ function renderProviders() {
 // thinkingFormat values Pi understands (pi-ai types.d.ts). Empty = auto-detect
 // from the provider/baseUrl. "qwen-chat-template" uses chat_template_kwargs.
 
+// ── Per-model thinking-level editor ─────────────────────────────────────────
+// Edits `thinkingLevelMap`, whose three states carry all the meaning:
+//   absent → level offered with its own name as the sent value (xhigh/max are
+//            the exception: absent means NOT offered — they're opt-in);
+//   null   → level not offered;
+//   string → offered, and this is what goes on the wire.
+// The row shows only a summary ("off–high"); the chips and the per-level value
+// inputs live in a collapsible body so an untouched model stays one line.
+
+/** Expanded models, keyed provider␟id so the state survives a re-render. */
+const expandedLevels = new Set<string>();
+const levelKey = (prov: any, model: any) => prov + '\u001f' + (model?.id || '');
+
+function levelEnabled(map: any, lvl: any) {
+	const mapped = (map || {})[lvl];
+	if (mapped === null) return false;
+	if (lvl === 'xhigh' || lvl === 'max') return mapped !== undefined;
+	return true;
+}
+
+/** Apply a chip toggle to the draft map, keeping it as small as possible:
+ *  a level at its default state leaves no entry behind. */
+function setLevelEnabled(model: any, lvl: any, on: any) {
+	const map = Object.assign({}, model.thinkingLevelMap || {});
+	const optIn = lvl === 'xhigh' || lvl === 'max';
+	if (on) {
+		if (optIn) map[lvl] = lvl; // must be explicit to show up at all
+		else delete map[lvl]; // default-on → no entry needed
+	} else {
+		if (optIn) delete map[lvl]; // absent already means off
+		else map[lvl] = null; // explicit refusal
+	}
+	if (Object.keys(map).length === 0) delete model.thinkingLevelMap;
+	else model.thinkingLevelMap = map;
+}
+
+/** Set the on-the-wire value for a level. Empty input → back to the default
+ *  (the level's own name), which for xhigh/max still needs an explicit entry. */
+function setLevelValue(model: any, lvl: any, value: any) {
+	const v = String(value || '').trim();
+	const map = Object.assign({}, model.thinkingLevelMap || {});
+	const optIn = lvl === 'xhigh' || lvl === 'max';
+	if (v) map[lvl] = v;
+	else if (optIn) map[lvl] = lvl;
+	else delete map[lvl];
+	if (Object.keys(map).length === 0) delete model.thinkingLevelMap;
+	else model.thinkingLevelMap = map;
+}
+
+function renderLevelsBlock(wrap: any, provName: any, idx: any, model: any) {
+	const map = model.thinkingLevelMap || {};
+	const key = levelKey(provName, model);
+	const open = expandedLevels.has(key);
+	const levels = THINKING_LEVELS.filter(Boolean);
+	const tf = (model.compat && model.compat.thinkingFormat) || '';
+	const binary = BINARY_THINKING_FORMATS.indexOf(tf) !== -1;
+
+	const chips = levels
+		.map((lvl) => {
+			const on = levelEnabled(map, lvl);
+			const custom = typeof map[lvl] === 'string' && map[lvl] !== lvl;
+			return (
+				'<button type="button" class="lv-chip' + (on ? ' on' : '') + '" data-lv="' + esc(lvl) + '">' +
+				esc(lvl) +
+				(custom ? '<span class="lv-mapped">→' + esc(map[lvl]) + '</span>' : '') +
+				'</button>'
+			);
+		})
+		.join('');
+
+	const valueRows = levels
+		.map((lvl) => {
+			const raw = map[lvl];
+			const val = typeof raw === 'string' ? raw : '';
+			const off = !levelEnabled(map, lvl);
+			return (
+				'<label class="lv-valrow' + (off ? ' disabled' : '') + '"><span>' + esc(lvl) + '</span>' +
+				'<input type="text" placeholder="' + esc(lvl) + '" value="' + esc(val) + '" data-lvval="' + esc(lvl) + '"' + (off ? ' disabled' : '') + ' /></label>'
+			);
+		})
+		.join('');
+
+	wrap.innerHTML =
+		'<button type="button" class="lv-summary" data-lv-toggle>' +
+		'<span class="lv-caret">' + (open ? '▾' : '▸') + '</span>' +
+		'<span class="lv-title">' + esc(t('settings.models.levels')) + '</span>' +
+		'<span class="lv-range">' + esc(summarizeLevels(levelsFromMap(map))) + '</span>' +
+		'</button>' +
+		'<div class="lv-body' + (open ? '' : ' hidden') + '">' +
+		'<div class="lv-hint">' + esc(t('settings.models.levelsHint')) + '</div>' +
+		'<div class="lv-chips">' + chips + '</div>' +
+		(binary ? '<div class="lv-hint warn">' + esc(t('settings.models.levelsBinary')) + '</div>' : '') +
+		'<details class="lv-adv"><summary>' + esc(t('settings.models.levelsAdvanced')) + '</summary>' +
+		'<div class="lv-hint">' + esc(t('settings.models.levelsAdvancedHint')) + '</div>' +
+		'<div class="lv-values">' + valueRows + '</div>' +
+		'</details>' +
+		'</div>';
+
+	const rerender = () => {
+		renderLevelsBlock(wrap, provName, idx, model);
+		updateSaveBar();
+		const card = wrap.closest('.provider-card');
+		if (card) card.classList.toggle('dirty', provDirty(provName));
+	};
+
+	const toggleBtn = q(wrap, '[data-lv-toggle]');
+	if (toggleBtn) {
+		toggleBtn.addEventListener('click', () => {
+			if (expandedLevels.has(key)) expandedLevels.delete(key);
+			else expandedLevels.add(key);
+			renderLevelsBlock(wrap, provName, idx, model);
+		});
+	}
+	qa(wrap, '.lv-chip').forEach((chip: any) => {
+		chip.addEventListener('click', () => {
+			const lvl = chip.getAttribute('data-lv');
+			setLevelEnabled(model, lvl, !levelEnabled(model.thinkingLevelMap || {}, lvl));
+			rerender();
+		});
+	});
+	qa(wrap, 'input[data-lvval]').forEach((input: any) => {
+		// Commit on blur/Enter, not per keystroke: re-rendering mid-typing would
+		// yank focus out of the field.
+		const commit = () => {
+			setLevelValue(model, input.getAttribute('data-lvval'), input.value);
+			rerender();
+		};
+		input.addEventListener('change', commit);
+		input.addEventListener('keydown', (e: any) => {
+			if (e.key === 'Enter') commit();
+		});
+	});
+}
+
 function renderModelRows(container: any, provName: any, models: any) {
 	container.innerHTML = '';
 	if (models.length === 0) {
@@ -403,6 +537,16 @@ function renderModelRows(container: any, provName: any, models: any) {
 			'<div class="tf-cell"><select title="' + esc(t('settings.models.thinkingFormatTitle')) + '" data-mp="' + esc(provName) + '" data-mi="' + idx + '" data-mf="thinkingFormat"' + (m.reasoning ? '' : ' style="display:none"') + '>' + thinkingFormatOptionsHtml(tf) + '</select></div>' +
 			'<button class="danger" data-del-model="' + esc(provName) + '" data-mi="' + idx + '" title="' + esc(t('settings.providers.remove')) + '">✕</button>';
 		container.appendChild(row);
+		// Thinking-level editor: its own full-width strip under the row (the row
+		// itself is a fixed 7-column grid). Meaningless without reasoning, so it
+		// follows the same visibility rule as the thinking-format dropdown.
+		const levels = document.createElement('div');
+		levels.className = 'model-levels';
+		levels.setAttribute('data-mp', provName);
+		levels.setAttribute('data-mi', String(idx));
+		if (!m.reasoning) levels.classList.add('hidden');
+		renderLevelsBlock(levels, provName, idx, m);
+		container.appendChild(levels);
 	});
 	qa(container, '[data-mf]').forEach((el: any) => {
 		const isCheckbox = el.type === 'checkbox';
@@ -433,12 +577,25 @@ function renderModelRows(container: any, provName: any, models: any) {
 			} else {
 				model[f] = isCheckbox ? el.checked : el.value;
 			}
-			// Reasoning toggle controls whether the thinking-format dropdown is
-			// shown (it's meaningless for non-reasoning models).
+			// Reasoning toggle controls whether the thinking-format dropdown and
+			// the level editor are shown (both are meaningless without it).
 			if (f === 'reasoning') {
 				const row = el.closest('.model-row-card');
 				const sel = row && q(row, 'select[data-mf="thinkingFormat"]');
 				if (sel) sel.style.display = el.checked ? '' : 'none';
+				const levels = row && row.nextElementSibling;
+				if (levels && levels.classList.contains('model-levels')) {
+					levels.classList.toggle('hidden', !el.checked);
+				}
+			}
+			// The format decides whether levels are leveled or binary — re-render
+			// the editor so its hint matches.
+			if (f === 'thinkingFormat') {
+				const row = el.closest('.model-row-card');
+				const levels = row && row.nextElementSibling;
+				if (levels && levels.classList.contains('model-levels')) {
+					renderLevelsBlock(levels, p, i, model);
+				}
 			}
 			// id change can rename a model — any mode pinned to the old id
 			// loses its target and needs fallback.

@@ -532,3 +532,94 @@ th {
 }
 .oauth-usage-row .cu-pct { min-width: 34px; text-align: right; }
 .oauth-usage-row .cu-reset { color: var(--vscode-descriptionForeground); }
+
+/* ── Per-model thinking-level editor (settings.ts renderLevelsBlock) ────────
+   Full-width strip under a model row: a one-line summary that expands into
+   level chips plus an advanced per-level "value sent" section. */
+.model-levels {
+	grid-column: 1 / -1;
+	margin: -2px 0 8px 36px;
+}
+.model-levels.hidden { display: none; }
+
+.lv-summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent;
+	border: none;
+	padding: 2px 4px;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	cursor: pointer;
+	border-radius: 3px;
+}
+.lv-summary:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+	color: var(--vscode-foreground);
+}
+.lv-caret { font-size: 9px; width: 8px; }
+.lv-title { text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+.lv-range {
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-foreground);
+}
+
+.lv-body {
+	padding: 6px 4px 4px 12px;
+	border-left: 1px solid var(--vscode-panel-border);
+	margin-left: 4px;
+}
+.lv-body.hidden { display: none; }
+
+.lv-hint {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 6px;
+}
+.lv-hint.warn { color: var(--vscode-charts-orange, #e0a030); margin: 6px 0 0; }
+
+.lv-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lv-chip {
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 10px;
+	padding: 2px 9px;
+	font-size: 11px;
+	cursor: pointer;
+	text-decoration: line-through;
+	opacity: 0.65;
+}
+.lv-chip:hover { border-color: var(--vscode-focusBorder); opacity: 1; }
+.lv-chip.on {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border-color: transparent;
+	text-decoration: none;
+	opacity: 1;
+}
+.lv-mapped { margin-left: 4px; opacity: 0.8; font-family: var(--vscode-editor-font-family, monospace); }
+
+.lv-adv { margin-top: 8px; }
+.lv-adv > summary {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	user-select: none;
+}
+.lv-adv > summary:hover { color: var(--vscode-foreground); }
+.lv-adv[open] > summary { margin-bottom: 6px; }
+
+.lv-values {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 4px 10px;
+}
+.lv-valrow { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.lv-valrow > span {
+	min-width: 52px;
+	color: var(--vscode-descriptionForeground);
+}
+.lv-valrow.disabled { opacity: 0.45; }
+.lv-valrow input { flex: 1; min-width: 0; }
