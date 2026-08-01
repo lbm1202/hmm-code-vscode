@@ -7,6 +7,17 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.17] — 2026-08-01
+
+Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.14.
+
+### Added
+- **Thinking levels are editable per model** (Settings → Models). Each reasoning model gets a one-line summary — `off–high` — that expands into chips for the whole ladder (`off · minimal · low · medium · high · xhigh · max`): click to offer or withhold a level. `xhigh` and `max` are opt-in by design (they aren't standard, and sending them blindly makes strict endpoints fail), which is why a custom model only offered levels up to `high` until now. An advanced section sets the value actually sent per level, for endpoints that use different words. Levels left at their default write nothing to `models.json`, so the file stays minimal.
+
+### Changed
+- **Review mode is now visible where the modes are listed** — the empty state reads `Plan · Code · Review · Debug · Ask`, and the README, user guide and settings reference cover the fifth mode along with the implementation → review handoff.
+- The user guide's "opening a chat" and session sections were rewritten for the 0.1.16 layout (sidebar session list, chat in editor tabs), and the command names in the docs match the palette again.
+
 ## [0.1.16] — 2026-08-01
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.14. The sidebar is now a session browser and chat always opens as an editor tab.
