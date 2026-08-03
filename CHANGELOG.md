@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.19] — 2026-08-03
+
+Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.15.
+
+### Changed
+- **A new Claude subscription now starts on Opus 5.** The first-run preset filled `plan` and `review` with Opus 4.8 — the newest Opus the previous runtime knew about. It writes `claude-opus-5` now; `code` / `debug` / `ask` stay on Sonnet 5. Modes you already configured are still never touched, and the preset still only writes a model the live catalogue actually offers, so a plan without Opus 5 access leaves the mode empty rather than pinning an id that can't run.
+
 ## [0.1.18] — 2026-08-03
 
 Bundles Pi runtime 0.83.0 (was 0.80.6) + hmm-code-pi 0.1.15.
