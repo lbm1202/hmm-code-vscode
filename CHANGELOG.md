@@ -7,6 +7,24 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.18] — 2026-08-03
+
+Bundles Pi runtime 0.83.0 (was 0.80.6) + hmm-code-pi 0.1.15.
+
+### ✨ Highlights
+- **Claude Opus 5 is selectable.** It simply wasn't in the bundled runtime's model catalog before.
+
+### Added
+- **Claude Opus 5** in the model pickers (adaptive thinking with `xhigh` / `max`, 1M context), along with everything else the newer runtime brings: Kimi K3 across the built-in providers, OpenRouter and Kimi Code sign-in from `/login`, llama.cpp model management, and Qwen Token Plan providers.
+
+### Changed
+- **Bundled Pi runtime updated 0.80.6 → 0.83.0.** Also picks up more resilient compaction (transient provider failures now follow the retry policy), OAuth credentials refreshing before they expire rather than after, and stricter provider-error surfacing — an unmapped terminal stream state is now reported as an error instead of quietly ending a turn as if it succeeded.
+- Keyless custom providers keep working on the new runtime, which removed the registry internal the previous fix relied on (see hmm-code-pi 0.1.15). Verified end to end: a `models.json` provider with no API key is listed, selectable, and applies as a mode's model.
+- `marked` 18.0.6 → 18.0.7.
+
+### ⚠️ Known issues / notes
+- The bundled runtime pins `brace-expansion` 5.0.7 through its own shrinkwrap (GHSA-mh99-v99m-4gvg, a denial-of-service on maliciously crafted brace patterns). The pin is upstream's and cannot be overridden from here; it moved 5.0.6 → 5.0.7 with this update and is not reachable from untrusted input in normal use.
+
 ## [0.1.17] — 2026-08-01
 
 Bundles Pi runtime 0.80.6 + hmm-code-pi 0.1.14.
