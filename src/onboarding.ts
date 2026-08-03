@@ -56,12 +56,12 @@ export function noAuthDetected(): boolean {
  *  planning/verification on the flagship, implementation/queries on the
  *  faster (and subscription-cheaper) tier. */
 const MODE_PRESETS: Record<string, { planReview: string; rest: string }> = {
-	anthropic: { planReview: "claude-opus-4-8", rest: "claude-sonnet-5" },
+	anthropic: { planReview: "claude-opus-5", rest: "claude-sonnet-5" },
 	"openai-codex": { planReview: "gpt-5.6", rest: "gpt-5.5" },
 };
 
 export interface PresetApplied {
-	/** e.g. { "plan · review": "claude-opus-4-8", "code · debug · ask": "claude-sonnet-5" } */
+	/** e.g. { "plan · review": "claude-opus-5", "code · debug · ask": "claude-sonnet-5" } */
 	groups: { modes: string[]; model: string }[];
 }
 
