@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.21] — 2026-09-03
+
+Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.17.
+
+### Changed
+- **Code mode's prompt now has a single work loop.** The "build incrementally" and "task management" sections overlapped, and the agent tended to follow the first and leave the todo list to catch up on later. They are merged into one numbered per-item loop (in_progress → implement → verify → completed + next in_progress) placed at the top of the code-mode prompt; the remaining scope / environment / acceptance-pass guidance sits below it. Nothing removed. See hmm-code-pi 0.1.17.
+
 ## [0.1.20] — 2026-09-03
 
 Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.16.
