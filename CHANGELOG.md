@@ -7,6 +7,13 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.20] — 2026-09-03
+
+Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.16.
+
+### Changed
+- **Task list updates are cheap now, and code mode is told to make them one task at a time.** Marking a single todo done used to mean re-sending the whole list, so the agent tended to defer updates and then tick several items at once at the end. `todo_write` now takes incremental `updates` / `append` merged into the current list (the pinned todo panel keeps showing the full list), the list survives a session resume, and the code-mode prompt is rewritten as a per-task loop: in_progress → implement → verify → completed plus the next task in one call. See hmm-code-pi 0.1.16.
+
 ## [0.1.19] — 2026-08-03
 
 Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.15.
