@@ -7,6 +7,10 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+## [0.1.22] — 2026-09-03
+
+Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.18.
+
 ### Changed
 - **`todo_write` calls read as actions in the chat.** The header now carries an operation badge — "New list · 8 items", "Update" with the flipped items (`#6 ☑  #7 ▶`), or "Append · 2 items" — instead of the raw arguments JSON that the incremental form used to show, and after the call succeeds the merged list's `n/m` progress appears on the same line (the arguments alone can't tell it for an update). Localized (en/ko).
 
