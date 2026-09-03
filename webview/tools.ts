@@ -80,11 +80,12 @@ export function buildToolCallBlock(
 	// (b) not a known built-in (those have a clean summary), and (c) >1 key
 	// worth showing. For typical { path } / { command } args the summary
 	// already conveys everything; a JSON pre below would be pure noise.
+	// Exception: a malformed todo_write call (the tool will reject it) shows
+	// its raw args so the user can see what actually went wrong.
 	if (
 		args !== undefined &&
-		!INTERACTIVE_TOOLS.has(toolName) &&
-		!BUILT_IN_PRETTY.has(toolName) &&
-		shouldShowArgsBlock(args)
+		((!INTERACTIVE_TOOLS.has(toolName) && !BUILT_IN_PRETTY.has(toolName) && shouldShowArgsBlock(args)) ||
+			(toolName === "todo_write" && todoSummaryParts(args).malformed))
 	) {
 		const pre = document.createElement("pre");
 		pre.className = "tool-input";
@@ -484,6 +485,15 @@ function filePathFromArgs(toolName: string, args: any): string | undefined {
  *  summary text in a `.file-link` span so Ctrl/Cmd-click can open the file —
  *  events.ts has the global capture handler. */
 export function summaryHtmlForTool(toolName: string, args: any): string {
+	// todo_write: operation badge (new list / update / append) + compact detail,
+	// so the header reads as an action rather than the raw args JSON.
+	if (toolName === "todo_write") {
+		const p = todoSummaryParts(args);
+		return (
+			`<span class="tool-op${p.malformed ? " tool-op-bad" : ""}">${escapeHtml(p.op)}</span>` +
+			(p.detail ? `<span class="tool-args-inline">${escapeHtml(p.detail)}</span>` : "")
+		);
+	}
 	const text = summaryForTool(toolName, args);
 	if (!text) return "";
 	const path = filePathFromArgs(toolName, args);
@@ -521,14 +531,67 @@ function interactiveSummaryArgs(toolName: string, args: any): string {
 	if (toolName === "finalize_plan" || toolName === "finalize_implementation") {
 		return String(args?.summary ?? "").slice(0, 60);
 	}
-	if (toolName === "todo_write" && Array.isArray(args?.todos)) {
-		const todos = args.todos;
-		const done = todos.filter((t: any) => t?.status === "completed").length;
-		const inProg = todos.find((t: any) => t?.status === "in_progress");
-		const label = inProg ? `· ${String(inProg.content ?? "").slice(0, 40)}` : "";
-		return `${done}/${todos.length} ${label}`.trim();
+	if (toolName === "todo_write") {
+		const p = todoSummaryParts(args);
+		return p.detail ? `${p.op} · ${p.detail}` : p.op;
 	}
 	return "";
+}
+
+const TODO_ICON: Record<string, string> = {
+	pending: "☐",
+	in_progress: "▶",
+	completed: "☑",
+	cancelled: "✕",
+};
+
+/** Accept an array, or a JSON string encoding one (models occasionally
+ *  stringify the argument). null = absent, "bad" = present but unusable. */
+function todoArgArray(v: unknown): any[] | null | "bad" {
+	if (v === undefined || v === null) return null;
+	if (Array.isArray(v)) return v;
+	if (typeof v === "string") {
+		try {
+			const parsed = JSON.parse(v);
+			return Array.isArray(parsed) ? parsed : "bad";
+		} catch {
+			return "bad";
+		}
+	}
+	return "bad";
+}
+
+/** todo_write call summary: which operation the call performs (full list /
+ *  incremental update / append — see hmm-code-pi todo.ts) plus a compact
+ *  detail line. `malformed` flags args the tool will reject (e.g. a truncated
+ *  JSON string) so the block can expose the raw args for diagnosis. */
+export function todoSummaryParts(args: any): { op: string; detail: string; malformed: boolean } {
+	const todos = todoArgArray(args?.todos);
+	const updates = todoArgArray(args?.updates);
+	const append = todoArgArray(args?.append);
+	if (todos === "bad" || updates === "bad" || append === "bad") {
+		return { op: t("tool.todo.malformed"), detail: "", malformed: true };
+	}
+	if (todos) {
+		const inProg = todos.find((x) => x?.status === "in_progress");
+		const detail = inProg ? `▶ ${String(inProg.content ?? "").slice(0, 40)}` : "";
+		return { op: t("tool.todo.new", { n: todos.length }), detail, malformed: false };
+	}
+	if (updates) {
+		const flips = updates
+			.map((u) => {
+				const icon = u?.status ? (TODO_ICON[u.status] ?? String(u.status)) : u?.content ? "✎" : "";
+				return `#${u?.index ?? "?"} ${icon}`.trim();
+			})
+			.join("  ");
+		const extra = append ? ` · ${t("tool.todo.plus", { n: append.length })}` : "";
+		return { op: t("tool.todo.update"), detail: flips + extra, malformed: false };
+	}
+	if (append) {
+		const first = String(append[0]?.content ?? "").slice(0, 40);
+		return { op: t("tool.todo.append", { n: append.length }), detail: first, malformed: false };
+	}
+	return { op: t("tool.todo.malformed"), detail: "", malformed: true };
 }
 
 /** Render incremental partial output for a running tool (e.g. streaming bash).
@@ -561,12 +624,19 @@ export function updateToolResult(toolCallId: string, ok: boolean, output: unknow
 
 	const toolName = block.dataset.toolName ?? "";
 
-	// Pinned-todo mode: the full list lives in the top panel (todo-panel.ts), so
-	// the in-stream todo_write block stays collapsed to its one-line summary.
-	if (toolName === "todo_write" && todoPanelEnabled) {
-		block.querySelector(".tool-result-streaming")?.remove();
-		(block as HTMLDetailsElement).open = false;
-		return;
+	// todo_write success: the header gets the merged list's n/m progress (the
+	// args alone can't tell it for an incremental update). In pinned-todo mode
+	// the full list lives in the top panel (todo-panel.ts), so the in-stream
+	// block stays collapsed to its one-line summary. Errors fall through so the
+	// rejection reason is rendered and readable on click.
+	if (toolName === "todo_write" && ok) {
+		const todos = (output as any)?.details?.todos;
+		if (Array.isArray(todos) && todos.length) appendSummaryHint(block, todoProgressLabel(todos));
+		if (todoPanelEnabled) {
+			block.querySelector(".tool-result-streaming")?.remove();
+			(block as HTMLDetailsElement).open = false;
+			return;
+		}
 	}
 
 	// 1. Interactive-tool pretty renderer (ask_user / todo_write / etc.)

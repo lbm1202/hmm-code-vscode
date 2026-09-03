@@ -731,6 +731,23 @@ body.mod-down .bash-cmd-link:hover {
 }
 
 /* todo_write rendering */
+.tool-op {
+	font-size: 10px;
+	line-height: 16px;
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+.tool-op-bad {
+	background: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.2));
+	color: var(--vscode-errorForeground, #f48771);
+}
+.tool-result-err .status-text {
+	white-space: pre-wrap;
+}
 .todo-header {
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);

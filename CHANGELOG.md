@@ -7,6 +7,12 @@ Releases are produced by `.github/workflows/release.yml` — push a `vX.Y.Z` tag
 
 ## [Unreleased]
 
+### Changed
+- **`todo_write` calls read as actions in the chat.** The header now carries an operation badge — "New list · 8 items", "Update" with the flipped items (`#6 ☑  #7 ▶`), or "Append · 2 items" — instead of the raw arguments JSON that the incremental form used to show, and after the call succeeds the merged list's `n/m` progress appears on the same line (the arguments alone can't tell it for an update). Localized (en/ko).
+
+### Fixed
+- **A rejected `todo_write` now shows why.** With the pinned todo panel on, the in-stream block was collapsed unconditionally, so a failed call was just a red dot with nothing to expand. Errors now render the rejection text, and a call whose arguments are malformed (an array sent as a JSON string, typically cut off mid-output) is flagged in the header and shows its raw arguments for diagnosis.
+
 ## [0.1.21] — 2026-09-03
 
 Bundles Pi runtime 0.83.0 + hmm-code-pi 0.1.17.
